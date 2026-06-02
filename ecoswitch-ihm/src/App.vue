@@ -187,6 +187,52 @@ onMounted(() => {
 
 <template>
   <div class="app-root flex flex-column min-h-screen">
+
+    <!-- Décor de fond : icônes flottantes thématiques -->
+    <div class="bg-decor" aria-hidden="true">
+
+      <!-- === VOITURES (10) === -->
+      <svg class="bg-icon bg-car" style="--x:3%;--y:8%;--s:5rem;--r:-12deg;--d:0s;--op:0.09" viewBox="0 0 24 24" fill="currentColor"><path d="M19 10l-1.5-3.5C17.2 5.8 16.5 5.3 15.7 5.3H8.3C7.5 5.3 6.8 5.8 6.5 6.5L5 10H3c-.6 0-1 .4-1 1v4c0 .6.4 1 1 1h1.1c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3h.2c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3H21c.6 0 1-.4 1-1v-4c0-.6-.4-1-1-1h-2z"/><circle cx="8" cy="16" r="2"/><circle cx="16" cy="16" r="2"/></svg>
+      <svg class="bg-icon bg-car" style="--x:85%;--y:5%;--s:4rem;--r:8deg;--d:3s;--op:0.08" viewBox="0 0 24 24" fill="currentColor"><path d="M19 10l-1.5-3.5C17.2 5.8 16.5 5.3 15.7 5.3H8.3C7.5 5.3 6.8 5.8 6.5 6.5L5 10H3c-.6 0-1 .4-1 1v4c0 .6.4 1 1 1h1.1c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3h.2c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3H21c.6 0 1-.4 1-1v-4c0-.6-.4-1-1-1h-2z"/><circle cx="8" cy="16" r="2"/><circle cx="16" cy="16" r="2"/></svg>
+      <svg class="bg-icon bg-car" style="--x:40%;--y:68%;--s:6rem;--r:5deg;--d:6s;--op:0.07" viewBox="0 0 24 24" fill="currentColor"><path d="M19 10l-1.5-3.5C17.2 5.8 16.5 5.3 15.7 5.3H8.3C7.5 5.3 6.8 5.8 6.5 6.5L5 10H3c-.6 0-1 .4-1 1v4c0 .6.4 1 1 1h1.1c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3h.2c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3H21c.6 0 1-.4 1-1v-4c0-.6-.4-1-1-1h-2z"/><circle cx="8" cy="16" r="2"/><circle cx="16" cy="16" r="2"/></svg>
+      <svg class="bg-icon bg-car" style="--x:68%;--y:50%;--s:3.5rem;--r:-18deg;--d:9s;--op:0.08" viewBox="0 0 24 24" fill="currentColor"><path d="M19 10l-1.5-3.5C17.2 5.8 16.5 5.3 15.7 5.3H8.3C7.5 5.3 6.8 5.8 6.5 6.5L5 10H3c-.6 0-1 .4-1 1v4c0 .6.4 1 1 1h1.1c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3h.2c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3H21c.6 0 1-.4 1-1v-4c0-.6-.4-1-1-1h-2z"/><circle cx="8" cy="16" r="2"/><circle cx="16" cy="16" r="2"/></svg>
+      <svg class="bg-icon bg-car" style="--x:18%;--y:82%;--s:4.5rem;--r:10deg;--d:1.5s;--op:0.085" viewBox="0 0 24 24" fill="currentColor"><path d="M19 10l-1.5-3.5C17.2 5.8 16.5 5.3 15.7 5.3H8.3C7.5 5.3 6.8 5.8 6.5 6.5L5 10H3c-.6 0-1 .4-1 1v4c0 .6.4 1 1 1h1.1c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3h.2c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3H21c.6 0 1-.4 1-1v-4c0-.6-.4-1-1-1h-2z"/><circle cx="8" cy="16" r="2"/><circle cx="16" cy="16" r="2"/></svg>
+      <svg class="bg-icon bg-car" style="--x:52%;--y:20%;--s:3rem;--r:-5deg;--d:4s;--op:0.07" viewBox="0 0 24 24" fill="currentColor"><path d="M19 10l-1.5-3.5C17.2 5.8 16.5 5.3 15.7 5.3H8.3C7.5 5.3 6.8 5.8 6.5 6.5L5 10H3c-.6 0-1 .4-1 1v4c0 .6.4 1 1 1h1.1c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3h.2c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3H21c.6 0 1-.4 1-1v-4c0-.6-.4-1-1-1h-2z"/><circle cx="8" cy="16" r="2"/><circle cx="16" cy="16" r="2"/></svg>
+      <svg class="bg-icon bg-car" style="--x:90%;--y:78%;--s:5.5rem;--r:15deg;--d:12s;--op:0.075" viewBox="0 0 24 24" fill="currentColor"><path d="M19 10l-1.5-3.5C17.2 5.8 16.5 5.3 15.7 5.3H8.3C7.5 5.3 6.8 5.8 6.5 6.5L5 10H3c-.6 0-1 .4-1 1v4c0 .6.4 1 1 1h1.1c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3h.2c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3H21c.6 0 1-.4 1-1v-4c0-.6-.4-1-1-1h-2z"/><circle cx="8" cy="16" r="2"/><circle cx="16" cy="16" r="2"/></svg>
+      <svg class="bg-icon bg-car" style="--x:25%;--y:35%;--s:3.8rem;--r:-22deg;--d:7s;--op:0.065" viewBox="0 0 24 24" fill="currentColor"><path d="M19 10l-1.5-3.5C17.2 5.8 16.5 5.3 15.7 5.3H8.3C7.5 5.3 6.8 5.8 6.5 6.5L5 10H3c-.6 0-1 .4-1 1v4c0 .6.4 1 1 1h1.1c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3h.2c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3H21c.6 0 1-.4 1-1v-4c0-.6-.4-1-1-1h-2z"/><circle cx="8" cy="16" r="2"/><circle cx="16" cy="16" r="2"/></svg>
+      <svg class="bg-icon bg-car" style="--x:75%;--y:88%;--s:4.2rem;--r:3deg;--d:10s;--op:0.08" viewBox="0 0 24 24" fill="currentColor"><path d="M19 10l-1.5-3.5C17.2 5.8 16.5 5.3 15.7 5.3H8.3C7.5 5.3 6.8 5.8 6.5 6.5L5 10H3c-.6 0-1 .4-1 1v4c0 .6.4 1 1 1h1.1c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3h.2c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3H21c.6 0 1-.4 1-1v-4c0-.6-.4-1-1-1h-2z"/><circle cx="8" cy="16" r="2"/><circle cx="16" cy="16" r="2"/></svg>
+      <svg class="bg-icon bg-car" style="--x:47%;--y:44%;--s:2.8rem;--r:-8deg;--d:15s;--op:0.06" viewBox="0 0 24 24" fill="currentColor"><path d="M19 10l-1.5-3.5C17.2 5.8 16.5 5.3 15.7 5.3H8.3C7.5 5.3 6.8 5.8 6.5 6.5L5 10H3c-.6 0-1 .4-1 1v4c0 .6.4 1 1 1h1.1c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3h.2c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3H21c.6 0 1-.4 1-1v-4c0-.6-.4-1-1-1h-2z"/><circle cx="8" cy="16" r="2"/><circle cx="16" cy="16" r="2"/></svg>
+
+      <!-- === RECYCLAGE (8) === -->
+      <svg class="bg-icon bg-recycle" style="--x:12%;--y:38%;--s:4.5rem;--r:0deg;--d:2s;--op:0.09" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.5 6H7l2.3 3.9-1.1 1.9L4 5.5 1 11l3.5.5L3 14h6.3L12 19l2.7-5H21l-1.5-3 3.5-.5-3-5.5-4.2 6.3-1.1-1.9L18.9 6H16.5L14 2h-2z"/></svg>
+      <svg class="bg-icon bg-recycle" style="--x:78%;--y:28%;--s:3.5rem;--r:30deg;--d:7s;--op:0.085" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.5 6H7l2.3 3.9-1.1 1.9L4 5.5 1 11l3.5.5L3 14h6.3L12 19l2.7-5H21l-1.5-3 3.5-.5-3-5.5-4.2 6.3-1.1-1.9L18.9 6H16.5L14 2h-2z"/></svg>
+      <svg class="bg-icon bg-recycle" style="--x:58%;--y:80%;--s:5rem;--r:-10deg;--d:4.5s;--op:0.08" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.5 6H7l2.3 3.9-1.1 1.9L4 5.5 1 11l3.5.5L3 14h6.3L12 19l2.7-5H21l-1.5-3 3.5-.5-3-5.5-4.2 6.3-1.1-1.9L18.9 6H16.5L14 2h-2z"/></svg>
+      <svg class="bg-icon bg-recycle" style="--x:33%;--y:18%;--s:3rem;--r:45deg;--d:11s;--op:0.075" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.5 6H7l2.3 3.9-1.1 1.9L4 5.5 1 11l3.5.5L3 14h6.3L12 19l2.7-5H21l-1.5-3 3.5-.5-3-5.5-4.2 6.3-1.1-1.9L18.9 6H16.5L14 2h-2z"/></svg>
+      <svg class="bg-icon bg-recycle" style="--x:62%;--y:12%;--s:4rem;--r:-20deg;--d:5s;--op:0.08" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.5 6H7l2.3 3.9-1.1 1.9L4 5.5 1 11l3.5.5L3 14h6.3L12 19l2.7-5H21l-1.5-3 3.5-.5-3-5.5-4.2 6.3-1.1-1.9L18.9 6H16.5L14 2h-2z"/></svg>
+      <svg class="bg-icon bg-recycle" style="--x:2%;--y:60%;--s:5.5rem;--r:15deg;--d:8s;--op:0.07" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.5 6H7l2.3 3.9-1.1 1.9L4 5.5 1 11l3.5.5L3 14h6.3L12 19l2.7-5H21l-1.5-3 3.5-.5-3-5.5-4.2 6.3-1.1-1.9L18.9 6H16.5L14 2h-2z"/></svg>
+      <svg class="bg-icon bg-recycle" style="--x:88%;--y:45%;--s:3.8rem;--r:-35deg;--d:13s;--op:0.085" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.5 6H7l2.3 3.9-1.1 1.9L4 5.5 1 11l3.5.5L3 14h6.3L12 19l2.7-5H21l-1.5-3 3.5-.5-3-5.5-4.2 6.3-1.1-1.9L18.9 6H16.5L14 2h-2z"/></svg>
+      <svg class="bg-icon bg-recycle" style="--x:44%;--y:92%;--s:4.5rem;--r:25deg;--d:16s;--op:0.07" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.5 6H7l2.3 3.9-1.1 1.9L4 5.5 1 11l3.5.5L3 14h6.3L12 19l2.7-5H21l-1.5-3 3.5-.5-3-5.5-4.2 6.3-1.1-1.9L18.9 6H16.5L14 2h-2z"/></svg>
+
+      <!-- === DEVISES (17) === -->
+      <span class="bg-icon bg-currency" style="--x:91%;--y:60%;--s:5.5rem;--r:-5deg;--d:0.5s;--op:0.1">€</span>
+      <span class="bg-icon bg-currency" style="--x:2%;--y:63%;--s:4.5rem;--r:12deg;--d:5s;--op:0.09">$</span>
+      <span class="bg-icon bg-currency" style="--x:49%;--y:3%;--s:3.5rem;--r:-8deg;--d:8s;--op:0.085">€</span>
+      <span class="bg-icon bg-currency" style="--x:27%;--y:52%;--s:5rem;--r:20deg;--d:3.5s;--op:0.08">$</span>
+      <span class="bg-icon bg-currency" style="--x:69%;--y:16%;--s:4rem;--r:-18deg;--d:10s;--op:0.09">€</span>
+      <span class="bg-icon bg-currency" style="--x:7%;--y:88%;--s:5rem;--r:5deg;--d:2.5s;--op:0.08">$</span>
+      <span class="bg-icon bg-currency" style="--x:54%;--y:42%;--s:3rem;--r:-25deg;--d:13s;--op:0.075">€</span>
+      <span class="bg-icon bg-currency" style="--x:81%;--y:90%;--s:4.5rem;--r:15deg;--d:7.5s;--op:0.085">$</span>
+      <span class="bg-icon bg-currency" style="--x:38%;--y:5%;--s:3.5rem;--r:-12deg;--d:6s;--op:0.08">$</span>
+      <span class="bg-icon bg-currency" style="--x:15%;--y:18%;--s:4rem;--r:22deg;--d:9s;--op:0.09">€</span>
+      <span class="bg-icon bg-currency" style="--x:72%;--y:72%;--s:3.8rem;--r:-8deg;--d:14s;--op:0.08">$</span>
+      <span class="bg-icon bg-currency" style="--x:30%;--y:95%;--s:4.5rem;--r:18deg;--d:1s;--op:0.075">€</span>
+      <span class="bg-icon bg-currency" style="--x:94%;--y:25%;--s:3.5rem;--r:-15deg;--d:11s;--op:0.085">$</span>
+      <span class="bg-icon bg-currency" style="--x:55%;--y:58%;--s:5rem;--r:30deg;--d:17s;--op:0.07">€</span>
+      <span class="bg-icon bg-currency" style="--x:20%;--y:65%;--s:3rem;--r:-20deg;--d:4s;--op:0.08">$</span>
+      <span class="bg-icon bg-currency" style="--x:83%;--y:12%;--s:4.8rem;--r:10deg;--d:18s;--op:0.075">€</span>
+      <span class="bg-icon bg-currency" style="--x:10%;--y:45%;--s:3.5rem;--r:-30deg;--d:20s;--op:0.085">$</span>
+    </div>
+
     <!-- Navbar Premium -->
     <header class="navbar-glass py-3 px-4 flex-between sticky-top">
       <div class="brand flex-center gap-2">
@@ -283,7 +329,7 @@ onMounted(() => {
     </footer>
 
     <!-- Barre de Navigation Basse sur Mobile (Style Snapchat/Instagram) -->
-    <nav class="mobile-bottom-nav hide-on-desktop">
+    <nav class="mobile-bottom-nav">
       <button class="mobile-nav-btn" :class="activeTab === 'direct' ? 'active' : ''" @click="setTab('direct')" title="Simulateur direct">
         <HelpCircle size="22" />
       </button>
@@ -363,6 +409,73 @@ onMounted(() => {
 </template>
 
 <style>
+/* =============================================
+   BACKGROUND DECORATIVE LAYER
+   ============================================= */
+.bg-decor {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.bg-icon {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  font-size: var(--s);
+  width: var(--s);
+  height: var(--s);
+  transform: rotate(var(--r));
+  opacity: var(--op);
+  animation: bg-float 20s ease-in-out infinite;
+  animation-delay: var(--d);
+  user-select: none;
+  line-height: 1;
+}
+
+/* Voitures : couleur teal (accent principal) */
+.bg-car {
+  color: hsl(var(--accent-teal));
+}
+
+/* Recyclage : couleur cyan */
+.bg-recycle {
+  color: hsl(var(--accent-cyan));
+}
+
+/* Devises : dégradé entre teal et cyan via couleur ambre pour contraste */
+.bg-currency {
+  color: hsl(var(--accent-teal));
+  font-family: var(--font-heading);
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Alternance couleur sur les $ (pairs) */
+.bg-currency:nth-child(odd) {
+  color: hsl(var(--accent-cyan));
+}
+
+@keyframes bg-float {
+  0%   { transform: rotate(var(--r)) translateY(0px);   opacity: var(--op); }
+  30%  { opacity: calc(var(--op) * 1.5); }
+  50%  { transform: rotate(var(--r)) translateY(-18px);  opacity: var(--op); }
+  70%  { opacity: calc(var(--op) * 0.6); }
+  100% { transform: rotate(var(--r)) translateY(0px);   opacity: var(--op); }
+}
+
+/* S'assure que le contenu applicatif est au-dessus du décor */
+.app-root > header,
+.app-root > main,
+.app-root > footer {
+  position: relative;
+  z-index: 1;
+}
+
 /* App Root variables and resets */
 .min-h-screen { min-height: 100vh; }
 .flex { display: flex; }
@@ -655,6 +768,7 @@ onMounted(() => {
 }
 
 .mobile-bottom-nav {
+  display: none;
   position: fixed;
   bottom: 0;
   left: 0;
@@ -664,12 +778,17 @@ onMounted(() => {
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-top: 1px solid hsl(var(--border-glass));
-  display: flex;
   justify-content: space-around;
   align-items: center;
   z-index: 999;
   padding-bottom: env(safe-area-inset-bottom);
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+}
+
+@media (max-width: 768px) {
+  .mobile-bottom-nav {
+    display: flex;
+  }
 }
 
 .mobile-nav-btn {
