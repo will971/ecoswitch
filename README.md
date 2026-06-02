@@ -24,6 +24,30 @@ DEV/
   - Java 24 (API)
   - Node.js 22+ et npm (IHM)
 
+## Clonage du projet avec submodules
+
+### Option 1 (recommandee)
+Cloner directement le monorepo avec les submodules :
+
+```bash
+git clone --recurse-submodules https://github.com/will971/ecoswitch.git
+cd ecoswitch
+```
+
+### Option 2 (si le repo est deja clone)
+Initialiser les submodules apres un clone standard :
+
+```bash
+git submodule update --init --recursive
+```
+
+### Apres un `git pull`
+Mettre a jour les dossiers de submodules sur les commits references par le repo racine :
+
+```bash
+git submodule update --init --recursive
+```
+
 ## Demarrage rapide (recommande)
 
 Depuis la racine `DEV` :
