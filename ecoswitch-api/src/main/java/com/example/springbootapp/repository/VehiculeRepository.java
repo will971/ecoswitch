@@ -23,8 +23,8 @@ public class VehiculeRepository {
 	public Vehicule save(Vehicule vehicule) {
 		final String sql = """
 			INSERT INTO vehicule
-			(name, purchase_price, fuel_type, consumption, annual_mileage, insurance_cost, maintenance_cost, resale_value)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			(name, purchase_price, fuel_type, consumption, annual_mileage, insurance_cost, maintenance_cost, resale_value, url, visibility, created_by)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			""";
 		KeyHolder keyHolder = new GeneratedKeyHolder();
 		jdbcTemplate.update(connection -> {
@@ -37,6 +37,9 @@ public class VehiculeRepository {
 			statement.setDouble(6, vehicule.getInsuranceCost());
 			statement.setDouble(7, vehicule.getMaintenanceCost());
 			statement.setDouble(8, vehicule.getResaleValue());
+			statement.setString(9, vehicule.getUrl());
+			statement.setString(10, vehicule.getVisibility());
+			statement.setString(11, vehicule.getCreatedBy());
 			return statement;
 		}, keyHolder);
 
@@ -49,7 +52,7 @@ public class VehiculeRepository {
 
 	public List<Vehicule> findAll() {
 		final String sql = """
-			SELECT id, name, purchase_price, fuel_type, consumption, annual_mileage, insurance_cost, maintenance_cost, resale_value
+			SELECT id, name, purchase_price, fuel_type, consumption, annual_mileage, insurance_cost, maintenance_cost, resale_value, url, visibility, created_by
 			FROM vehicule
 			ORDER BY id DESC
 			""";
@@ -58,7 +61,7 @@ public class VehiculeRepository {
 
 	public Optional<Vehicule> findById(Long id) {
 		final String sql = """
-			SELECT id, name, purchase_price, fuel_type, consumption, annual_mileage, insurance_cost, maintenance_cost, resale_value
+			SELECT id, name, purchase_price, fuel_type, consumption, annual_mileage, insurance_cost, maintenance_cost, resale_value, url, visibility, created_by
 			FROM vehicule
 			WHERE id = ?
 			""";
@@ -70,7 +73,7 @@ public class VehiculeRepository {
 		final String sql = """
 			UPDATE vehicule
 			SET name = ?, purchase_price = ?, fuel_type = ?, consumption = ?, annual_mileage = ?, insurance_cost = ?,
-			    maintenance_cost = ?, resale_value = ?
+			    maintenance_cost = ?, resale_value = ?, url = ?, visibility = ?, created_by = ?
 			WHERE id = ?
 			""";
 		return jdbcTemplate.update(
@@ -83,6 +86,9 @@ public class VehiculeRepository {
 			vehicule.getInsuranceCost(),
 			vehicule.getMaintenanceCost(),
 			vehicule.getResaleValue(),
+			vehicule.getUrl(),
+			vehicule.getVisibility(),
+			vehicule.getCreatedBy(),
 			vehicule.getId()
 		);
 	}
@@ -103,6 +109,9 @@ public class VehiculeRepository {
 		vehicule.setInsuranceCost(resultSet.getDouble("insurance_cost"));
 		vehicule.setMaintenanceCost(resultSet.getDouble("maintenance_cost"));
 		vehicule.setResaleValue(resultSet.getDouble("resale_value"));
+		vehicule.setUrl(resultSet.getString("url"));
+		vehicule.setVisibility(resultSet.getString("visibility"));
+		vehicule.setCreatedBy(resultSet.getString("created_by"));
 		return vehicule;
 	}
 }

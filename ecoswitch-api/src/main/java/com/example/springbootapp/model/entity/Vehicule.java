@@ -47,6 +47,15 @@ public class Vehicule {
     private double resaleValue;
     // valeur estimée après X années (optionnel au début)
 
+    @Column(name = "url", length = 2000)
+    private String url;
+
+    @Column(name = "visibility", nullable = false, length = 20)
+    private String visibility = "PUBLIC";
+
+    @Column(name = "created_by", length = 320)
+    private String createdBy;
+
     public Long getId() {
         return id;
     }
@@ -83,6 +92,18 @@ public class Vehicule {
         return resaleValue;
     }
 
+    public String getUrl() {
+        return url;
+    }
+
+    public String getVisibility() {
+        return visibility;
+    }
+
+    public String getCreatedBy() {
+        return createdBy;
+    }
+
     public void setId(Long id) {
         this.id = id;
     }
@@ -117,6 +138,18 @@ public class Vehicule {
 
     public void setResaleValue(double resaleValue) {
         this.resaleValue = resaleValue;
+    }
+
+    public void setUrl(String url) {
+        this.url = url;
+    }
+
+    public void setVisibility(String visibility) {
+        this.visibility = visibility;
+    }
+
+    public void setCreatedBy(String createdBy) {
+        this.createdBy = createdBy;
     }
 
     public record VehicleCost(

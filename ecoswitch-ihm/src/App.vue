@@ -42,7 +42,7 @@ const checkSession = () => {
 
 /** Persiste la session après auth réussie */
 const persistSession = (userData) => {
-  const user = { name: userData.name, email: userData.email, plan: userData.plan }
+  const user = { name: userData.name, email: userData.email, plan: userData.plan, role: userData.role }
   localStorage.setItem('saas_token', userData.token)
   localStorage.setItem('saas_user', JSON.stringify(user))
   currentUser.value = user
@@ -315,7 +315,7 @@ onMounted(() => {
         <div :key="activeTab">
           <DirectSimulator v-if="activeTab === 'direct'" :loadedSimulation="loadedSimulation" :currentUser="currentUser" />
           <CatalogComparator v-else-if="activeTab === 'compare'" />
-          <VehicleManager v-else-if="activeTab === 'catalog'" />
+          <VehicleManager v-else-if="activeTab === 'catalog'" :currentUser="currentUser" />
           <SavedSimulations v-else-if="activeTab === 'saved' && currentUser" :currentUser="currentUser" @load-simulation="handleLoadSimulation" />
           
         </div>

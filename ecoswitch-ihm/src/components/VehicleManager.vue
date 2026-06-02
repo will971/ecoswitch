@@ -2,6 +2,13 @@
 import { ref, onMounted } from 'vue'
 import { Plus, Edit2, Trash2, Shield, Settings, Eye, HelpCircle, Save, X, Sparkles, Check, Info } from '@lucide/vue'
 
+const props = defineProps({
+  currentUser: {
+    type: Object,
+    default: null
+  }
+})
+
 const vehicles = ref([])
 const loading = ref(false)
 const error = ref(null)
@@ -20,14 +27,26 @@ const form = ref({
   annualMileage: 15000,
   insuranceCost: 600,
   maintenanceCost: 400,
-  resaleValue: 5000
+  resaleValue: 5000,
+  url: '',
+  visibility: 'PUBLIC'
 })
+
+const getHeaders = () => {
+  const token = localStorage.getItem('saas_token')
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+  }
+}
 
 const fetchVehicles = async () => {
   loading.value = true
   error.value = null
   try {
-    const response = await fetch('/api/v1/vehicules')
+    const response = await fetch('/api/v1/vehicules', {
+      headers: getHeaders()
+    })
     if (!response.ok) throw new Error('Impossible de charger le catalogue de véhicules.')
     vehicles.value = await response.json()
   } catch (err) {
@@ -48,7 +67,9 @@ const openAddForm = () => {
     annualMileage: 15000,
     insuranceCost: 650,
     maintenanceCost: 450,
-    resaleValue: 8000
+    resaleValue: 8000,
+    url: '',
+    visibility: 'PUBLIC'
   }
   formOpen.value = true
 }
@@ -56,7 +77,11 @@ const openAddForm = () => {
 const openEditForm = (vehicle) => {
   editMode.value = true
   activeVehicleId.value = vehicle.id
-  form.value = { ...vehicle }
+  form.value = { 
+    ...vehicle,
+    url: vehicle.url || '',
+    visibility: vehicle.visibility || 'PUBLIC'
+  }
   formOpen.value = true
 }
 
@@ -71,7 +96,7 @@ const saveVehicle = async () => {
 
     const response = await fetch(url, {
       method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHeaders(),
       body: JSON.stringify(form.value)
     })
 
@@ -99,7 +124,8 @@ const deleteVehicle = async (id) => {
 
   try {
     const response = await fetch(`/api/v1/vehicules/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: getHeaders()
     })
 
     if (!response.ok) {
@@ -145,6 +171,12 @@ const formatCurrency = (val) => {
   return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(val)
 }
 
+const goToVehicle = (url) => {
+  if (url) {
+    window.open(url, '_blank')
+  }
+}
+
 onMounted(() => {
   fetchVehicles()
 })
@@ -157,9 +189,12 @@ onMounted(() => {
         <h2 class="text-gradient mb-2">Catalogue des Véhicules</h2>
         <p class="text-muted">Gérez la base de données des véhicules disponibles pour vos comparaisons et analyses.</p>
       </div>
-      <button v-if="!formOpen" class="btn btn-primary" @click="openAddForm">
+      <button v-if="!formOpen && currentUser" class="btn btn-primary" @click="openAddForm">
         <Plus size="18" /> Ajouter un véhicule
       </button>
+      <div v-else-if="!formOpen" class="text-xs text-rose flex-center bg-warning-glass border-rose px-3 py-2 rounded">
+        <Info size="14" class="mr-1" /> Connectez-vous pour ajouter un véhicule.
+      </div>
     </div>
 
     <!-- Notifications et erreurs -->
@@ -206,6 +241,10 @@ onMounted(() => {
             <label class="form-label">Prix d'achat ou de référence (€)</label>
             <input v-model.number="form.purchasePrice" type="number" class="form-control" required />
           </div>
+          <div class="form-group">
+            <label class="form-label">Lien vers le véhicule (URL de redirection)</label>
+            <input v-model="form.url" type="url" class="form-control" placeholder="https://example.com/vehicule" />
+          </div>
         </div>
 
         <div>
@@ -224,6 +263,13 @@ onMounted(() => {
           <div class="form-group">
             <label class="form-label">Valeur résiduelle/de revente estimée (€)</label>
             <input v-model.number="form.resaleValue" type="number" class="form-control" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Visibilité</label>
+            <select v-model="form.visibility" class="form-control form-select">
+              <option value="PUBLIC">Publique (visible de tous)</option>
+              <option value="PRIVATE">Privée (visible uniquement par vous et les administrateurs)</option>
+            </select>
           </div>
         </div>
       </div>
@@ -249,26 +295,37 @@ onMounted(() => {
     </div>
 
     <div v-else class="vehicles-grid">
-      <div v-for="vehicle in vehicles" :key="vehicle.id" class="card-glass card-glass-hover flex flex-column justify-between relative overflow-hidden">
+      <div v-for="vehicle in vehicles" 
+           :key="vehicle.id" 
+           @click="goToVehicle(vehicle.url)"
+           :class="['card-glass', 'card-glass-hover', 'flex', 'flex-column', 'justify-between', 'relative', 'overflow-hidden', vehicle.url ? 'cursor-pointer' : '']">
         
         <!-- Dégradé lumineux en arrière plan de carte -->
         <div class="glow-accent-overlay" :class="'overlay-' + vehicle.fuelType.toLowerCase()"></div>
 
         <div class="card-header-top mb-3 flex-between">
-          <span class="badge" :class="getFuelBadgeClass(vehicle.fuelType)">
-            {{ getFuelLabel(vehicle.fuelType) }}
-          </span>
-          <div class="actions flex gap-2">
-            <button class="icon-btn btn-secondary-edit" @click="openEditForm(vehicle)" title="Modifier">
+          <div class="flex gap-1 items-center">
+            <span class="badge" :class="getFuelBadgeClass(vehicle.fuelType)">
+              {{ getFuelLabel(vehicle.fuelType) }}
+            </span>
+            <span v-if="currentUser && vehicle.visibility" class="badge" :class="vehicle.visibility === 'PRIVATE' ? 'badge-rose' : 'badge-teal'">
+              {{ vehicle.visibility === 'PRIVATE' ? 'Privé' : 'Public' }}
+            </span>
+          </div>
+          <div v-if="currentUser && (currentUser.role === 'ADMIN' || currentUser.email === vehicle.createdBy)" class="actions flex gap-2">
+            <button class="icon-btn btn-secondary-edit" @click.stop="openEditForm(vehicle)" title="Modifier">
               <Edit2 size="14" />
             </button>
-            <button class="icon-btn btn-danger-delete" @click="deleteVehicle(vehicle.id)" title="Supprimer">
+            <button class="icon-btn btn-danger-delete" @click.stop="deleteVehicle(vehicle.id)" title="Supprimer">
               <Trash2 size="14" />
             </button>
           </div>
         </div>
 
-        <h3 class="vehicle-title text-gradient text-md mb-3">{{ vehicle.name }}</h3>
+        <h3 class="vehicle-title text-gradient text-md mb-3 flex items-center gap-1">
+          {{ vehicle.name }}
+          <svg v-if="vehicle.url" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-cyan"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+        </h3>
 
         <!-- Fiche technique -->
         <div class="specifications-sheet py-2 border-t border-glass text-xs">
@@ -295,6 +352,10 @@ onMounted(() => {
           <div class="flex-between py-1">
             <span class="text-dimmed">Valeur revente :</span>
             <span class="font-semibold text-amber">{{ formatCurrency(vehicle.resaleValue) }}</span>
+          </div>
+          <div v-if="currentUser && currentUser.role === 'ADMIN' && vehicle.createdBy" class="flex-between py-1 border-t border-glass text-cyan mt-1">
+            <span class="text-dimmed">Ajouté par :</span>
+            <span class="font-semibold">{{ vehicle.createdBy }}</span>
           </div>
         </div>
       </div>
@@ -399,7 +460,7 @@ onMounted(() => {
 .mr-2 { margin-right: 0.5rem; }
 .relative { position: relative; }
 .overflow-hidden { overflow: hidden; }
-.py-5 { padding-top: 3rem; padding-bottom: 3rem; }
 .p-5 { padding: 3rem; }
 .bg-card { background: hsl(var(--bg-glass)); }
+.cursor-pointer { cursor: pointer; }
 </style>

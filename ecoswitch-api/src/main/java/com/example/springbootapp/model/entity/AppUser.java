@@ -37,6 +37,9 @@ public class AppUser {
     @Column(nullable = false, length = 50)
     private String plan;
 
+    @Column(nullable = false, length = 20)
+    private String role = "USER";
+
     // ── Constructeurs ──────────────────────────────────────────────────────
 
     public AppUser() {}
@@ -47,6 +50,16 @@ public class AppUser {
         this.passwordHash = passwordHash;
         this.provider     = provider;
         this.plan         = plan;
+        this.role         = "USER";
+    }
+
+    public AppUser(String email, String name, String passwordHash, String provider, String plan, String role) {
+        this.email        = email;
+        this.name         = name;
+        this.passwordHash = passwordHash;
+        this.provider     = provider;
+        this.plan         = plan;
+        this.role         = role;
     }
 
     // ── Getters & Setters ──────────────────────────────────────────────────
@@ -57,6 +70,7 @@ public class AppUser {
     public String getPasswordHash()    { return passwordHash; }
     public String getProvider()        { return provider; }
     public String getPlan()            { return plan; }
+    public String getRole()            { return role; }
 
     public void setId(Long id)                     { this.id = id; }
     public void setEmail(String email)             { this.email = email; }
@@ -64,4 +78,5 @@ public class AppUser {
     public void setPasswordHash(String h)          { this.passwordHash = h; }
     public void setProvider(String provider)       { this.provider = provider; }
     public void setPlan(String plan)               { this.plan = plan; }
+    public void setRole(String role)               { this.role = role; }
 }

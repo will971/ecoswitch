@@ -167,7 +167,8 @@ public class AuthController {
                 "token",  token,
                 "name",   user.getName(),
                 "email",  user.getEmail(),
-                "plan",   user.getPlan()
+                "plan",   user.getPlan(),
+                "role",   user.getRole()
         );
     }
 }
