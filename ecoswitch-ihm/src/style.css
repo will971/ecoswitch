@@ -22,6 +22,41 @@
   --text-main: 220 20% 97%;
   --text-muted: 217 12% 70%;
   --text-dimmed: 218 8% 45%;
+
+  /* Theme-specific custom styles */
+  --bg-nav: 11 15 25 / 0.75;
+  --bg-footer: 7 10 17 / 0.95;
+  --bg-auth-card: var(--bg-deep) / 0.9;
+  --bg-overlay: 0 0% 0% / 0.6;
+  --bg-hover: 255 255 255 / 0.03;
+}
+
+[data-theme="light"] {
+  /* HSL Color System - Light Mode */
+  --bg-deep: 220 20% 96%;          /* light grey/blue background */
+  --bg-card: 0 0% 100%;            /* pure white */
+  --bg-glass: 0 0% 100% / 0.8;     /* white semi-transparent card */
+  --border-glass: 220 20% 84% / 0.9; /* subtle light border */
+  --border-glass-focus: 187 92% 40% / 0.5;
+
+  /* Accent adjustments (darker/more saturated for high contrast on light bg) */
+  --accent-teal: 162 80% 32%;      /* highly readable teal */
+  --accent-blue: 221 85% 42%;
+  --accent-cyan: 187 90% 32%;
+  --accent-rose: 343 85% 45%;
+  --accent-amber: 37 95% 35%;
+
+  /* Text states - Light Mode */
+  --text-main: 224 47% 12%;        /* very dark slate */
+  --text-muted: 220 15% 32%;       /* slate grey */
+  --text-dimmed: 220 12% 48%;      /* readable light slate */
+
+  /* Theme-specific custom styles */
+  --bg-nav: 255 255 255 / 1;        /* solid white (RGB) */
+  --bg-footer: 255 255 255 / 1;     /* solid white (RGB) */
+  --bg-auth-card: 0 0% 100% / 0.95; /* HSL for hsl() compatibility */
+  --bg-overlay: 0 0 0 / 0.35;       /* solid black overlay (RGB) */
+  --bg-hover: 0 0 0 / 0.04;         /* subtle dark hover (RGB) */
 }
 
 * {

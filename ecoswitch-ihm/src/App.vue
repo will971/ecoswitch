@@ -1,14 +1,17 @@
 <script setup>
 import { ref, watch, nextTick, onMounted } from 'vue'
-import { Car, BarChart3, Settings, HelpCircle, Activity, ExternalLink, ShieldCheck, User, LogOut, Lock, Mail, Key, CreditCard, Sparkles, Check, X } from '@lucide/vue'
+import { Car, BarChart3, Settings, HelpCircle, Activity, ExternalLink, ShieldCheck, User, LogOut, Lock, Mail, Key, CreditCard, Sparkles, Check, X, Sun, Moon } from '@lucide/vue'
 import DirectSimulator from './components/DirectSimulator.vue'
 import VehicleManager from './components/VehicleManager.vue'
 import CatalogComparator from './components/CatalogComparator.vue'
 import SavedSimulations from './components/SavedSimulations.vue'
 import { apiRegister, apiLogin, apiGoogleLogin } from './utils/api.js'
+import { useTheme } from './utils/theme.js'
 
 const activeTab = ref('direct') // direct, compare, catalog, saved, pricing
 const currentUser = ref(null)
+
+const { currentTheme, initTheme, toggleTheme } = useTheme()
 
 // Modale Auth
 const showAuthModal = ref(false)
@@ -156,6 +159,7 @@ const handleLoadSimulation = (sim) => {
 }
 
 onMounted(() => {
+  initTheme()
   checkSession()
 
   // Google Identity Services — certaines versions du parser Safari (JavaScriptCore)
@@ -217,6 +221,12 @@ onMounted(() => {
           <span>Console H2</span>
           <ExternalLink size="12" />
         </a>
+
+        <!-- Bouton bascule de thème -->
+        <button class="icon-btn-nav flex-center theme-toggle-btn" @click="toggleTheme" :title="currentTheme === 'light' ? 'Activer le mode sombre' : 'Activer le mode clair'">
+          <Sun v-if="currentTheme === 'light'" size="16" class="text-amber" />
+          <Moon v-else size="16" class="text-cyan" />
+        </button>
 
         <!-- Authentification Section -->
         <div class="border-l border-glass pl-3 flex-center">
@@ -349,13 +359,13 @@ onMounted(() => {
 
 /* Sticky Navbar & Footer */
 .navbar-glass {
-  background: rgba(11, 15, 25, 0.75);
+  background: rgba(var(--bg-nav));
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid hsl(var(--border-glass));
 }
 .footer-glass {
-  background: rgba(7, 10, 17, 0.95);
+  background: rgba(var(--bg-footer));
   border-top: 1px solid hsl(var(--border-glass));
 }
 .logo-box {
@@ -396,7 +406,7 @@ onMounted(() => {
 }
 .nav-btn:hover {
   color: hsl(var(--text-main));
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(var(--bg-hover));
 }
 .nav-btn.active {
   color: hsl(var(--accent-teal));
@@ -443,6 +453,19 @@ onMounted(() => {
   padding: 4px;
   transition: color 0.2s ease;
 }
+.theme-toggle-btn {
+  border-radius: 8px;
+  padding: 8px;
+  background: rgba(var(--bg-hover));
+  border: 1px solid hsl(var(--border-glass));
+  color: hsl(var(--text-muted));
+  transition: all 0.2s ease;
+}
+.theme-toggle-btn:hover {
+  color: hsl(var(--text-main));
+  background: hsl(var(--border-glass) / 0.4);
+  border-color: hsl(var(--text-muted) / 0.3);
+}
 .hover-text-rose:hover {
   color: hsl(var(--accent-rose));
 }
@@ -487,14 +510,14 @@ onMounted(() => {
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(var(--bg-overlay));
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   z-index: 1000;
 }
 .auth-modal-card {
   z-index: 1001;
-  background: hsl(var(--bg-deep) / 0.9);
+  background: hsl(var(--bg-auth-card));
 }
 .hover-text-main:hover {
   color: hsl(var(--text-main));

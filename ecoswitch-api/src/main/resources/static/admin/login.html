@@ -27,8 +27,78 @@
 			--text-main: 220 20% 97%;
 			--text-muted: 217 12% 70%;
 			--text-dimmed: 218 8% 45%;
+
+			--bg-hover: 255 255 255 / 0.03;
 		}
 
+		[data-theme="light"] {
+			/* HSL Color System - Light Mode */
+			--bg-deep: 220 20% 96%;          /* light grey/blue background */
+			--bg-card: 0 0% 100%;            /* pure white */
+			--bg-glass: 0 0% 100% / 0.8;     /* white semi-transparent card */
+			--border-glass: 220 20% 84% / 0.9; /* subtle light border */
+			--border-glass-focus: 187 92% 40% / 0.5;
+
+			/* Accent adjustments (darker/more saturated for high contrast on light bg) */
+			--accent-teal: 162 80% 32%;      /* highly readable teal */
+			--accent-cyan: 187 90% 32%;
+			--accent-rose: 343 85% 45%;
+
+			/* Text states - Light Mode */
+			--text-main: 224 47% 12%;        /* very dark slate */
+			--text-muted: 220 15% 32%;       /* slate grey */
+			--text-dimmed: 220 12% 48%;      /* readable light slate */
+
+			--bg-hover: 0 0 0 / 0.04;
+		}
+	</style>
+
+	<script>
+		// Gestion du Thème Clair / Sombre immédiate pour éviter le flash
+		function getSystemTheme() {
+			return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+		}
+
+		function applyTheme(theme) {
+			document.documentElement.setAttribute('data-theme', theme);
+			const btn = document.getElementById('themeToggleBtn');
+			if (btn) {
+				btn.textContent = theme === 'light' ? '🌙' : '☀️';
+				btn.title = theme === 'light' ? 'Activer le mode sombre' : 'Activer le mode clair';
+			}
+		}
+
+		function toggleTheme() {
+			const current = document.documentElement.getAttribute('data-theme') || 'dark';
+			const next = current === 'light' ? 'dark' : 'light';
+			localStorage.setItem('ecoswitch_theme', next);
+			applyTheme(next);
+		}
+
+		function initTheme() {
+			const saved = localStorage.getItem('ecoswitch_theme');
+			if (saved === 'light' || saved === 'dark') {
+				applyTheme(saved);
+			} else {
+				applyTheme(getSystemTheme());
+			}
+
+			window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
+				if (!localStorage.getItem('ecoswitch_theme')) {
+					applyTheme(e.matches ? 'light' : 'dark');
+				}
+			});
+		}
+
+		initTheme();
+
+		document.addEventListener('DOMContentLoaded', () => {
+			const current = document.documentElement.getAttribute('data-theme') || 'dark';
+			applyTheme(current);
+		});
+	</script>
+
+	<style>
 		* {
 			box-sizing: border-box;
 			margin: 0;
@@ -238,7 +308,11 @@
 	<div class="glow-blob glow-blob-2"></div>
 
 	<div class="login-container">
-		<main class="card-glass glow-cyan">
+		<main class="card-glass glow-cyan" style="position: relative;">
+			<!-- Theme Toggle Button -->
+			<button id="themeToggleBtn" onclick="toggleTheme()" style="position: absolute; top: 16px; right: 16px; background: transparent; border: none; font-size: 1.1rem; cursor: pointer; outline: none; user-select: none;" title="Changer le thème">
+				🌓
+			</button>
 			<div class="logo-area">
 				<div class="lock-icon-wrapper">🔒</div>
 				<h2>Supervision API</h2>
