@@ -1,0 +1,26 @@
+{
+  "name": "springboot-ts",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/java:1": {
+      "version": "24",
+      "installMaven": false,
+      "installGradle": true,
+      "gradleVersion": "8.14.3"
+    },
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "moby": false
+    }
+  },
+  "runArgs": ["--privileged"],
+  "remoteUser": "node",
+  "containerEnv": {
+    "GH_TOKEN": "${localEnv:GH_TOKEN}"
+  },
+  "mounts": [
+    "source=/home/debian/.claude,target=/home/node/.claude,type=bind",
+    "source=/home/debian/.claude.json,target=/home/node/.claude.json,type=bind",
+    "source=/home/debian/devcontainer-bin,target=/usr/local/devcontainer-bin,type=bind,readonly"
+  ],
+  "postCreateCommand": "npm install -g @anthropic-ai/claude-code && bash /usr/local/devcontainer-bin/setup-gh.sh"
+}
