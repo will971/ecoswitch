@@ -1,7 +1,17 @@
 <script setup>
 import { ref, watch, onMounted } from 'vue'
-import { Zap, HelpCircle, ArrowRight, DollarSign, TrendingUp, Sparkles, CheckCircle2, AlertCircle, FileSpreadsheet, Save, X, Wrench, ChevronRight, ChevronDown, ChevronUp, Search } from '@lucide/vue'
+import { Zap, HelpCircle, ArrowRight, ArrowLeft, DollarSign, TrendingUp, Sparkles, CheckCircle2, AlertCircle, FileSpreadsheet, Save, X, Share2 } from '@lucide/vue'
+import vehicleEcoSavingsImg from '../assets/vehicle_eco_savings.png'
 import { apiSaveSimulation } from '../utils/api.js'
+
+// Import des sous-composants
+import VehicleFormBlock from './simulator/VehicleFormBlock.vue'
+import ArbitrageCard from './simulator/ArbitrageCard.vue'
+import AdvisorRecommendations from './simulator/AdvisorRecommendations.vue'
+import ProjectionsTable from './simulator/ProjectionsTable.vue'
+import CarbonFootprintCard from './simulator/CarbonFootprintCard.vue'
+import LeasingCard from './simulator/LeasingCard.vue'
+import ShareModal from './simulator/ShareModal.vue'
 
 const props = defineProps({
   loadedSimulation: {
@@ -13,11 +23,6 @@ const props = defineProps({
     default: null
   }
 })
-
-const registrationPlate = ref('')
-const searchingPlate = ref(false)
-const plateSuccessMessage = ref(null)
-const plateErrorMessage = ref(null)
 
 const currentVehicle = ref({
   name: '',
@@ -44,7 +49,6 @@ const targetVehicle = ref({
 const fuelPrices = ref({
   PETROL: 1.88,
   DIESEL: 1.74,
-  HYBRID: 1.82,
   ELECTRIC: 0.25
 })
 
@@ -54,14 +58,17 @@ const loading = ref(false)
 const error = ref(null)
 const result = ref(null)
 const isAdvanced = ref(false)
-const showProjectionsTable = ref(false)
+const activeMobileView = ref('form') // form or results
 
-// Autocomplétion du catalogue
+// B2C States
+const homeChargingRatio = ref(0.8)
+const taxIncome = ref(20000)
+const scrapVehicle = ref(false)
+const isLeasing = ref(false)
+const customLeasingMonthlyPrice = ref(null)
+const showShareModal = ref(false)
+
 const catalogVehicles = ref([])
-const showCurrentSuggestions = ref(false)
-const showTargetSuggestions = ref(false)
-const currentSuggestions = ref([])
-const targetSuggestions = ref([])
 
 const fetchCatalog = async () => {
   try {
@@ -74,104 +81,21 @@ const fetchCatalog = async () => {
   }
 }
 
-const filterCurrentSuggestions = () => {
-  const query = currentVehicle.value.name.trim().toLowerCase()
-  if (!query) {
-    currentSuggestions.value = []
-    return
-  }
-  currentSuggestions.value = catalogVehicles.value
-    .filter(v => v.name.toLowerCase().includes(query))
-    .slice(0, 5)
-}
-
-const filterTargetSuggestions = () => {
-  const query = targetVehicle.value.name.trim().toLowerCase()
-  if (!query) {
-    targetSuggestions.value = []
-    return
-  }
-  targetSuggestions.value = catalogVehicles.value
-    .filter(v => v.name.toLowerCase().includes(query))
-    .slice(0, 5)
-}
-
-const selectCurrentSuggestion = (v) => {
-  currentVehicle.value.name = v.name
-  currentVehicle.value.fuelType = v.fuelType
-  currentVehicle.value.consumption = v.consumption
-  if (v.annualMileage) currentVehicle.value.annualMileage = v.annualMileage
-  if (v.insuranceCost) currentVehicle.value.insuranceCost = v.insuranceCost
-  if (v.maintenanceCost) currentVehicle.value.maintenanceCost = v.maintenanceCost
-  if (v.resaleValue) currentVehicle.value.resaleValue = v.resaleValue
-  
-  targetVehicle.value.annualMileage = currentVehicle.value.annualMileage
-
-  currentSuggestions.value = []
-  showCurrentSuggestions.value = false
-}
-
-const selectTargetSuggestion = (v) => {
-  targetVehicle.value.name = v.name
-  targetVehicle.value.fuelType = v.fuelType
-  targetVehicle.value.consumption = v.consumption
-  if (v.purchasePrice) targetVehicle.value.purchasePrice = v.purchasePrice
-  if (v.insuranceCost) targetVehicle.value.insuranceCost = v.insuranceCost
-  if (v.maintenanceCost) targetVehicle.value.maintenanceCost = v.maintenanceCost
-  if (v.resaleValue !== undefined) targetVehicle.value.resaleValue = v.resaleValue
-
-  targetSuggestions.value = []
-  showTargetSuggestions.value = false
-}
-
-const closeCurrentSuggestionsWithDelay = () => {
-  setTimeout(() => {
-    showCurrentSuggestions.value = false
-  }, 200)
-}
-
-const closeTargetSuggestionsWithDelay = () => {
-  setTimeout(() => {
-    showTargetSuggestions.value = false
-  }, 200)
-}
-
-// Handlers dédiés pour le focus — évite les handlers inline composés (ex: "a = true; b()")
-// qui génèrent des arrow functions avec corps de bloc dans une expression groupée,
-// un pattern que le parser JavaScriptCore de Safari ne sait pas gérer correctement.
-const onCurrentNameFocus = () => {
-  showCurrentSuggestions.value = true
-  filterCurrentSuggestions()
-}
-
-const onTargetNameFocus = () => {
-  showTargetSuggestions.value = true
-  filterTargetSuggestions()
-}
-
-const formatFuelType = (type) => {
-  switch (type) {
-    case 'PETROL': return 'Essence'
-    case 'DIESEL': return 'Diesel'
-    case 'HYBRID': return 'Hybride'
-    case 'ELECTRIC': return 'Électrique'
-    default: return type
-  }
-}
-
 onMounted(() => {
   fetchCatalog()
 })
 
-// Sauvegarde Modal
+const onCurrentVehicleSelected = (v) => {
+  targetVehicle.value.annualMileage = v.annualMileage
+}
+
+const onAnnualMileageChange = (val) => {
+  targetVehicle.value.annualMileage = val
+}
+
 const showSaveModal = ref(false)
 const saveNote = ref('')
 
-// Watcher pour charger une simulation existante
-// NOTE: Le callback est extrait en variable nommée pour éviter le pattern `}, {`
-// qui déclenche un bug du parser JavaScriptCore de Safari :
-// watch(source, (v) => { ... }, { immediate: true })
-//                              ↑ Safari voit '{' mais attend ')'
 const onLoadedSimulationChange = (newVal) => {
   if (newVal) {
     currentVehicle.value = { ...newVal.currentVehicle }
@@ -180,12 +104,37 @@ const onLoadedSimulationChange = (newVal) => {
     maxYears.value = newVal.maxYears
     immediateRepairCost.value = newVal.immediateRepairCost || 0
     result.value = { ...newVal.result }
+    
+    // Charger aussi les états B2C si disponibles
+    if (newVal.homeChargingRatio !== undefined) homeChargingRatio.value = newVal.homeChargingRatio
+    if (newVal.taxIncome !== undefined) taxIncome.value = newVal.taxIncome
+    if (newVal.scrapVehicle !== undefined) scrapVehicle.value = newVal.scrapVehicle
+    if (newVal.isLeasing !== undefined) isLeasing.value = newVal.isLeasing
+    if (newVal.customLeasingMonthlyPrice !== undefined) customLeasingMonthlyPrice.value = newVal.customLeasingMonthlyPrice
   }
 }
 watch(() => props.loadedSimulation, onLoadedSimulationChange, { immediate: true })
 
+const getDefaultInsuranceCost = (fuelType) => {
+  switch (fuelType) {
+    case 'ELECTRIC': return 600
+    case 'HYBRID': return 650
+    case 'DIESEL': return 750
+    default: return 700
+  }
+}
+
+const getDefaultMaintenanceCost = (fuelType) => {
+  switch (fuelType) {
+    case 'ELECTRIC': return 250
+    case 'HYBRID': return 350
+    case 'DIESEL': return 500
+    default: return 450
+  }
+}
+
 const calculate = async () => {
-  // Validation des champs
+  // Validation des champs principaux obligatoires
   if (!currentVehicle.value.name || !currentVehicle.value.name.trim()) {
     error.value = "Veuillez saisir le nom du modèle pour le véhicule actuel."
     return
@@ -203,11 +152,9 @@ const calculate = async () => {
     return
   }
   
-  if (!isAdvanced.value) {
-    if (currentVehicle.value.annualMileage === null || currentVehicle.value.annualMileage === '' || currentVehicle.value.annualMileage <= 0) {
-      error.value = "Veuillez saisir un kilométrage annuel valide."
-      return
-    }
+  if (currentVehicle.value.annualMileage === null || currentVehicle.value.annualMileage === '' || currentVehicle.value.annualMileage <= 0) {
+    error.value = "Veuillez saisir un kilométrage annuel valide."
+    return
   }
 
   if (!targetVehicle.value.name || !targetVehicle.value.name.trim()) {
@@ -227,29 +174,23 @@ const calculate = async () => {
     return
   }
 
+  // Fallbacks automatiques sur les coûts d'entretien/assurance si non renseignés (B2C)
+  if (currentVehicle.value.insuranceCost === null || currentVehicle.value.insuranceCost === '') {
+    currentVehicle.value.insuranceCost = getDefaultInsuranceCost(currentVehicle.value.fuelType)
+  }
+  if (currentVehicle.value.maintenanceCost === null || currentVehicle.value.maintenanceCost === '') {
+    currentVehicle.value.maintenanceCost = getDefaultMaintenanceCost(currentVehicle.value.fuelType)
+  }
+  if (targetVehicle.value.insuranceCost === null || targetVehicle.value.insuranceCost === '') {
+    targetVehicle.value.insuranceCost = getDefaultInsuranceCost(targetVehicle.value.fuelType)
+  }
+  if (targetVehicle.value.maintenanceCost === null || targetVehicle.value.maintenanceCost === '') {
+    targetVehicle.value.maintenanceCost = getDefaultMaintenanceCost(targetVehicle.value.fuelType)
+  }
+
   if (isAdvanced.value) {
-    if (currentVehicle.value.insuranceCost === null || currentVehicle.value.insuranceCost === '' || currentVehicle.value.insuranceCost < 0) {
-      error.value = "Veuillez saisir un coût d'assurance valide pour le véhicule actuel."
-      return
-    }
-    if (currentVehicle.value.maintenanceCost === null || currentVehicle.value.maintenanceCost === '' || currentVehicle.value.maintenanceCost < 0) {
-      error.value = "Veuillez saisir un coût d'entretien valide pour le véhicule actuel."
-      return
-    }
-    if (currentVehicle.value.annualMileage === null || currentVehicle.value.annualMileage === '' || currentVehicle.value.annualMileage <= 0) {
-      error.value = "Veuillez saisir un kilométrage annuel valide."
-      return
-    }
     if (maxYears.value === null || maxYears.value === '' || maxYears.value <= 0) {
       error.value = "Veuillez saisir un horizon maximal de simulation valide."
-      return
-    }
-    if (targetVehicle.value.insuranceCost === null || targetVehicle.value.insuranceCost === '' || targetVehicle.value.insuranceCost < 0) {
-      error.value = "Veuillez saisir un coût d'assurance valide pour le nouveau véhicule."
-      return
-    }
-    if (targetVehicle.value.maintenanceCost === null || targetVehicle.value.maintenanceCost === '' || targetVehicle.value.maintenanceCost < 0) {
-      error.value = "Veuillez saisir un coût d'entretien valide pour le nouveau véhicule."
       return
     }
   }
@@ -269,7 +210,12 @@ const calculate = async () => {
         targetVehicle: targetVehicle.value,
         fuelPricesByType: fuelPrices.value,
         maxYears: maxYears.value,
-        immediateRepairCost: immediateRepairCost.value
+        immediateRepairCost: immediateRepairCost.value,
+        homeChargingRatio: homeChargingRatio.value,
+        taxIncome: taxIncome.value,
+        scrapVehicle: scrapVehicle.value,
+        isLeasing: isLeasing.value,
+        customLeasingMonthlyPrice: customLeasingMonthlyPrice.value
       })
     })
 
@@ -279,6 +225,7 @@ const calculate = async () => {
     }
 
     result.value = await response.json()
+    activeMobileView.value = 'results'
   } catch (err) {
     error.value = err.message
   } finally {
@@ -286,12 +233,11 @@ const calculate = async () => {
   }
 }
 
-// Générer les détails cumulatifs année par année
 const getYearlyForecast = () => {
   if (!result.value) return []
   
   const forecast = []
-  let cumulativeCurrent = immediateRepairCost.value // Démarre avec les réparations !
+  let cumulativeCurrent = immediateRepairCost.value
   let cumulativeTarget = result.value.switchInvestment
 
   for (let year = 1; year <= maxYears.value; year++) {
@@ -315,7 +261,6 @@ const formatCurrency = (val) => {
   return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(val)
 }
 
-// Exporter en CSV
 const exportToCSV = () => {
   if (!result.value) return
   
@@ -338,7 +283,6 @@ const exportToCSV = () => {
   document.body.removeChild(link)
 }
 
-// Sauvegarde dans l'espace personnel (via API — persistance serveur)
 const triggerSave = () => {
   if (!props.currentUser) {
     alert("Veuillez d'abord vous connecter pour sauvegarder vos simulations.")
@@ -354,6 +298,11 @@ const confirmSave = async () => {
     fuelPricesByType:  { ...fuelPrices.value },
     maxYears:          maxYears.value,
     immediateRepairCost: immediateRepairCost.value,
+    homeChargingRatio: homeChargingRatio.value,
+    taxIncome:         taxIncome.value,
+    scrapVehicle:      scrapVehicle.value,
+    isLeasing:         isLeasing.value,
+    customLeasingMonthlyPrice: customLeasingMonthlyPrice.value,
     result:            { ...result.value },
     note:              saveNote.value
   }
@@ -376,7 +325,6 @@ const confirmSave = async () => {
   }
 }
 
-// Charger un véhicule recommandé depuis l'API H2
 const loadAlternative = async (rec) => {
   loading.value = true
   try {
@@ -392,62 +340,36 @@ const loadAlternative = async (rec) => {
     loading.value = false
   }
 }
-
-const searchByPlate = async () => {
-  if (!registrationPlate.value || !registrationPlate.value.trim()) return
-  searchingPlate.value = true
-  plateSuccessMessage.value = null
-  plateErrorMessage.value = null
-  
-  try {
-    const formattedPlate = registrationPlate.value.trim().toUpperCase()
-    const res = await fetch(`/api/v1/immatriculation/${formattedPlate}`)
-    if (!res.ok) {
-      const err = await res.json()
-      throw new Error(err.error || "Plaque d'immatriculation introuvable.")
-    }
-    
-    const carData = await res.json()
-    
-    // Remplissage automatique des informations
-    currentVehicle.value.name = carData.name
-    currentVehicle.value.fuelType = carData.fuelType
-    currentVehicle.value.consumption = carData.consumption
-    
-    if (carData.annualMileage) currentVehicle.value.annualMileage = carData.annualMileage
-    if (carData.insuranceCost) currentVehicle.value.insuranceCost = carData.insuranceCost
-    if (carData.maintenanceCost) currentVehicle.value.maintenanceCost = carData.maintenanceCost
-    if (carData.resaleValue) currentVehicle.value.resaleValue = carData.resaleValue
-    
-    // Mettre à jour aussi le kilométrage cible par défaut
-    targetVehicle.value.annualMileage = currentVehicle.value.annualMileage
-    
-    let sourceLabel = 'Base locale de secours'
-    if (carData.source === 'OSCARO') {
-      sourceLabel = 'Oscaro API'
-    }
-    plateSuccessMessage.value = `Véhicule identifié avec succès via ${sourceLabel} !`
-    
-    // Lancer automatiquement le calcul de rentabilité pour fluidifier l'expérience !
-    calculate()
-  } catch (err) {
-    plateErrorMessage.value = err.message
-  } finally {
-    searchingPlate.value = false
-  }
-}
 </script>
 
 <template>
   <div class="direct-simulator-container">
-    <div class="header-section text-center mb-5">
-      <h2 class="text-gradient mb-2">Simulateur de Rentabilité à la volée</h2>
-      <p class="text-muted">Comparez instantanément le coût total de possession de deux véhicules pour identifier le point d'équilibre financier.</p>
+    <!-- Hero Banner Premium avec Image & Identité Visuelle -->
+    <div class="hero-banner-card mb-5">
+      <div class="hero-content text-left">
+        <div class="badge badge-teal mb-3 flex items-center gap-1 w-max">
+          <Zap size="12" /> <span>Transition Écologique & Économique</span>
+        </div>
+        <h2 class="hero-title font-heading">Simulateur de Rentabilité à la volée</h2>
+        <p class="hero-description">
+          Évaluez intelligemment l'impact financier et environnemental d'un changement de véhicule. Comparez le coût total de possession (TCO), estimez les subventions fiscales, et visualisez vos gains de CO₂ en temps réel.
+        </p>
+      </div>
+      <div class="hero-image-wrapper hide-on-mobile">
+        <img :src="vehicleEcoSavingsImg" class="hero-brand-image" alt="EcoSwitch Transition" />
+      </div>
     </div>
 
     <div class="grid-cols-2">
       <!-- Section Formulaire -->
-      <section class="card-glass glow-teal">
+      <section class="card-glass glow-teal" :class="{ 'mobile-hidden': activeMobileView === 'results' }">
+        <!-- Bouton Aller aux résultats sur Mobile uniquement s'il y a un résultat déjà calculé -->
+        <div v-if="result" class="mobile-next-btn-container hide-on-desktop mb-3">
+          <button class="btn btn-secondary btn-small w-100 flex-center gap-1 border-teal" @click="activeMobileView = 'results'">
+            <span>Voir les résultats calculés</span>
+            <ArrowRight size="14" class="text-teal" />
+          </button>
+        </div>
         <h3 class="mb-3 text-gradient-teal flex-between">
           <span>Saisie des véhicules</span>
           <Sparkles class="text-teal" size="18" />
@@ -467,167 +389,79 @@ const searchByPlate = async () => {
         </div>
 
         <!-- Formulaire Véhicule Actuel -->
-        <div class="vehicle-form-block mb-4 p-3 border-glass rounded">
-          <h4 class="mb-3 text-cyan flex-between">
-            <span>Véhicule Actuel (À remplacer)</span>
-            <span class="badge badge-amber badge-small">Actuel</span>
-          </h4>
-
-          <!-- Recherche par Plaque d'Immatriculation -->
-          <div class="form-group mb-3 pb-3 border-b border-glass">
-            <label class="form-label text-xxs text-dimmed uppercase">⚡ Remplissage rapide par plaque d'immatriculation</label>
-            <div class="flex gap-2">
-              <input v-model="registrationPlate" type="text" class="form-control text-center font-bold tracking-wider border-cyan-focus text-cyan" placeholder="ex: EZ-999-ZZ" @keyup.enter="searchByPlate" />
-              <button type="button" :disabled="searchingPlate || !registrationPlate" class="btn btn-secondary flex-center gap-1 py-2 px-3 text-xs" @click="searchByPlate">
-                <span v-if="searchingPlate" class="spinner-small mr-1"></span>
-                <span v-else class="flex items-center gap-1"><Search size="14" /> Rechercher</span>
-              </button>
-            </div>
-            <p v-if="plateSuccessMessage" class="text-xxs text-teal mt-1 font-semibold flex items-center gap-1">
-              <CheckCircle2 size="12" /> {{ plateSuccessMessage }}
-            </p>
-            <p v-if="plateErrorMessage" class="text-xxs text-rose mt-1 font-semibold flex items-center gap-1">
-              <AlertCircle size="12" /> {{ plateErrorMessage }}
-            </p>
-          </div>
-
-          <div class="form-group relative">
-            <label class="form-label">Nom du modèle</label>
-            <input v-model="currentVehicle.name" type="text" class="form-control" placeholder="ex: Peugeot 208" required 
-                   @input="filterCurrentSuggestions" 
-                   @focus="onCurrentNameFocus" 
-                   @blur="closeCurrentSuggestionsWithDelay" />
-            
-            <div v-if="showCurrentSuggestions && currentSuggestions.length > 0" class="autocomplete-dropdown card-glass">
-              <div v-for="v in currentSuggestions" :key="v.id" class="suggestion-item" @mousedown="selectCurrentSuggestion(v)">
-                <div class="suggestion-info">
-                  <span class="suggestion-name">{{ v.name }}</span>
-                  <span class="suggestion-meta">
-                    {{ formatFuelType(v.fuelType) }} &middot; {{ v.consumption }} {{ v.fuelType === 'ELECTRIC' ? 'kWh' : 'L' }}/100km
-                  </span>
-                </div>
-                <span class="badge badge-teal badge-small">Base</span>
-              </div>
-            </div>
-          </div>
-          <div class="grid-2-fields">
-            <div class="form-group">
-              <label class="form-label">Type d'énergie</label>
-              <select v-model="currentVehicle.fuelType" class="form-control form-select">
-                <option value="" disabled>Sélectionnez un carburant</option>
-                <option value="PETROL">Essence</option>
-                <option value="DIESEL">Diesel</option>
-                <option value="HYBRID">Hybride</option>
-                <option value="ELECTRIC">Électrique</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Consommation (L ou kWh/100km)</label>
-              <input v-model.number="currentVehicle.consumption" type="number" step="0.1" class="form-control" required />
-            </div>
-          </div>
-
-          <!-- Mode Avancé : Assurance et Entretien -->
-          <div v-if="isAdvanced" class="grid-3-fields mb-3">
-            <div class="form-group">
-              <label class="form-label">Assurance (€/an)</label>
-              <input v-model.number="currentVehicle.insuranceCost" type="number" class="form-control" required />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Entretien (€/an)</label>
-              <input v-model.number="currentVehicle.maintenanceCost" type="number" class="form-control" required />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Reprise actuelle (€)</label>
-              <input v-model.number="currentVehicle.resaleValue" type="number" class="form-control" required />
-            </div>
-          </div>
-
-          <!-- Mode Simple : Reprise et Kilométrage -->
-          <div v-else class="grid-2-fields mb-3">
-            <div class="form-group">
-              <label class="form-label">Reprise actuelle (€)</label>
-              <input v-model.number="currentVehicle.resaleValue" type="number" class="form-control" required />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Kilométrage annuel (km/an)</label>
-              <input v-model.number="currentVehicle.annualMileage" type="number" class="form-control" @input="targetVehicle.annualMileage = currentVehicle.annualMileage" required />
-            </div>
-          </div>
-
-          <!-- AJOUT : Frais de réparations immédiats -->
-          <div class="form-group border-t border-glass pt-3">
-            <label class="form-label text-rose font-semibold flex-between">
-              <span class="flex items-center gap-1"><Wrench size="14" /> Frais de réparations immédiats (€)</span>
-              <span class="badge badge-rose badge-small">Frais de garage</span>
-            </label>
-            <input v-model.number="immediateRepairCost" type="number" min="0" class="form-control border-rose-focus" placeholder="ex: 3000" />
-            <p class="text-xxs text-dimmed mt-1">Saisissez le coût des réparations requises si vous décidez de conserver votre voiture actuelle.</p>
-          </div>
-        </div>
+        <VehicleFormBlock
+          v-model:vehicle="currentVehicle"
+          v-model:immediateRepairCost="immediateRepairCost"
+          type="current"
+          :isAdvanced="isAdvanced"
+          :catalogVehicles="catalogVehicles"
+          @annual-mileage-change="onAnnualMileageChange"
+          @suggestion-selected="onCurrentVehicleSelected"
+        />
 
         <!-- Formulaire Véhicule Cible -->
-        <div class="vehicle-form-block mb-4 p-3 border-glass rounded">
-          <h4 class="mb-3 text-teal flex-between">
-            <span>Nouveau Véhicule (Cible)</span>
-            <span class="badge badge-teal badge-small">Cible</span>
+        <VehicleFormBlock
+          v-model:vehicle="targetVehicle"
+          type="target"
+          :isAdvanced="isAdvanced"
+          :catalogVehicles="catalogVehicles"
+        />
+
+        <!-- SECTION B2C : Options de Financement et Aides d'État -->
+        <div class="general-params p-3 border-glass rounded mb-4 bg-b2c-glass">
+          <h4 class="mb-3 text-gradient-teal text-sm font-semibold flex items-center gap-2">
+            <Sparkles size="16" />
+            <span>⚙️ Options Grand Public (B2C)</span>
           </h4>
-          <div class="form-group relative">
-            <label class="form-label">Nom du modèle</label>
-            <input v-model="targetVehicle.name" type="text" class="form-control" placeholder="ex: Tesla Model 3" required 
-                   @input="filterTargetSuggestions" 
-                   @focus="onTargetNameFocus" 
-                   @blur="closeTargetSuggestionsWithDelay" />
+
+          <!-- Mode de financement (Achat comptant ou leasing) -->
+          <div class="form-group mb-3 pb-3 border-b border-glass">
+            <label class="form-label text-xxs text-dimmed uppercase">Mode de financement du nouveau véhicule</label>
+            <div class="flex gap-2 mt-1">
+              <button type="button" class="btn btn-secondary w-50 py-1.5 text-xs font-semibold" :class="!isLeasing ? 'active-mode' : ''" @click="isLeasing = false">
+                Achat comptant / Crédit
+              </button>
+              <button type="button" class="btn btn-secondary w-50 py-1.5 text-xs font-semibold" :class="isLeasing ? 'active-mode' : ''" @click="isLeasing = true">
+                Leasing (LOA / LLD)
+              </button>
+            </div>
             
-            <div v-if="showTargetSuggestions && targetSuggestions.length > 0" class="autocomplete-dropdown card-glass">
-              <div v-for="v in targetSuggestions" :key="v.id" class="suggestion-item" @mousedown="selectTargetSuggestion(v)">
-                <div class="suggestion-info">
-                  <span class="suggestion-name">{{ v.name }}</span>
-                  <span class="suggestion-meta">
-                    {{ formatFuelType(v.fuelType) }} &middot; {{ v.consumption }} {{ v.fuelType === 'ELECTRIC' ? 'kWh' : 'L' }}/100km
-                  </span>
-                </div>
-                <span class="badge badge-teal badge-small">Base</span>
-              </div>
-            </div>
-          </div>
-          <div class="grid-2-fields">
-            <div class="form-group">
-              <label class="form-label">Type d'énergie</label>
-              <select v-model="targetVehicle.fuelType" class="form-control form-select">
-                <option value="" disabled>Sélectionnez un carburant</option>
-                <option value="PETROL">Essence</option>
-                <option value="DIESEL">Diesel</option>
-                <option value="HYBRID">Hybride</option>
-                <option value="ELECTRIC">Électrique</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Consommation (L ou kWh/100km)</label>
-              <input v-model.number="targetVehicle.consumption" type="number" step="0.1" class="form-control" required />
+            <div v-if="isLeasing" class="form-group mt-3">
+              <label class="form-label text-xs">Loyer mensuel estimé (€/mois)</label>
+              <input v-model.number="customLeasingMonthlyPrice" type="number" class="form-control" placeholder="ex: 290 (laisser vide pour estimation auto)" />
             </div>
           </div>
 
-          <!-- Mode Avancé : Prix, Assurance, Entretien -->
-          <div v-if="isAdvanced" class="grid-3-fields">
-            <div class="form-group">
-              <label class="form-label">Prix d'achat (€)</label>
-              <input v-model.number="targetVehicle.purchasePrice" type="number" class="form-control" required />
+          <!-- Bonus et Conversion (Subventions) -->
+          <div class="form-group mb-3 pb-3 border-b border-glass">
+            <label class="form-label text-xxs text-dimmed uppercase">Éligibilité aux Subventions de l'État</label>
+            
+            <div class="form-group mt-2">
+              <label class="form-label text-xs">Revenu Fiscal de Référence par part (RFR en €)</label>
+              <input v-model.number="taxIncome" type="number" class="form-control" placeholder="ex: 15000" />
+              <p class="text-xxs text-dimmed mt-1">Sert à estimer la majoration du bonus écologique (seuil à 15 400 €).</p>
             </div>
-            <div class="form-group">
-              <label class="form-label">Assurance (€/an)</label>
-              <input v-model.number="targetVehicle.insuranceCost" type="number" class="form-control" required />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Entretien (€/an)</label>
-              <input v-model.number="targetVehicle.maintenanceCost" type="number" class="form-control" required />
+
+            <div class="checkbox-group flex items-center gap-2 mt-2">
+              <input v-model="scrapVehicle" type="checkbox" id="scrapCheck" class="pointer" />
+              <label for="scrapCheck" class="text-xs text-main pointer-events-none">Mettre à la casse un vieux véhicule thermique</label>
             </div>
           </div>
 
-          <!-- Mode Simple : Prix d'achat uniquement -->
-          <div v-else class="form-group">
-            <label class="form-label">Prix d'achat (€)</label>
-            <input v-model.number="targetVehicle.purchasePrice" type="number" class="form-control" required />
+          <!-- Profil de recharge (Uniquement si véhicule électrique concerné) -->
+          <div v-if="currentVehicle.fuelType === 'ELECTRIC' || targetVehicle.fuelType === 'ELECTRIC'" class="form-group p-3 rounded bg-deep-glass border-glass">
+            <label class="form-label text-xxs text-dimmed uppercase flex-between">
+              <span>🔌 Répartition des recharges électriques</span>
+              <span class="font-bold text-teal">{{ (homeChargingRatio * 100).toFixed(0) }}% Domicile</span>
+            </label>
+            <input v-model.number="homeChargingRatio" type="range" min="0" max="1" step="0.05" class="w-100 accent-teal cursor-pointer" />
+            <div class="flex-between text-xxs text-muted mt-1 font-semibold">
+              <span>0% (Tout sur Borne Publique Rapide)</span>
+              <span>100% (Tout à Domicile)</span>
+            </div>
+            <p class="text-xxs text-dimmed mt-2 mb-0">
+              Ajustez la proportion de recharges effectuées chez vous (au tarif de base de {{ fuelPrices.ELECTRIC }} €/kWh) par rapport aux recharges d'appoint sur borne publique rapide d'autoroute (tarif majoré de 0.65 €/kWh).
+            </p>
           </div>
         </div>
 
@@ -646,7 +480,7 @@ const searchByPlate = async () => {
           </div>
 
           <h5 class="my-3 text-dimmed text-sm uppercase">Prix des énergies (€/L ou €/kWh)</h5>
-          <div class="grid-4-fields">
+          <div class="grid-3-fields">
             <div class="form-group">
               <label class="form-label text-xs">Essence</label>
               <input v-model.number="fuelPrices.PETROL" type="number" step="0.01" class="form-control form-control-sm" />
@@ -654,10 +488,6 @@ const searchByPlate = async () => {
             <div class="form-group">
               <label class="form-label text-xs">Diesel</label>
               <input v-model.number="fuelPrices.DIESEL" type="number" step="0.01" class="form-control form-control-sm" />
-            </div>
-            <div class="form-group">
-              <label class="form-label text-xs">Hybride</label>
-              <input v-model.number="fuelPrices.HYBRID" type="number" step="0.01" class="form-control form-control-sm" />
             </div>
             <div class="form-group">
               <label class="form-label text-xs">Élec</label>
@@ -678,7 +508,14 @@ const searchByPlate = async () => {
       </section>
 
       <!-- Section Résultats -->
-      <section class="card-glass flex flex-column justify-between">
+      <section class="card-glass flex flex-column justify-between" :class="{ 'mobile-hidden': activeMobileView === 'form' }">
+        <!-- Bouton Retour sur Mobile uniquement -->
+        <div class="mobile-back-btn-container hide-on-desktop mb-3">
+          <button class="btn btn-secondary btn-small flex-center gap-1" @click="activeMobileView = 'form'">
+            <ArrowLeft size="14" class="text-teal" />
+            <span>Retour à la saisie</span>
+          </button>
+        </div>
         <div v-if="!result && !loading" class="flex-center flex-column h-100 text-center text-dimmed py-5">
           <HelpCircle size="64" class="mb-3 text-cyan opacity-40" />
           <h4 class="mb-2 text-muted">Prêt pour la simulation</h4>
@@ -695,6 +532,10 @@ const searchByPlate = async () => {
           <div class="flex-between mb-4">
             <h3 class="text-gradient">Résultats de la Simulation</h3>
             <div class="actions flex gap-2">
+              <button class="btn btn-secondary btn-small flex-center gap-1 glow-teal" @click="showShareModal = true" title="Partager le bilan">
+                <Share2 size="14" class="text-teal" />
+                <span>Partager</span>
+              </button>
               <button class="btn btn-secondary btn-small flex-center gap-1 glow-teal" @click="exportToCSV" title="Exporter en CSV">
                 <FileSpreadsheet size="14" class="text-teal" />
                 <span>Exporter</span>
@@ -706,45 +547,19 @@ const searchByPlate = async () => {
             </div>
           </div>
 
-          <!-- AJOUT : Rapport d'Arbitrage Réparer vs Remplacer (si frais de garage) -->
-          <div v-if="immediateRepairCost > 0" class="arbitrage-card p-3 border-glass rounded mb-4 bg-card-glass">
-            <h4 class="text-sm font-heading text-rose mb-3 flex items-center gap-1">
-              <Wrench size="16" /> Arbitrage Financier : Réparer vs Remplacer
-            </h4>
-            <div class="grid-cols-2 text-xs gap-3">
-              <div class="p-2 border-glass rounded bg-deep-glass">
-                <div class="text-dimmed uppercase text-xxs">Scénario Réparer (Upfront)</div>
-                <div class="font-heading text-md mt-1 text-rose font-bold">{{ formatCurrency(immediateRepairCost) }}</div>
-              </div>
-              <div class="p-2 border-glass rounded bg-deep-glass">
-                <div class="text-dimmed uppercase text-xxs">Scénario Remplacer (Upfront Net)</div>
-                <div class="font-heading text-md mt-1 text-cyan font-bold">{{ formatCurrency(result.switchInvestment) }}</div>
-              </div>
-            </div>
-            <div class="mt-3 border-t border-glass pt-2 text-xxs text-dimmed flex-between">
-              <span>Effort de trésorerie net initial pour le remplacement :</span>
-              <span class="font-semibold" :class="result.switchInvestment - immediateRepairCost > 0 ? 'text-rose' : 'text-teal'">
-                {{ formatCurrency(result.switchInvestment - immediateRepairCost) }}
-              </span>
-            </div>
+          <!-- Bilan Écologique CO2 -->
+          <CarbonFootprintCard :result="result" />
 
-            <!-- Verdict dynamique intelligent -->
-            <div class="mt-3 p-2 bg-deep-glass rounded text-xxs text-muted border-glass">
-              <strong class="text-gradient">Verdict de l'Assistant : </strong>
-              <span v-if="result.breakEvenYear && result.breakEvenYear <= 3">
-                Il est fortement recommandé de **remplacer le véhicule**. Bien que le remplacement exige un effort financier net de {{ formatCurrency(result.switchInvestment - immediateRepairCost) }}, les économies d'énergie substantielles amortiront ce surcoût en seulement **{{ result.breakEvenYear }} ans**. Réparer une carrosserie abîmée à hauteur de {{ formatCurrency(immediateRepairCost) }} sur un modèle ancien n'est pas viable.
-              </span>
-              <span v-else-if="result.breakEvenYear && result.breakEvenYear <= 7">
-                Le **remplacement est pertinent sur le moyen terme** (seuil à **{{ result.breakEvenYear }} ans**). La facture de garage de {{ formatCurrency(immediateRepairCost) }} représente une trop grande partie de la valeur de revente de votre véhicule actuel ({{ formatCurrency(currentVehicle.resaleValue) }}). Il est conseillé de sauter le pas.
-              </span>
-              <span v-else-if="result.breakEvenYear">
-                Le remplacement s'amortit lentement (seuil à **{{ result.breakEvenYear }} ans**). Si votre trésorerie est limitée, la **réparation à {{ formatCurrency(immediateRepairCost) }} est envisageable**, bien que le changement reste rentable sur le très long terme.
-              </span>
-              <span v-else>
-                Il est plus raisonnable de **faire réparer votre véhicule actuel**. L'achat du nouveau modèle exige un effort financier trop important par rapport aux économies d'énergie réelles obtenues.
-              </span>
-            </div>
-          </div>
+          <!-- Comparatif Leasing LOA/LLD (Si activé) -->
+          <LeasingCard v-if="isLeasing" :result="result" />
+
+          <!-- Arbitrage Financier (Si frais de réparation) -->
+          <ArbitrageCard
+            v-if="immediateRepairCost > 0"
+            :result="result"
+            :immediateRepairCost="immediateRepairCost"
+            :currentVehicle="currentVehicle"
+          />
 
           <!-- Badge Rentabilité Premium -->
           <div class="profitability-status-banner p-4 rounded mb-4 flex-center flex-column text-center"
@@ -780,6 +595,9 @@ const searchByPlate = async () => {
               <div class="font-heading text-xl mt-1 text-rose">
                 {{ formatCurrency(result.switchInvestment) }}
               </div>
+              <div v-if="result.totalSubsidies > 0" class="text-xxs text-teal mt-1">
+                (Aides déduites : -{{ formatCurrency(result.totalSubsidies) }})
+              </div>
             </div>
 
             <div class="stat-card p-3 border-glass rounded bg-card-glass text-center">
@@ -792,69 +610,15 @@ const searchByPlate = async () => {
             </div>
           </div>
 
-          <!-- AJOUT : Moteur de Recommandations Intelligentes du Catalogue -->
-          <div v-if="result.recommendations && result.recommendations.length > 0" class="recommendations-container p-3 border-glass rounded mb-4 bg-card-glass glow-teal">
-            <h4 class="text-xs font-heading text-teal mb-3 flex items-center gap-1">
-              <Sparkles size="14" /> 💡 Recommandations de notre Assistant SaaS
-            </h4>
-            <p class="text-xxs text-dimmed mb-3">Voici les véhicules du catalogue les plus rentables par rapport à votre voiture actuelle :</p>
-            
-            <div class="rec-grid flex flex-column gap-2">
-              <div v-for="rec in result.recommendations" :key="rec.vehicleId" 
-                   class="rec-item p-2 border-glass rounded flex-between bg-deep-glass hover-border-cyan transition"
-                   @click="loadAlternative(rec)">
-                <div>
-                  <div class="text-xxs font-semibold text-gradient">{{ rec.vehicleName }}</div>
-                  <div class="text-xxs text-dimmed">
-                    Économie : <strong class="text-teal">{{ formatCurrency(rec.annualSavings) }}/an</strong> &middot; 
-                    Achat : {{ formatCurrency(rec.switchInvestment) }}
-                  </div>
-                </div>
-                <button class="btn btn-secondary btn-small text-xxs flex-center py-1 px-2">
-                  <span>Charger</span>
-                  <ChevronRight size="12" />
-                </button>
-              </div>
-            </div>
-          </div>
+          <!-- Recommandations Intelligentes -->
+          <AdvisorRecommendations
+            v-if="result.recommendations && result.recommendations.length > 0"
+            :recommendations="result.recommendations"
+            @load-alternative="loadAlternative"
+          />
 
-          <!-- Bouton Accordéon pour le Tableau des Projections -->
-          <div class="mt-4 border-t border-glass pt-3 flex-center">
-            <button type="button" class="btn btn-secondary w-100 flex-center gap-2 text-xxs font-semibold" @click="showProjectionsTable = !showProjectionsTable">
-              <span>{{ showProjectionsTable ? 'Masquer le tableau des projections' : 'Afficher le tableau des projections détaillées' }}</span>
-              <component :is="showProjectionsTable ? ChevronUp : ChevronDown" size="14" class="text-teal" />
-            </button>
-          </div>
-
-          <!-- Projections année par année -->
-          <div v-if="showProjectionsTable" class="table-container mt-3">
-            <table class="table-glass">
-              <thead>
-                <tr>
-                  <th>Année</th>
-                  <th>Coût Actuel (Réparé)</th>
-                  <th>Coût Cible</th>
-                  <th>Bilan</th>
-                  <th>État</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="row in getYearlyForecast()" :key="row.year">
-                  <td>{{ row.year }}</td>
-                  <td>{{ formatCurrency(row.currentCost) }}</td>
-                  <td>{{ formatCurrency(row.targetCost) }}</td>
-                  <td :class="row.difference <= 0 ? 'text-teal' : 'text-rose'">
-                    {{ row.difference <= 0 ? '-' : '+' }}{{ formatCurrency(Math.abs(row.difference)) }}
-                  </td>
-                  <td>
-                    <span class="badge" :class="row.isProfitable ? 'badge-teal' : 'badge-rose'">
-                      {{ row.isProfitable ? 'Rentable' : 'Déficit' }}
-                    </span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <!-- Tableau des Projections -->
+          <ProjectionsTable :yearlyForecast="getYearlyForecast()" />
         </div>
       </section>
     </div>
@@ -879,42 +643,28 @@ const searchByPlate = async () => {
         </div>
       </div>
     </div>
+
+    <!-- Modal de Partage Social -->
+    <ShareModal
+      :show="showShareModal"
+      :currentVehicle="currentVehicle"
+      :targetVehicle="targetVehicle"
+      :result="result"
+      @close="showShareModal = false"
+    />
   </div>
 </template>
 
 <style scoped>
-.grid-2-fields {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
-}
-.grid-3-fields {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-.grid-4-fields {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-}
-@media (max-width: 576px) {
-  .grid-2-fields, .grid-3-fields, .grid-4-fields {
-    grid-template-columns: 1fr;
-    gap: 8px;
-  }
-}
-.vehicle-form-block {
-  background: rgba(255, 255, 255, 0.02);
-}
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
 }
-@media (max-width: 576px) {
+@media (max-width: 768px) {
   .stats-grid {
     grid-template-columns: 1fr;
+    gap: 8px;
   }
 }
 .stat-card {
@@ -932,13 +682,9 @@ const searchByPlate = async () => {
 .border-amber {
   border: 1px solid rgba(244, 63, 94, 0.3);
 }
-.border-rose-focus:focus {
-  border-color: hsl(var(--accent-rose)) !important;
-  box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.2) !important;
-}
-.text-teal { color: hsl(var(--accent-teal)); }
-.text-rose { color: hsl(var(--accent-rose)); }
-.text-cyan { color: hsl(var(--accent-cyan)); }
+.text-teal { color: #10b981; }
+.text-rose { color: #f43f5e; }
+.text-cyan { color: #22d3ee; }
 .text-xxs { font-size: 0.65rem; }
 .text-xs { font-size: 0.75rem; }
 .text-sm { font-size: 0.875rem; }
@@ -957,38 +703,6 @@ const searchByPlate = async () => {
 .font-semibold { font-weight: 600; }
 .border-t { border-top: 1px solid; }
 .pt-3 { padding-top: 12px; }
-.py-1 { padding-top: 4px; padding-bottom: 4px; }
-.px-2 { padding-left: 8px; padding-right: 8px; }
-
-/* Arbitrage & recommendations classes */
-.arbitrage-card {
-  border-color: rgba(225, 29, 72, 0.25);
-  background: rgba(225, 29, 72, 0.02);
-}
-.bg-deep-glass {
-  background: rgba(0, 0, 0, 0.2);
-}
-.text-md { font-size: 1rem; }
-.font-bold { font-weight: 700; }
-.rec-grid {
-  display: flex;
-  flex-direction: column;
-}
-.rec-item {
-  cursor: pointer;
-  background: rgba(255, 255, 255, 0.01);
-  transition: all 0.2s ease;
-}
-.rec-item:hover {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: hsl(var(--accent-cyan) / 0.4);
-}
-.hover-border-cyan:hover {
-  border-color: hsl(var(--accent-cyan));
-}
-.transition {
-  transition: all 0.2s ease;
-}
 
 /* Modal overlay styling */
 .auth-modal-overlay {
@@ -1020,55 +734,103 @@ const searchByPlate = async () => {
   box-shadow: 0 0 10px 0 hsl(var(--accent-cyan) / 0.1);
 }
 
-/* Autocomplete Suggestion Styles */
-.relative {
-  position: relative;
+.bg-b2c-glass {
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px dashed rgba(255, 255, 255, 0.15);
 }
-.autocomplete-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  z-index: 50;
-  max-height: 250px;
-  overflow-y: auto;
-  margin-top: 4px;
-  background: hsl(var(--bg-deep) / 0.95);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
-  padding: 4px;
+.checkbox-group {
+  margin-top: 8px;
 }
-.suggestion-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 12px;
-  border-radius: 6px;
+.pointer {
   cursor: pointer;
-  transition: all 0.2s ease;
-  border: 1px solid transparent;
 }
-.suggestion-item:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.05);
+.accent-teal {
+  accent-color: #10b981;
 }
-.suggestion-info {
+
+/* Premium Hero Banner Styles */
+.hero-banner-card {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  text-align: left;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  background: radial-gradient(circle at top right, #0c201d 0%, #080c14 100%);
+  border: 1px solid rgba(20, 184, 166, 0.2);
+  border-radius: 16px;
+  padding: 2rem 2.5rem;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+  position: relative;
+  overflow: hidden;
 }
-.suggestion-name {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: hsl(var(--text-main));
+.hero-banner-card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -20%;
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(34, 211, 238, 0.08) 0%, transparent 70%);
+  z-index: 1;
+  pointer-events: none;
 }
-.suggestion-meta {
-  font-size: 0.65rem;
-  color: hsl(var(--text-muted));
-  margin-top: 2px;
+.hero-content {
+  z-index: 2;
+  flex: 1;
+}
+.hero-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #ffffff 40%, #a5f3fc 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 0.75rem;
+}
+.hero-description {
+  color: #94a3b8;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  max-width: 32rem;
+  margin: 0;
+}
+.hero-image-wrapper {
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.hero-brand-image {
+  max-height: 140px;
+  width: auto;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s ease;
+}
+.hero-brand-image:hover {
+  transform: scale(1.05) rotate(1deg);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.7), 0 0 20px rgba(20, 184, 166, 0.25);
+}
+.w-max {
+  width: max-content;
+}
+@media (max-width: 768px) {
+  .hero-banner-card {
+    flex-direction: column;
+    text-align: center;
+    padding: 1.5rem;
+  }
+  .hero-content {
+    text-align: center !important;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .hero-description {
+    max-width: 100%;
+  }
+  .hide-on-mobile {
+    display: none;
+  }
 }
 </style>

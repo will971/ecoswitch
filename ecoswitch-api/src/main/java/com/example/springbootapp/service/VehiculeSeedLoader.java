@@ -22,8 +22,10 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Component;
+import org.springframework.context.annotation.Profile;
 
 @Component
+@Profile("!prod")
 public class VehiculeSeedLoader implements ApplicationRunner {
 
 	private static final Logger logger = LoggerFactory.getLogger(VehiculeSeedLoader.class);

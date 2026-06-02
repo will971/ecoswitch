@@ -121,26 +121,58 @@ public class ComparisonController {
 		int maxYears = requestedMaxYears == null ? DEFAULT_MAX_YEARS : requestedMaxYears;
 		double immediateRepairCost = request.immediateRepairCost() == null ? 0.0 : request.immediateRepairCost();
 
-		double currentAnnualCost = costCalculationService.calculateAnnualCost(
-				current,
-				costCalculationService.resolveFuelPrice(current, request.fuelPricesByType()));
-		double targetAnnualCost = costCalculationService.calculateAnnualCost(
-				target,
-				costCalculationService.resolveFuelPrice(target, request.fuelPricesByType()));
+		double rawCurrentPrice = costCalculationService.resolveFuelPrice(current, request.fuelPricesByType());
+		double currentPrice = costCalculationService.resolveWeightedFuelPrice(current, rawCurrentPrice, request.homeChargingRatio());
+
+		double rawTargetPrice = costCalculationService.resolveFuelPrice(target, request.fuelPricesByType());
+		double targetPrice = costCalculationService.resolveWeightedFuelPrice(target, rawTargetPrice, request.homeChargingRatio());
+
+		double currentAnnualCost = costCalculationService.calculateAnnualCost(current, currentPrice);
+		double targetAnnualCost = costCalculationService.calculateAnnualCost(target, targetPrice);
 		double annualSavings = currentAnnualCost - targetAnnualCost;
-		double switchInvestment = Math.max(0.0, target.getPurchasePrice() - current.getResaleValue());
+
+		double bonusEcologique = costCalculationService.calculateBonusEcologique(target, request.taxIncome());
+		double primeConversion = costCalculationService.calculatePrimeConversion(current, target, request.scrapVehicle(), request.taxIncome());
+		double totalSubsidies = bonusEcologique + primeConversion;
+
+		double rawSwitchInvestment = Math.max(0.0, target.getPurchasePrice() - current.getResaleValue());
+		double switchInvestment = Math.max(0.0, rawSwitchInvestment - totalSubsidies);
+
 		double totalCostDeltaAtHorizon = costCalculationService.calculateSwitchCostAtYear(
 				current,
 				target,
 				maxYears,
-				request.fuelPricesByType(),
+				currentPrice,
+				targetPrice,
+				switchInvestment,
 				immediateRepairCost);
+
 		Integer breakEvenYear = costCalculationService.calculateBreakEvenYear(
 				current,
 				target,
 				maxYears,
-				request.fuelPricesByType(),
+				currentPrice,
+				targetPrice,
+				switchInvestment,
 				immediateRepairCost);
+
+		// CO2 calculations
+		double currentAnnualCO2 = costCalculationService.calculateAnnualCO2Kg(current);
+		double targetAnnualCO2 = costCalculationService.calculateAnnualCO2Kg(target);
+		double annualCO2Savings = currentAnnualCO2 - targetAnnualCO2;
+
+		// Monthly / Leasing calculations
+		double leasingMonthlyPrice = 0.0;
+		if (request.isLeasing() != null && request.isLeasing()) {
+			if (request.customLeasingMonthlyPrice() != null && request.customLeasingMonthlyPrice() > 0) {
+				leasingMonthlyPrice = request.customLeasingMonthlyPrice();
+			} else {
+				leasingMonthlyPrice = target.getPurchasePrice() * 0.0125; // 1.25% estimation standard LOA
+			}
+		}
+		double currentMonthlyTotalCost = currentAnnualCost / 12.0;
+		double targetMonthlyTotalCost = leasingMonthlyPrice + (targetAnnualCost / 12.0);
+		double monthlySavings = currentMonthlyTotalCost - targetMonthlyTotalCost;
 
 		// 2. Moteur de recommandation intelligente (SaaS Advisor)
 		List<Vehicule> catalog = vehiculeService.findAll();
@@ -154,22 +186,35 @@ public class ComparisonController {
 			}
 
 			try {
-				double catAnnualCost = costCalculationService.calculateAnnualCost(
-						catalogVehicle,
-						costCalculationService.resolveFuelPrice(catalogVehicle, request.fuelPricesByType()));
+				double catFuelPrice = costCalculationService.resolveFuelPrice(catalogVehicle, request.fuelPricesByType());
+				double weightedCatPrice = costCalculationService.resolveWeightedFuelPrice(catalogVehicle, catFuelPrice, request.homeChargingRatio());
+
+				double catAnnualCost = costCalculationService.calculateAnnualCost(catalogVehicle, weightedCatPrice);
 				double catSavings = currentAnnualCost - catAnnualCost;
-				double catSwitchInvestment = Math.max(0.0, catalogVehicle.getPurchasePrice() - current.getResaleValue());
+
+				double catBonus = costCalculationService.calculateBonusEcologique(catalogVehicle, request.taxIncome());
+				double catPrime = costCalculationService.calculatePrimeConversion(current, catalogVehicle, request.scrapVehicle(), request.taxIncome());
+				double catTotalSubsidies = catBonus + catPrime;
+
+				double catRawSwitch = Math.max(0.0, catalogVehicle.getPurchasePrice() - current.getResaleValue());
+				double catSwitchInvestment = Math.max(0.0, catRawSwitch - catTotalSubsidies);
+
 				double catTotalCostDelta = costCalculationService.calculateSwitchCostAtYear(
 						current,
 						catalogVehicle,
 						maxYears,
-						request.fuelPricesByType(),
+						currentPrice,
+						weightedCatPrice,
+						catSwitchInvestment,
 						immediateRepairCost);
+
 				Integer catBreakEvenYear = costCalculationService.calculateBreakEvenYear(
 						current,
 						catalogVehicle,
 						maxYears,
-						request.fuelPricesByType(),
+						currentPrice,
+						weightedCatPrice,
+						catSwitchInvestment,
 						immediateRepairCost);
 
 				// On ne suggère que les véhicules du catalogue qui sont rentables OU offrent des économies
@@ -207,7 +252,16 @@ public class ComparisonController {
 				switchInvestment,
 				breakEvenYear,
 				totalCostDeltaAtHorizon,
-				topRecommendations);
+				topRecommendations,
+				bonusEcologique,
+				primeConversion,
+				totalSubsidies,
+				currentAnnualCO2,
+				targetAnnualCO2,
+				annualCO2Savings,
+				currentMonthlyTotalCost,
+				targetMonthlyTotalCost,
+				monthlySavings);
 	}
 
 	private void validateDirectRequest(DirectProfitabilityRequest request) {
@@ -288,7 +342,12 @@ public class ComparisonController {
 			Vehicule targetVehicle,
 			Map<String, Double> fuelPricesByType,
 			Integer maxYears,
-			Double immediateRepairCost) {
+			Double immediateRepairCost,
+			Double homeChargingRatio,
+			Double taxIncome,
+			Boolean scrapVehicle,
+			Boolean isLeasing,
+			Double customLeasingMonthlyPrice) {
 	}
 
 	public record DirectProfitabilityResponse(
@@ -298,6 +357,15 @@ public class ComparisonController {
 			double switchInvestment,
 			Integer breakEvenYear,
 			double totalCostDeltaAtHorizon,
-			List<VehicleProfitability> recommendations) {
+			List<VehicleProfitability> recommendations,
+			double bonusEcologique,
+			double primeConversion,
+			double totalSubsidies,
+			double currentAnnualCO2,
+			double targetAnnualCO2,
+			double annualCO2Savings,
+			double currentMonthlyTotalCost,
+			double targetMonthlyTotalCost,
+			double monthlySavings) {
 	}
 }

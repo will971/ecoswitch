@@ -33,14 +33,19 @@ class ComparisonControllerTest {
 			target,
 			fuelPrices,
 			10,
-			0.0
+			0.0,
+			1.0,
+			25000.0,
+			false,
+			false,
+			null
 		);
 
 		ComparisonController.DirectProfitabilityResponse response = comparisonController.compareDirect(request);
 
 		assertNotNull(response);
-		assertEquals(6, response.breakEvenYear());
-		assertEquals(13000.0, response.switchInvestment());
+		assertEquals(4, response.breakEvenYear());
+		assertEquals(9000.0, response.switchInvestment());
 		assertEquals(4015.0, response.currentAnnualCost());
 		assertEquals(1683.1, response.targetAnnualCost());
 		assertEquals(2331.9, response.annualSavings(), 0.001);
@@ -54,6 +59,11 @@ class ComparisonControllerTest {
 			null,
 			Map.of(),
 			10,
+			null,
+			null,
+			null,
+			null,
+			null,
 			null
 		);
 

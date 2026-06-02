@@ -247,12 +247,41 @@ h1, h2, h3, h4, h5, h6 {
   gap: 24px;
 }
 
+.grid-2-fields {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.grid-3-fields {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.grid-4-fields {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
 @media (max-width: 768px) {
   .grid-cols-2 {
     grid-template-columns: 1fr;
     gap: 16px;
   }
+  .mobile-hidden {
+    display: none !important;
+  }
 }
+
+@media (max-width: 576px) {
+  .grid-2-fields, .grid-3-fields, .grid-4-fields {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
 
 /* Tables */
 .table-container {

@@ -1,6 +1,6 @@
 <script setup>
 import { ref, watch, nextTick, onMounted } from 'vue'
-import { Car, BarChart3, Settings, HelpCircle, Activity, ExternalLink, ShieldCheck, User, LogOut, Lock, Mail, Key, CreditCard, Sparkles, Check, X, Sun, Moon } from '@lucide/vue'
+import { Car, BarChart3, Settings, HelpCircle, Activity, ExternalLink, ShieldCheck, User, LogOut, Lock, Mail, Key, CreditCard, Sparkles, Check, X, Sun, Moon, Menu } from '@lucide/vue'
 import DirectSimulator from './components/DirectSimulator.vue'
 import VehicleManager from './components/VehicleManager.vue'
 import CatalogComparator from './components/CatalogComparator.vue'
@@ -10,6 +10,7 @@ import { useTheme } from './utils/theme.js'
 
 const activeTab = ref('direct') // direct, compare, catalog, saved, pricing
 const currentUser = ref(null)
+const showMobileMenu = ref(false)
 
 const { currentTheme, initTheme, toggleTheme } = useTheme()
 
@@ -190,7 +191,21 @@ onMounted(() => {
     <header class="navbar-glass py-3 px-4 flex-between sticky-top">
       <div class="brand flex-center gap-2">
         <div class="logo-box flex-center">
-          <Activity class="text-teal spinner-slow" size="22" />
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M19 10L17.5 6.5C17.2 5.8 16.5 5.3 15.7 5.3H8.3C7.5 5.3 6.8 5.8 6.5 6.5L5 10H3C2.4 10 2 10.4 2 11V15C2 15.6 2.4 16 3 16H4.1C4.5 17.7 6.1 19 8 19C9.9 19 11.5 17.7 11.9 16H12.1C12.5 17.7 14.1 19 16 19C17.9 19 19.5 17.7 19.9 16H21C21.6 16 22 15.6 22 15V11C22 10.4 21.6 10 21 10H19Z" fill="url(#logo-grad-car)" />
+            <path d="M12.5 5C14.5 5 18 6.5 19 8.5" stroke="#10b981" stroke-width="1.5" stroke-linecap="round" />
+            <!-- Leaf tail representing transition to green -->
+            <path d="M21 10C21.5 9 22.5 6.5 20.5 4.5C18.5 2.5 16 3.5 15 4C16.5 5 16.5 7.5 16.5 8.5C16.5 9.5 17 10 17 10H21Z" fill="#10b981" />
+            <!-- Wheels -->
+            <circle cx="8" cy="16" r="2.5" fill="#0f172a" stroke="#10b981" stroke-width="1.5" />
+            <circle cx="16" cy="16" r="2.5" fill="#0f172a" stroke="#10b981" stroke-width="1.5" />
+            <defs>
+              <linearGradient id="logo-grad-car" x1="2" y1="5.3" x2="22" y2="19" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#22d3ee" />
+                <stop offset="1" stop-color="#10b981" />
+              </linearGradient>
+            </defs>
+          </svg>
         </div>
         <div>
           <h1 class="brand-title text-gradient">EcoSwitch</h1>
@@ -199,7 +214,7 @@ onMounted(() => {
       </div>
 
       <!-- Navigation Onglets -->
-      <nav class="flex gap-2">
+      <nav class="flex gap-2 hide-on-mobile">
         <button class="nav-btn" :class="activeTab === 'direct' ? 'active' : ''" @click="setTab('direct')">
           <HelpCircle size="16" /> Simulateur direct
         </button>
@@ -266,6 +281,22 @@ onMounted(() => {
       <p>&copy; 2026 EcoSwitch. Tous droits réservés. Propulsé par Spring Boot 4 et Vue.js 3 (Vite).</p>
       <p class="mt-1">Interface SaaS Premium développée selon les standards esthétiques mode sombre.</p>
     </footer>
+
+    <!-- Barre de Navigation Basse sur Mobile (Style Snapchat/Instagram) -->
+    <nav class="mobile-bottom-nav hide-on-desktop">
+      <button class="mobile-nav-btn" :class="activeTab === 'direct' ? 'active' : ''" @click="setTab('direct')" title="Simulateur direct">
+        <HelpCircle size="22" />
+      </button>
+      <button class="mobile-nav-btn" :class="activeTab === 'compare' ? 'active' : ''" @click="setTab('compare')" title="Comparateur">
+        <BarChart3 size="22" />
+      </button>
+      <button class="mobile-nav-btn" :class="activeTab === 'catalog' ? 'active' : ''" @click="setTab('catalog')" title="Catalogue H2">
+        <Car size="22" />
+      </button>
+      <button v-if="currentUser" class="mobile-nav-btn" :class="activeTab === 'saved' ? 'active' : ''" @click="setTab('saved')" title="Mes Simulations">
+        <Sparkles size="22" />
+      </button>
+    </nav>
 
     <!-- Modale d'Authentification (SaaS Sign In/Up) -->
     <div v-if="showAuthModal" class="auth-modal-overlay flex-center">
@@ -566,6 +597,101 @@ onMounted(() => {
   font-size: 0.8rem;
   padding: 8px 12px;
   text-align: center;
+}
+
+/* Responsive navbar design for mobile & tablet */
+@media (max-width: 992px) {
+  header.navbar-glass {
+    flex-wrap: wrap !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 0.75rem 1rem !important;
+    gap: 0.75rem !important;
+  }
+  header.navbar-glass > .brand {
+    order: 1;
+  }
+  header.navbar-glass > div.flex-center.gap-3 {
+    order: 2;
+  }
+  header.navbar-glass > nav {
+    order: 3;
+    width: 100%;
+    display: flex;
+    justify-content: flex-start;
+    overflow-x: auto;
+    white-space: nowrap;
+    padding: 4px 0;
+    margin-top: 0.25rem;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  header.navbar-glass > nav::-webkit-scrollbar {
+    display: none;
+  }
+  header.navbar-glass > nav .nav-btn {
+    flex-shrink: 0;
+    white-space: nowrap;
+    padding: 8px 12px;
+    font-size: 0.82rem;
+  }
+}
+
+/* Visibility rules & Bottom mobile menu styling */
+.hide-on-desktop {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .hide-on-mobile {
+    display: none !important;
+  }
+  .hide-on-desktop {
+    display: flex !important;
+  }
+  .app-root {
+    padding-bottom: 75px !important;
+  }
+}
+
+.mobile-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 65px;
+  background: hsl(var(--bg-glass));
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid hsl(var(--border-glass));
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 999;
+  padding-bottom: env(safe-area-inset-bottom);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.mobile-nav-btn {
+  background: transparent;
+  border: none;
+  color: hsl(var(--text-muted));
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+.mobile-nav-btn:active {
+  transform: scale(0.9);
+}
+
+.mobile-nav-btn.active {
+  color: hsl(var(--accent-teal));
+  background: rgba(20, 184, 166, 0.08);
 }
 </style>
 
