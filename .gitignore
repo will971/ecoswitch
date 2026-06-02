@@ -1,3 +1,12 @@
 .DS_Store
 .vscode/
 springboot-app/.gradle/
+
+# Secrets / env
+**/.env
+**/.env.*
+
+# Builds / dependencies
+**/node_modules/
+**/dist/
+**/build/
