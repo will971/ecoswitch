@@ -1,0 +1,20 @@
+services:
+  api:
+    build:
+      context: ./ecoswitch-api
+      dockerfile: Dockerfile
+    container_name: ecoswitch-api
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  ihm:
+    build:
+      context: ./ecoswitch-ihm
+      dockerfile: Dockerfile
+    container_name: ecoswitch-ihm
+    depends_on:
+      - api
+    ports:
+      - "3000:80"
+    restart: unless-stopped
