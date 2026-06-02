@@ -20,24 +20,24 @@ const plateSuccessMessage = ref(null)
 const plateErrorMessage = ref(null)
 
 const currentVehicle = ref({
-  name: 'Peugeot 208 Essence',
+  name: '',
   purchasePrice: 0,
-  fuelType: 'PETROL',
-  consumption: 7.2,
-  annualMileage: 18000,
-  insuranceCost: 750,
-  maintenanceCost: 550,
-  resaleValue: 9500
+  fuelType: '',
+  consumption: null,
+  annualMileage: null,
+  insuranceCost: null,
+  maintenanceCost: null,
+  resaleValue: null
 })
 
 const targetVehicle = ref({
-  name: 'Renault Megane E-Tech',
-  purchasePrice: 38000,
-  fuelType: 'ELECTRIC',
-  consumption: 16.2,
-  annualMileage: 18000,
-  insuranceCost: 650,
-  maintenanceCost: 280,
+  name: '',
+  purchasePrice: null,
+  fuelType: '',
+  consumption: null,
+  annualMileage: null,
+  insuranceCost: null,
+  maintenanceCost: null,
   resaleValue: 0
 })
 
@@ -185,6 +185,75 @@ const onLoadedSimulationChange = (newVal) => {
 watch(() => props.loadedSimulation, onLoadedSimulationChange, { immediate: true })
 
 const calculate = async () => {
+  // Validation des champs
+  if (!currentVehicle.value.name || !currentVehicle.value.name.trim()) {
+    error.value = "Veuillez saisir le nom du modèle pour le véhicule actuel."
+    return
+  }
+  if (!currentVehicle.value.fuelType) {
+    error.value = "Veuillez sélectionner le type d'énergie pour le véhicule actuel."
+    return
+  }
+  if (currentVehicle.value.consumption === null || currentVehicle.value.consumption === '' || currentVehicle.value.consumption <= 0) {
+    error.value = "Veuillez saisir une consommation valide pour le véhicule actuel."
+    return
+  }
+  if (currentVehicle.value.resaleValue === null || currentVehicle.value.resaleValue === '' || currentVehicle.value.resaleValue < 0) {
+    error.value = "Veuillez saisir une valeur de reprise/revente valide pour le véhicule actuel."
+    return
+  }
+  
+  if (!isAdvanced.value) {
+    if (currentVehicle.value.annualMileage === null || currentVehicle.value.annualMileage === '' || currentVehicle.value.annualMileage <= 0) {
+      error.value = "Veuillez saisir un kilométrage annuel valide."
+      return
+    }
+  }
+
+  if (!targetVehicle.value.name || !targetVehicle.value.name.trim()) {
+    error.value = "Veuillez saisir le nom du modèle pour le nouveau véhicule."
+    return
+  }
+  if (!targetVehicle.value.fuelType) {
+    error.value = "Veuillez sélectionner le type d'énergie pour le nouveau véhicule."
+    return
+  }
+  if (targetVehicle.value.consumption === null || targetVehicle.value.consumption === '' || targetVehicle.value.consumption <= 0) {
+    error.value = "Veuillez saisir une consommation valide pour le nouveau véhicule."
+    return
+  }
+  if (targetVehicle.value.purchasePrice === null || targetVehicle.value.purchasePrice === '' || targetVehicle.value.purchasePrice <= 0) {
+    error.value = "Veuillez saisir un prix d'achat valide pour le nouveau véhicule."
+    return
+  }
+
+  if (isAdvanced.value) {
+    if (currentVehicle.value.insuranceCost === null || currentVehicle.value.insuranceCost === '' || currentVehicle.value.insuranceCost < 0) {
+      error.value = "Veuillez saisir un coût d'assurance valide pour le véhicule actuel."
+      return
+    }
+    if (currentVehicle.value.maintenanceCost === null || currentVehicle.value.maintenanceCost === '' || currentVehicle.value.maintenanceCost < 0) {
+      error.value = "Veuillez saisir un coût d'entretien valide pour le véhicule actuel."
+      return
+    }
+    if (currentVehicle.value.annualMileage === null || currentVehicle.value.annualMileage === '' || currentVehicle.value.annualMileage <= 0) {
+      error.value = "Veuillez saisir un kilométrage annuel valide."
+      return
+    }
+    if (maxYears.value === null || maxYears.value === '' || maxYears.value <= 0) {
+      error.value = "Veuillez saisir un horizon maximal de simulation valide."
+      return
+    }
+    if (targetVehicle.value.insuranceCost === null || targetVehicle.value.insuranceCost === '' || targetVehicle.value.insuranceCost < 0) {
+      error.value = "Veuillez saisir un coût d'assurance valide pour le nouveau véhicule."
+      return
+    }
+    if (targetVehicle.value.maintenanceCost === null || targetVehicle.value.maintenanceCost === '' || targetVehicle.value.maintenanceCost < 0) {
+      error.value = "Veuillez saisir un coût d'entretien valide pour le nouveau véhicule."
+      return
+    }
+  }
+
   loading.value = true
   error.value = null
   result.value = null
@@ -445,6 +514,7 @@ const searchByPlate = async () => {
             <div class="form-group">
               <label class="form-label">Type d'énergie</label>
               <select v-model="currentVehicle.fuelType" class="form-control form-select">
+                <option value="" disabled>Sélectionnez un carburant</option>
                 <option value="PETROL">Essence</option>
                 <option value="DIESEL">Diesel</option>
                 <option value="HYBRID">Hybride</option>
@@ -525,6 +595,7 @@ const searchByPlate = async () => {
             <div class="form-group">
               <label class="form-label">Type d'énergie</label>
               <select v-model="targetVehicle.fuelType" class="form-control form-select">
+                <option value="" disabled>Sélectionnez un carburant</option>
                 <option value="PETROL">Essence</option>
                 <option value="DIESEL">Diesel</option>
                 <option value="HYBRID">Hybride</option>
