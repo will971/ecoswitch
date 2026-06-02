@@ -1,6 +1,0 @@
-[submodule "ecoswitch-api"]
-	path = ecoswitch-api
-	url = https://github.com/will971/ecoswitch-api.git
-[submodule "ecoswitch-ihm"]
-	path = ecoswitch-ihm
-	url = https://github.com/will971/ecoswitch-ihm.git

@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: springboot-app
+  jpa:
+    hibernate:
+      ddl-auto: create-drop   # H2 en mémoire : tables créées au démarrage
+    show-sql: false
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+logging:
+  file:
+    name: logs/application.log
+
+app:
+  admin:
+    log-directory: logs
+    username: admin
+    password: admin
+  seed:
+    vehicles-file: classpath:data/vehicules-seed.csv
+    vehicles-url: https://raw.githubusercontent.com/williamsmodeste/antigravity-auto-db/main/vehicles.json
+  security:
+    google:
+      client-id: 1047781504975-placeholderclientid.apps.googleusercontent.com
+    jwt:
+      # Clé HMAC-SHA256 encodée en Base64 (256 bits minimum)
+      secret: RWNvU3dpdGNoU2VjcmV0S2V5MjAyNlByZW1pdW1BcHBKd3RTZWNVcmVUb2tlbg==
+      expiration-days: 7

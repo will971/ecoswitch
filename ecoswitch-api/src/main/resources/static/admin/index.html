@@ -1,0 +1,742 @@
+<!doctype html>
+<html lang="fr">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Console de Supervision API - EcoSwitch</title>
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+	<style>
+		:root {
+			--font-sans: 'Inter', sans-serif;
+			--font-heading: 'Outfit', sans-serif;
+
+			/* HSL Color System */
+			--bg-deep: 224 47% 4%;
+			--bg-card: 223 47% 8%;
+			--bg-glass: 223 47% 8% / 0.65;
+			--border-glass: 223 30% 16% / 0.5;
+			--border-glass-focus: 187 92% 45% / 0.5;
+
+			/* Brand Glow Accents */
+			--accent-teal: 162 72% 48%;     /* #14b8a6 */
+			--accent-blue: 221 83% 53%;     /* #2563eb */
+			--accent-cyan: 187 92% 45%;     /* #0891b2 */
+			--accent-rose: 343 82% 58%;     /* #e11d48 */
+			--accent-amber: 37 90% 51%;     /* #d97706 */
+
+			/* Text states */
+			--text-main: 220 20% 97%;
+			--text-muted: 217 12% 70%;
+			--text-dimmed: 218 8% 45%;
+		}
+
+		* {
+			box-sizing: border-box;
+			margin: 0;
+			padding: 0;
+		}
+
+		body {
+			font-family: var(--font-sans);
+			background-color: hsl(var(--bg-deep));
+			color: hsl(var(--text-main));
+			min-height: 100vh;
+			padding: 24px;
+			overflow-x: hidden;
+			-webkit-font-smoothing: antialiased;
+		}
+
+		h1, h2, h3, h4 {
+			font-family: var(--font-heading);
+			font-weight: 600;
+			letter-spacing: -0.02em;
+		}
+
+		/* Global Header Styles */
+		header {
+			margin-bottom: 32px;
+			border-bottom: 1px solid hsl(var(--border-glass));
+			padding-bottom: 20px;
+		}
+
+		.header-container {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			flex-wrap: wrap;
+			gap: 16px;
+		}
+
+		.title-block h1 {
+			font-size: 1.8rem;
+			background: linear-gradient(135deg, hsl(var(--text-main)) 30%, hsl(var(--accent-cyan)) 100%);
+			-webkit-background-clip: text;
+			-webkit-text-fill-color: transparent;
+			margin-bottom: 4px;
+		}
+
+		.badge {
+			display: inline-flex;
+			align-items: center;
+			font-size: 0.7rem;
+			font-weight: 700;
+			padding: 4px 10px;
+			border-radius: 20px;
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+		}
+
+		.badge-cyan {
+			background: hsl(var(--accent-cyan) / 0.15);
+			color: hsl(var(--accent-cyan));
+			border: 1px solid hsl(var(--accent-cyan) / 0.3);
+		}
+
+		.badge-rose {
+			background: hsl(var(--accent-rose) / 0.15);
+			color: hsl(var(--accent-rose));
+			border: 1px solid hsl(var(--accent-rose) / 0.3);
+		}
+
+		.badge-teal {
+			background: hsl(var(--accent-teal) / 0.15);
+			color: hsl(var(--accent-teal));
+			border: 1px solid hsl(var(--accent-teal) / 0.3);
+		}
+
+		.header-links a {
+			color: hsl(var(--accent-cyan));
+			text-decoration: none;
+			font-size: 0.875rem;
+			font-weight: 500;
+			transition: all 0.2s ease;
+			padding: 6px 12px;
+			border-radius: 8px;
+			background: hsl(var(--bg-card));
+			border: 1px solid hsl(var(--border-glass));
+		}
+
+		.header-links a:hover {
+			background: hsl(var(--border-glass) / 0.4);
+			box-shadow: 0 0 15px 0 hsl(var(--accent-cyan) / 0.25);
+		}
+
+		/* Grid & Layout */
+		.grid-main {
+			display: grid;
+			grid-template-columns: 1.2fr 0.8fr;
+			gap: 24px;
+			margin-bottom: 24px;
+		}
+
+		@media (max-width: 1024px) {
+			.grid-main {
+				grid-template-columns: 1fr;
+			}
+		}
+
+		.card-glass {
+			background: hsl(var(--bg-glass));
+			backdrop-filter: blur(16px);
+			-webkit-backdrop-filter: blur(16px);
+			border: 1px solid hsl(var(--border-glass));
+			border-radius: 16px;
+			padding: 24px;
+			box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.7);
+			transition: all 0.3s ease;
+		}
+
+		.glow-cyan {
+			box-shadow: 0 0 25px 0 hsl(var(--accent-cyan) / 0.08);
+		}
+
+		.glow-teal {
+			box-shadow: 0 0 25px 0 hsl(var(--accent-teal) / 0.08);
+		}
+
+		h2 {
+			font-size: 1.25rem;
+			margin-bottom: 20px;
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			background: linear-gradient(135deg, hsl(var(--accent-teal)) 0%, hsl(var(--accent-cyan)) 100%);
+			-webkit-background-clip: text;
+			-webkit-text-fill-color: transparent;
+		}
+
+		.card-header-actions {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin-bottom: 20px;
+			flex-wrap: wrap;
+			gap: 12px;
+		}
+
+		.card-header-actions h2 {
+			margin-bottom: 0;
+		}
+
+		/* Controls and forms */
+		.controls-row {
+			display: flex;
+			gap: 12px;
+			align-items: center;
+			margin-bottom: 16px;
+			flex-wrap: wrap;
+		}
+
+		.form-control {
+			background: hsl(var(--bg-deep) / 0.6);
+			border: 1px solid hsl(var(--border-glass));
+			border-radius: 8px;
+			color: hsl(var(--text-main));
+			font-size: 0.85rem;
+			padding: 8px 12px;
+			outline: none;
+			transition: all 0.2s ease;
+		}
+
+		.form-control:focus {
+			border-color: hsl(var(--accent-cyan));
+			box-shadow: 0 0 0 3px hsl(var(--border-glass-focus));
+		}
+
+		select.form-control {
+			padding-right: 32px;
+			cursor: pointer;
+		}
+
+		input[type="number"].form-control {
+			width: 90px;
+		}
+
+		/* Buttons */
+		.btn {
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			gap: 6px;
+			font-family: var(--font-heading);
+			font-weight: 500;
+			font-size: 0.85rem;
+			padding: 8px 16px;
+			border-radius: 8px;
+			border: 1px solid transparent;
+			cursor: pointer;
+			transition: all 0.2s ease;
+		}
+
+		.btn-primary {
+			background: linear-gradient(135deg, hsl(var(--accent-teal)) 0%, hsl(var(--accent-cyan)) 100%);
+			color: hsl(var(--bg-deep));
+			font-weight: 600;
+		}
+
+		.btn-primary:hover {
+			box-shadow: 0 0 15px 0 hsl(var(--accent-cyan) / 0.3);
+			transform: translateY(-1px);
+		}
+
+		.btn-secondary {
+			background: hsl(var(--bg-card));
+			border-color: hsl(var(--border-glass));
+			color: hsl(var(--text-main));
+		}
+
+		.btn-secondary:hover {
+			background: hsl(var(--border-glass) / 0.4);
+		}
+
+		/* Pre formatted logs box */
+		pre {
+			background: rgba(0, 0, 0, 0.4);
+			border: 1px solid hsl(var(--border-glass));
+			color: #b9c2d1;
+			padding: 16px;
+			border-radius: 12px;
+			max-height: 480px;
+			overflow-y: auto;
+			font-family: 'Courier New', Courier, monospace;
+			font-size: 0.8rem;
+			line-height: 1.4;
+			white-space: pre-wrap;
+			word-break: break-all;
+		}
+
+		/* Custom scrollbars */
+		::-webkit-scrollbar {
+			width: 6px;
+			height: 6px;
+		}
+		::-webkit-scrollbar-track {
+			background: rgba(0, 0, 0, 0.2);
+		}
+		::-webkit-scrollbar-thumb {
+			background: hsl(var(--border-glass));
+			border-radius: 3px;
+		}
+		::-webkit-scrollbar-thumb:hover {
+			background: hsl(var(--accent-cyan) / 0.5);
+		}
+
+		/* Dynamic Level info status */
+		.level-info-box {
+			background: hsl(var(--bg-deep) / 0.4);
+			border: 1px solid hsl(var(--border-glass));
+			border-radius: 10px;
+			padding: 16px;
+			margin-top: 16px;
+		}
+
+		.level-info-box p {
+			font-size: 0.875rem;
+			line-height: 1.6;
+		}
+
+		.level-val {
+			font-weight: 700;
+			color: hsl(var(--accent-cyan));
+		}
+
+		/* Metrics Grid (JVM Live Usage) */
+		.metrics-grid {
+			display: grid;
+			grid-template-columns: repeat(2, 1fr);
+			gap: 16px;
+			margin-bottom: 16px;
+		}
+
+		@media (max-width: 576px) {
+			.metrics-grid {
+				grid-template-columns: 1fr;
+			}
+		}
+
+		.metric-card {
+			background: hsl(var(--bg-deep) / 0.3);
+			border: 1px solid hsl(var(--border-glass));
+			border-radius: 12px;
+			padding: 16px;
+		}
+
+		.metric-header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin-bottom: 10px;
+		}
+
+		.metric-title {
+			font-size: 0.75rem;
+			color: hsl(var(--text-muted));
+			text-transform: uppercase;
+			font-weight: 600;
+			letter-spacing: 0.05em;
+		}
+
+		.metric-value {
+			font-size: 1.15rem;
+			font-weight: 700;
+			font-family: var(--font-heading);
+		}
+
+		.metric-value-cyan { color: hsl(var(--accent-cyan)); }
+		.metric-value-teal { color: hsl(var(--accent-teal)); }
+		.metric-value-rose { color: hsl(var(--accent-rose)); }
+		.metric-value-amber { color: hsl(var(--accent-amber)); }
+
+		/* Progress bars */
+		.progress-container {
+			background: rgba(255, 255, 255, 0.05);
+			border-radius: 6px;
+			height: 8px;
+			width: 100%;
+			overflow: hidden;
+			margin-top: 6px;
+			border: 1px solid rgba(255, 255, 255, 0.02);
+		}
+
+		.progress-bar {
+			height: 100%;
+			border-radius: 6px;
+			transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+		}
+
+		.progress-bar-cyan { background: linear-gradient(90deg, hsl(var(--accent-cyan) / 0.6), hsl(var(--accent-cyan))); }
+		.progress-bar-teal { background: linear-gradient(90deg, hsl(var(--accent-teal) / 0.6), hsl(var(--accent-teal))); }
+		.progress-bar-rose { background: linear-gradient(90deg, hsl(var(--accent-rose) / 0.6), hsl(var(--accent-rose))); }
+
+		.sub-info {
+			font-size: 0.7rem;
+			color: hsl(var(--text-dimmed));
+			margin-top: 6px;
+			display: block;
+		}
+
+		/* Tables */
+		.table-container {
+			overflow-x: auto;
+			border-radius: 12px;
+			border: 1px solid hsl(var(--border-glass));
+			margin-top: 16px;
+		}
+
+		.table-glass {
+			width: 100%;
+			border-collapse: collapse;
+			text-align: left;
+			font-size: 0.875rem;
+		}
+
+		.table-glass th {
+			background: hsl(var(--bg-card));
+			color: hsl(var(--text-muted));
+			font-weight: 600;
+			padding: 12px 16px;
+			border-bottom: 1px solid hsl(var(--border-glass));
+			text-transform: uppercase;
+			font-size: 0.75rem;
+			letter-spacing: 0.05em;
+		}
+
+		.table-glass td {
+			padding: 12px 16px;
+			border-bottom: 1px solid hsl(var(--border-glass) / 0.4);
+			color: hsl(var(--text-main));
+		}
+
+		.table-glass tr:last-child td {
+			border-bottom: none;
+		}
+
+		.table-glass tr:hover td {
+			background: hsl(var(--border-glass) / 0.25);
+		}
+
+		.footer {
+			margin-top: 48px;
+			text-align: center;
+			font-size: 0.75rem;
+			color: hsl(var(--text-dimmed));
+			border-top: 1px solid hsl(var(--border-glass));
+			padding-top: 20px;
+		}
+	</style>
+</head>
+
+<body>
+	<header>
+		<div class="header-container">
+			<div class="title-block">
+				<h1>Supervision & Diagnostic</h1>
+				<span class="badge badge-teal">⚡ Console d'Administration Live</span>
+			</div>
+			<div class="header-links">
+				<a href="/swagger-ui.html" target="_blank">📖 Documentation Swagger</a>
+			</div>
+		</div>
+	</header>
+
+	<div class="grid-main">
+		<!-- Colonne Gauche : Logs Reader -->
+		<main class="card-glass glow-cyan">
+			<div class="card-header-actions">
+				<h2>📄 Diagnostic des Logs Serveurs</h2>
+				<button class="btn btn-secondary" onclick="refreshLogFiles()">🔄 Actualiser</button>
+			</div>
+
+			<div class="controls-row">
+				<select id="logFileSelect" class="form-control"></select>
+				<div class="form-group" style="margin-bottom:0; display:flex; align-items:center; gap:8px;">
+					<span style="font-size: 0.75rem; color: hsl(var(--text-muted));">Lignes :</span>
+					<input id="lineCount" type="number" min="1" max="2000" value="300" class="form-control">
+				</div>
+				<button class="btn btn-primary" onclick="loadLogContent()">🔍 Lire</button>
+				<button class="btn btn-secondary" onclick="downloadLogFile()">📥 Télécharger</button>
+			</div>
+
+			<pre id="logOutput">Chargement en cours...</pre>
+		</main>
+
+		<!-- Colonne Droite : Configuration dynamic log levels -->
+		<aside style="display: flex; flex-direction: column; gap: 24px;">
+			<section class="card-glass glow-teal">
+				<h2>⚙️ Niveaux de Log Dynamiques</h2>
+				<p class="sub-info" style="margin-top: -12px; margin-bottom: 16px;">
+					Ajustez le niveau de log à chaud sans redémarrer le serveur API.
+				</p>
+
+				<div class="form-group">
+					<label class="form-label" style="font-size:0.75rem; color:hsl(var(--text-muted));">Logger de l'Application</label>
+					<input id="loggerName" value="ROOT" placeholder="Logger (ROOT, com.example...)" class="form-control" style="margin-bottom:12px; width:100%;">
+				</div>
+
+				<div class="controls-row" style="margin-bottom:0;">
+					<select id="logLevelSelect" class="form-control" style="flex: 1;">
+						<option>TRACE</option>
+						<option>DEBUG</option>
+						<option selected>INFO</option>
+						<option>WARN</option>
+						<option>ERROR</option>
+						<option>OFF</option>
+					</select>
+					<button class="btn btn-primary" onclick="updateLogLevel()">⚙️ Appliquer</button>
+					<button class="btn btn-secondary" onclick="refreshLogLevel()">👁️ Vérifier</button>
+				</div>
+
+				<div class="level-info-box">
+					<p id="logLevelInfo">Chargement en cours...</p>
+				</div>
+			</section>
+
+			<!-- JVM Realtime Live Status -->
+			<section class="card-glass glow-cyan">
+				<div class="card-header-actions" style="margin-bottom:16px;">
+					<h2>📊 État de la Machine Virtuelle (JVM)</h2>
+					<button class="btn btn-secondary btn-small" onclick="refreshJvmUsage()">🔄 Rafraîchir</button>
+				</div>
+
+				<div class="metrics-grid">
+					<!-- CPU Process -->
+					<div class="metric-card">
+						<div class="metric-header">
+							<span class="metric-title">CPU Application</span>
+							<span id="cpuProcessValue" class="metric-value metric-value-cyan">0%</span>
+						</div>
+						<div class="progress-container">
+							<div id="cpuProcessBar" class="progress-bar progress-bar-cyan" style="width: 0%"></div>
+						</div>
+					</div>
+
+					<!-- CPU System -->
+					<div class="metric-card">
+						<div class="metric-header">
+							<span class="metric-title">CPU Système</span>
+							<span id="cpuSystemValue" class="metric-value metric-value-teal">0%</span>
+						</div>
+						<div class="progress-container">
+							<div id="cpuSystemBar" class="progress-bar progress-bar-teal" style="width: 0%"></div>
+						</div>
+					</div>
+
+					<!-- Heap Memory -->
+					<div class="metric-card" style="grid-column: span 2;">
+						<div class="metric-header">
+							<span class="metric-title">Mémoire Tas (Heap)</span>
+							<span id="heapValue" class="metric-value metric-value-rose">0 MB</span>
+						</div>
+						<div class="progress-container">
+							<div id="heapBar" class="progress-bar progress-bar-rose" style="width: 0%"></div>
+						</div>
+						<span id="heapSubText" class="sub-info">Utilisé : 0 MB / Limite : 0 MB</span>
+					</div>
+				</div>
+
+				<!-- Stats complémentaires -->
+				<div class="level-info-box" style="padding: 12px; margin-top: 0;">
+					<div style="display:flex; justify-content:space-between; font-size: 0.75rem; color:hsl(var(--text-muted)); margin-bottom: 6px;">
+						<span>Mémoire Hors-Tas (Non-Heap) :</span>
+						<strong id="nonHeapValue" class="text-teal">0 MB</strong>
+					</div>
+					<div style="display:flex; justify-content:space-between; font-size: 0.75rem; color:hsl(var(--text-muted)); margin-bottom: 6px;">
+						<span>Threads Actifs :</span>
+						<strong id="liveThreadsValue" class="text-cyan">0</strong>
+					</div>
+					<div style="display:flex; justify-content:space-between; font-size: 0.75rem; color:hsl(var(--text-muted));">
+						<span>Temps d'Uptime :</span>
+						<strong id="uptimeValue" style="color: hsl(var(--accent-amber));">0 min</strong>
+					</div>
+				</div>
+			</section>
+		</aside>
+	</div>
+
+	<!-- Section Usage API performance tracking -->
+	<section class="card-glass glow-cyan" style="margin-top: 24px;">
+		<div class="card-header-actions">
+			<h2>⚡ Performances & Fréquence d'Usage des Services / DAO</h2>
+			<button class="btn btn-secondary" onclick="refreshUsage()">🔄 Actualiser</button>
+		</div>
+
+		<div class="table-container">
+			<table class="table-glass">
+				<thead>
+					<tr>
+						<th>Composant Service / DAO</th>
+						<th>Méthode Appelée</th>
+						<th>Nombre d'Appels</th>
+						<th>Moyenne d'Exécution (ms)</th>
+						<th>Dernier Temps d'Exécution (ms)</th>
+					</tr>
+				</thead>
+				<tbody id="usageBody">
+					<tr>
+						<td colspan="5" style="text-align: center; color: hsl(var(--text-dimmed)); padding: 20px;">
+							Chargement en cours...
+						</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+	</section>
+
+	<footer class="footer">
+		Console d'Administration EcoSwitch &middot; Spring Boot 4.0 &middot; Conception Pair Programming
+	</footer>
+
+	<script>
+		async function refreshLogFiles() {
+			try {
+				const response = await fetch('/api/v1/admin/log-files');
+				if (!response.ok) throw new Error("Erreur de chargement");
+				const files = await response.json();
+				const select = document.getElementById('logFileSelect');
+				select.innerHTML = '';
+				files.forEach(file => {
+					const option = document.createElement('option');
+					option.value = file.name;
+					option.textContent = `${file.name} (${Math.round(file.sizeBytes / 1024)} KB)`;
+					select.appendChild(option);
+				});
+				if (files.length > 0) {
+					await loadLogContent();
+				} else {
+					document.getElementById('logOutput').textContent = 'Aucun fichier .log trouvé dans le dossier logs.';
+				}
+			} catch (err) {
+				document.getElementById('logOutput').textContent = 'Erreur lors du chargement de la liste des fichiers de log.';
+			}
+		}
+
+		async function loadLogContent() {
+			const fileName = document.getElementById('logFileSelect').value;
+			if (!fileName) return;
+			const lines = document.getElementById('lineCount').value || 300;
+			document.getElementById('logOutput').textContent = 'Chargement des logs...';
+			try {
+				const response = await fetch(`/api/v1/admin/log-files/${encodeURIComponent(fileName)}?lines=${lines}`);
+				const result = await response.json();
+				document.getElementById('logOutput').textContent = result.content || '(fichier vide)';
+				
+				// Scroll to the bottom of the log viewer
+				const pre = document.getElementById('logOutput');
+				pre.scrollTop = pre.scrollHeight;
+			} catch (err) {
+				document.getElementById('logOutput').textContent = 'Impossible de lire le contenu de ce fichier de log.';
+			}
+		}
+
+		function downloadLogFile() {
+			const fileName = document.getElementById('logFileSelect').value;
+			if (!fileName) return;
+			window.location.href = `/api/v1/admin/log-files/${encodeURIComponent(fileName)}/download`;
+		}
+
+		async function refreshLogLevel() {
+			const logger = document.getElementById('loggerName').value || 'ROOT';
+			try {
+				const response = await fetch(`/api/v1/admin/log-level?logger=${encodeURIComponent(logger)}`);
+				const result = await response.json();
+				document.getElementById('logLevelInfo').innerHTML =
+					`Logger ciblé : <strong class="level-val">${result.logger}</strong><br>` +
+					`Niveau configuré : <strong class="level-val" style="color: hsl(var(--accent-amber));">${result.configuredLevel || 'Aucun'}</strong><br>` +
+					`Niveau effectif de log : <strong class="level-val" style="color: hsl(var(--accent-teal));">${result.effectiveLevel}</strong>`;
+				
+				if (result.effectiveLevel) {
+					document.getElementById('logLevelSelect').value = result.effectiveLevel;
+				}
+			} catch (err) {
+				document.getElementById('logLevelInfo').textContent = 'Erreur lors de la récupération des niveaux de log.';
+			}
+		}
+
+		async function updateLogLevel() {
+			const logger = document.getElementById('loggerName').value || 'ROOT';
+			const level = document.getElementById('logLevelSelect').value;
+			try {
+				await fetch('/api/v1/admin/log-level', {
+					method: 'PUT',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ logger, level })
+				});
+				await refreshLogLevel();
+			} catch (err) {
+				alert('Impossible de mettre à jour le niveau de log.');
+			}
+		}
+
+		async function refreshUsage() {
+			try {
+				const response = await fetch('/api/v1/admin/usage');
+				const usages = await response.json();
+				const body = document.getElementById('usageBody');
+				body.innerHTML = '';
+				
+				if (usages.length === 0) {
+					body.innerHTML = '<tr><td colspan="5" style="text-align: center; color: hsl(var(--text-dimmed));">Aucune donnée d\'usage disponible.</td></tr>';
+					return;
+				}
+
+				usages.forEach(item => {
+					const row = document.createElement('tr');
+					row.innerHTML = `
+					<td><span style="font-weight: 600; color: hsl(var(--accent-cyan));">${item.component}</span></td>
+					<td><code>${item.methodName}</code></td>
+					<td><span class="badge badge-cyan" style="font-weight: bold;">${item.callCount} appels</span></td>
+					<td><strong style="color: hsl(var(--accent-teal));">${item.avgMs} ms</strong></td>
+					<td><span style="color: hsl(var(--text-muted));">${item.lastMs} ms</span></td>`;
+					body.appendChild(row);
+				});
+			} catch (err) {
+				console.error("Erreur usage stats load", err);
+			}
+		}
+
+		async function refreshJvmUsage() {
+			try {
+				const response = await fetch('/api/v1/admin/jvm-usage');
+				const jvm = await response.json();
+				const uptimeMin = Math.round(jvm.uptimeMs / 1000 / 60);
+				
+				// CPU process animation
+				document.getElementById('cpuProcessValue').textContent = `${jvm.processCpuPercent}%`;
+				document.getElementById('cpuProcessBar').style.width = `${jvm.processCpuPercent}%`;
+				
+				// CPU system animation
+				document.getElementById('cpuSystemValue').textContent = `${jvm.systemCpuPercent}%`;
+				document.getElementById('cpuSystemBar').style.width = `${jvm.systemCpuPercent}%`;
+				
+				// Heap usage animation
+				const heapPct = Math.round((jvm.heapUsedMb / jvm.heapMaxMb) * 100);
+				document.getElementById('heapValue').textContent = `${jvm.heapUsedMb} MB (${heapPct}%)`;
+				document.getElementById('heapBar').style.width = `${heapPct}%`;
+				document.getElementById('heapSubText').textContent = `Utilisé : ${jvm.heapUsedMb} MB / Tas Max : ${jvm.heapMaxMb} MB (Committed : ${jvm.heapCommittedMb} MB)`;
+				
+				// Other variables
+				document.getElementById('nonHeapValue').textContent = `${jvm.nonHeapUsedMb} MB (Committed : ${jvm.nonHeapCommittedMb} MB)`;
+				document.getElementById('liveThreadsValue').textContent = jvm.liveThreads;
+				document.getElementById('uptimeValue').textContent = `${uptimeMin} min (${Math.round(uptimeMin / 60)}h)`;
+			} catch (err) {
+				console.error("Erreur JVM metrics load", err);
+			}
+		}
+
+		async function init() {
+			await refreshLogFiles();
+			await refreshLogLevel();
+			await refreshUsage();
+			await refreshJvmUsage();
+			
+			// Refresh indicators automatically every 5 seconds for responsive live statistics
+			setInterval(refreshUsage, 5000);
+			setInterval(refreshJvmUsage, 5000);
+		}
+
+		init();
+	</script>
+</body>
+
+</html>
