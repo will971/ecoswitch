@@ -21,6 +21,10 @@ const props = defineProps({
   currentUser: {
     type: Object,
     default: null
+  },
+  userProfile: {
+    type: Object,
+    default: null
   }
 })
 
@@ -81,9 +85,53 @@ const fetchCatalog = async () => {
   }
 }
 
-onMounted(() => {
-  fetchCatalog()
+onMounted(async () => {
+  await fetchCatalog()
+  
+  // Appliquer le profil s'il est déjà là au montage
+  if (props.userProfile) {
+    applyUserProfile(props.userProfile)
+  }
+
+  // Vérifier s'il y a un véhicule cible sélectionné depuis le catalogue
+  const targetId = localStorage.getItem('eco_target_vehicle_id')
+  if (targetId) {
+    const v = catalogVehicles.value.find(c => c.id === parseInt(targetId))
+    if (v) {
+      targetVehicle.value = { ...v }
+      localStorage.removeItem('eco_target_vehicle_id')
+    } else {
+      // S'il n'est pas dans le catalogue en mémoire (pagination), on peut le fetch
+      fetch(`/api/v1/vehicules/${targetId}`)
+        .then(res => res.json())
+        .then(data => {
+          targetVehicle.value = { ...data }
+          localStorage.removeItem('eco_target_vehicle_id')
+        })
+        .catch(e => console.error(e))
+    }
+  }
 })
+
+const applyUserProfile = (profile) => {
+  currentVehicle.value.name = profile.name
+  currentVehicle.value.fuelType = profile.fuelType
+  currentVehicle.value.consumption = profile.consumption
+  currentVehicle.value.annualMileage = profile.annualMileage
+  currentVehicle.value.insuranceCost = profile.insuranceCost
+  currentVehicle.value.maintenanceCost = profile.maintenanceCost
+  currentVehicle.value.resaleValue = profile.resaleValue
+
+  fuelPrices.value.PETROL = profile.petrolPrice
+  fuelPrices.value.DIESEL = profile.dieselPrice
+  fuelPrices.value.ELECTRIC = profile.electricPrice
+}
+
+watch(() => props.userProfile, (newVal) => {
+  if (newVal) {
+    applyUserProfile(newVal)
+  }
+}, { immediate: true })
 
 const onCurrentVehicleSelected = (v) => {
   targetVehicle.value.annualMileage = v.annualMileage

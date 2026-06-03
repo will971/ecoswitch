@@ -5,11 +5,14 @@ import DirectSimulator from './components/DirectSimulator.vue'
 import VehicleManager from './components/VehicleManager.vue'
 import CatalogComparator from './components/CatalogComparator.vue'
 import SavedSimulations from './components/SavedSimulations.vue'
-import { apiRegister, apiLogin, apiGoogleLogin } from './utils/api.js'
+import UserProfileModal from './components/UserProfileModal.vue'
+import { apiRegister, apiLogin, apiGoogleLogin, apiGetUserVehicleProfiles } from './utils/api.js'
 import { useTheme } from './utils/theme.js'
 
 const activeTab = ref('direct') // direct, compare, catalog, saved, pricing
 const currentUser = ref(null)
+const userProfiles = ref([]) // Liste des profils véhicules
+const activeUserProfile = ref(null) // Profil actif
 const showMobileMenu = ref(false)
 
 const { currentTheme, initTheme, toggleTheme } = useTheme()
@@ -20,6 +23,9 @@ const isRegister = ref(false)
 const authEmail = ref('williams@saas.com')
 const authPassword = ref('password')
 const authName = ref('Williams Modeste')
+
+// Modale Profil
+const showProfileModal = ref(false)
 
 // Simulation chargée depuis l'historique
 const loadedSimulation = ref(null)
@@ -41,13 +47,25 @@ const checkSession = () => {
 }
 
 /** Persiste la session après auth réussie */
-const persistSession = (userData) => {
+const persistSession = async (userData) => {
   const user = { name: userData.name, email: userData.email, plan: userData.plan, role: userData.role }
   localStorage.setItem('saas_token', userData.token)
   localStorage.setItem('saas_user', JSON.stringify(user))
   currentUser.value = user
   showAuthModal.value = false
   authError.value = ''
+  
+  // Charger les profils véhicules
+  try {
+    const profiles = await apiGetUserVehicleProfiles()
+    userProfiles.value = profiles
+    if (profiles.length > 0) {
+      activeUserProfile.value = profiles.find(p => p.default) || profiles[profiles.length - 1]
+    }
+  } catch (e) {
+    console.error("Erreur chargement profil véhicule", e)
+  }
+
   if (activeTab.value === 'saved') activeTab.value = 'direct'
 }
 
@@ -159,9 +177,34 @@ const handleLoadSimulation = (sim) => {
   activeTab.value = 'direct'
 }
 
-onMounted(() => {
+const handleProfileSaved = async () => {
+  try {
+    const profiles = await apiGetUserVehicleProfiles()
+    userProfiles.value = profiles
+    if (profiles.length > 0) {
+      activeUserProfile.value = profiles.find(p => p.default) || profiles[profiles.length - 1]
+    } else {
+      activeUserProfile.value = null
+    }
+  } catch (e) {
+    console.error("Erreur rechargement profils", e)
+  }
+}
+
+onMounted(async () => {
   initTheme()
   checkSession()
+  if (currentUser.value) {
+    try {
+      const profiles = await apiGetUserVehicleProfiles()
+      userProfiles.value = profiles
+      if (profiles.length > 0) {
+        activeUserProfile.value = profiles.find(p => p.default) || profiles[profiles.length - 1]
+      }
+    } catch (e) {
+      console.error("Erreur chargement profil au montage", e)
+    }
+  }
 
   // Google Identity Services — certaines versions du parser Safari (JavaScriptCore)
   // génèrent une SyntaxError interne au script GSI (via eval/new Function côté Google).
@@ -273,6 +316,9 @@ onMounted(() => {
         <button v-if="currentUser" class="nav-btn" :class="activeTab === 'saved' ? 'active' : ''" @click="setTab('saved')">
           <Sparkles size="16" class="text-cyan" /> Mes Simulations
         </button>
+        <button v-if="currentUser" class="nav-btn text-teal" @click="showProfileModal = true">
+          <Settings size="16" /> Profil Véhicule
+        </button>
       </nav>
 
       <!-- Lien vers Admin H2/Monitoring + Espace User -->
@@ -313,9 +359,9 @@ onMounted(() => {
     <main class="main-content-area flex-1 py-5 px-4 max-w-7xl mx-auto w-100">
       <Transition name="fade" mode="out-in">
         <div :key="activeTab">
-          <DirectSimulator v-if="activeTab === 'direct'" :loadedSimulation="loadedSimulation" :currentUser="currentUser" />
-          <CatalogComparator v-else-if="activeTab === 'compare'" />
-          <VehicleManager v-else-if="activeTab === 'catalog'" :currentUser="currentUser" />
+          <DirectSimulator v-if="activeTab === 'direct'" :loadedSimulation="loadedSimulation" :currentUser="currentUser" :userProfile="activeUserProfile" />
+          <CatalogComparator v-else-if="activeTab === 'compare'" :currentUser="currentUser" :userProfiles="userProfiles" :activeUserProfile="activeUserProfile" />
+          <VehicleManager v-else-if="activeTab === 'catalog'" :currentUser="currentUser" :userProfile="activeUserProfile" @open-simulator="setTab('direct')" />
           <SavedSimulations v-else-if="activeTab === 'saved' && currentUser" :currentUser="currentUser" @load-simulation="handleLoadSimulation" />
           
         </div>
@@ -403,6 +449,14 @@ onMounted(() => {
         </div>
       </div>
     </div>
+
+    <!-- Modale Profil Utilisateur (Garage) -->
+    <UserProfileModal
+      :show="showProfileModal"
+      :profiles="userProfiles"
+      @close="showProfileModal = false"
+      @profiles-updated="handleProfileSaved"
+    />
 
     <!-- Google Identity Services script manages the real OAuth popup window, no more mock modals -->
   </div>

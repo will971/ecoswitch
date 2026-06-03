@@ -59,6 +59,30 @@ public class VehiculeRepository {
 		return jdbcTemplate.query(sql, (resultSet, rowNum) -> mapRow(resultSet));
 	}
 
+	public List<Vehicule> findAll(Integer page, Integer size, String name, String fuelType) {
+		StringBuilder sql = new StringBuilder("""
+			SELECT id, name, purchase_price, fuel_type, consumption, annual_mileage, insurance_cost, maintenance_cost, resale_value, url, visibility, created_by
+			FROM vehicule
+			WHERE 1=1
+			""");
+		List<Object> params = new java.util.ArrayList<>();
+		if (name != null && !name.isBlank()) {
+			sql.append(" AND LOWER(name) LIKE ?");
+			params.add("%" + name.trim().toLowerCase() + "%");
+		}
+		if (fuelType != null && !fuelType.isBlank()) {
+			sql.append(" AND fuel_type = ?");
+			params.add(fuelType.trim().toUpperCase());
+		}
+		sql.append(" ORDER BY id DESC");
+		if (page != null && size != null) {
+			sql.append(" LIMIT ? OFFSET ?");
+			params.add(size);
+			params.add(page * size);
+		}
+		return jdbcTemplate.query(sql.toString(), (resultSet, rowNum) -> mapRow(resultSet), params.toArray());
+	}
+
 	public Optional<Vehicule> findById(Long id) {
 		final String sql = """
 			SELECT id, name, purchase_price, fuel_type, consumption, annual_mileage, insurance_cost, maintenance_cost, resale_value, url, visibility, created_by

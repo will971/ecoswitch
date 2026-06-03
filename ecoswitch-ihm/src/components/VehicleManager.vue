@@ -6,13 +6,26 @@ const props = defineProps({
   currentUser: {
     type: Object,
     default: null
+  },
+  userProfile: {
+    type: Object,
+    default: null
   }
 })
+
+const emit = defineEmits(['open-simulator'])
 
 const vehicles = ref([])
 const loading = ref(false)
 const error = ref(null)
 const successMsg = ref(null)
+
+// Pagination & Filtres
+const page = ref(0)
+const size = ref(6) // 6 véhicules par page
+const totalPages = ref(1)
+const searchName = ref('')
+const filterFuelType = ref('')
 
 // Formulaire
 const formOpen = ref(false)
@@ -44,15 +57,47 @@ const fetchVehicles = async () => {
   loading.value = true
   error.value = null
   try {
-    const response = await fetch('/api/v1/vehicules', {
+    const params = new URLSearchParams()
+    params.append('page', page.value)
+    params.append('size', size.value)
+    if (searchName.value.trim()) {
+      params.append('name', searchName.value.trim())
+    }
+    if (filterFuelType.value) {
+      params.append('fuelType', filterFuelType.value)
+    }
+    const response = await fetch(`/api/v1/vehicules?${params.toString()}`, {
       headers: getHeaders()
     })
     if (!response.ok) throw new Error('Impossible de charger le catalogue de véhicules.')
+    
+    const pagesHeader = response.headers.get('X-Total-Pages')
+    totalPages.value = pagesHeader ? parseInt(pagesHeader, 10) : 1
+    
     vehicles.value = await response.json()
   } catch (err) {
     error.value = err.message
   } finally {
     loading.value = false
+  }
+}
+
+const onSearch = () => {
+  page.value = 0
+  fetchVehicles()
+}
+
+const nextPage = () => {
+  if (page.value + 1 < totalPages.value) {
+    page.value++
+    fetchVehicles()
+  }
+}
+
+const prevPage = () => {
+  if (page.value > 0) {
+    page.value--
+    fetchVehicles()
   }
 }
 
@@ -177,6 +222,41 @@ const goToVehicle = (url) => {
   }
 }
 
+const getFuelPrice = (fuelType) => {
+  if (!props.userProfile) return 1.5 // Fallback generic
+  switch (fuelType) {
+    case 'PETROL': return props.userProfile.petrolPrice
+    case 'DIESEL': return props.userProfile.dieselPrice
+    case 'ELECTRIC': return props.userProfile.electricPrice
+    case 'HYBRID': return props.userProfile.petrolPrice // Approximation pour hybride
+    default: return 1.5
+  }
+}
+
+const calculateSavings = (vehicle) => {
+  if (!props.userProfile) return null
+  
+  const myProfile = props.userProfile
+  
+  // Coût du profil actuel
+  const myFuelCost = (myProfile.consumption * getFuelPrice(myProfile.fuelType) * myProfile.annualMileage) / 100
+  const myTotalCost = myFuelCost + myProfile.insuranceCost + myProfile.maintenanceCost
+  
+  // Coût du véhicule cible (on utilise le kilométrage annuel de l'utilisateur pour la simulation)
+  const targetFuelCost = (vehicle.consumption * getFuelPrice(vehicle.fuelType) * myProfile.annualMileage) / 100
+  const targetTotalCost = targetFuelCost + vehicle.insuranceCost + vehicle.maintenanceCost
+  
+  const savings = myTotalCost - targetTotalCost
+  return savings
+}
+
+const openSimulatorForVehicle = (vehicle) => {
+  // Déclencher un event global ou juste envoyer à App.vue avec event emit pour ouvrir le simulateur
+  // On sauvegarde le targetVehicle temporairement dans le localStorage ou un store pour que DirectSimulator le récupère
+  localStorage.setItem('eco_target_vehicle_id', vehicle.id)
+  emit('open-simulator')
+}
+
 onMounted(() => {
   fetchVehicles()
 })
@@ -206,6 +286,28 @@ onMounted(() => {
     <div v-if="error" class="alert-banner bg-warning-glass border-rose text-rose p-3 rounded mb-4 flex-between">
       <div class="flex-center">
         <Info size="18" class="mr-2" /> {{ error }}
+      </div>
+    </div>
+
+    <!-- Filtres et Recherche -->
+    <div v-if="!formOpen" class="filters-bar card-glass p-3 mb-4 flex-between gap-3">
+      <div class="flex-1">
+        <input 
+          v-model="searchName" 
+          @input="onSearch" 
+          type="text" 
+          class="form-control" 
+          placeholder="Rechercher par nom (ex: Peugeot)..." 
+        />
+      </div>
+      <div style="min-width: 180px;">
+        <select v-model="filterFuelType" @change="onSearch" class="form-control form-select">
+          <option value="">Tous les carburants</option>
+          <option value="PETROL">Essence</option>
+          <option value="DIESEL">Diesel</option>
+          <option value="HYBRID">Hybride</option>
+          <option value="ELECTRIC">Électrique</option>
+        </select>
       </div>
     </div>
 
@@ -327,6 +429,17 @@ onMounted(() => {
           <svg v-if="vehicle.url" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-cyan"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
         </h3>
 
+        <!-- Calcul rapide des économies (si profil présent) -->
+        <div v-if="userProfile" class="savings-badge mb-3 text-center py-2 px-3 rounded" :class="calculateSavings(vehicle) > 0 ? 'bg-success-glass border-teal' : 'bg-warning-glass border-rose'">
+          <div class="text-xs text-dimmed uppercase mb-1">Bilan Économique</div>
+          <div class="font-bold font-heading text-lg" :class="calculateSavings(vehicle) > 0 ? 'text-teal' : 'text-rose'">
+            {{ calculateSavings(vehicle) > 0 ? '+' : '' }}{{ formatCurrency(calculateSavings(vehicle)) }} / an
+          </div>
+        </div>
+        <div v-else-if="currentUser" class="savings-badge mb-3 text-center py-2 px-3 rounded bg-deep-glass border-glass text-xs text-dimmed">
+          Complétez votre profil pour voir vos économies.
+        </div>
+
         <!-- Fiche technique -->
         <div class="specifications-sheet py-2 border-t border-glass text-xs">
           <div class="flex-between py-1">
@@ -358,7 +471,32 @@ onMounted(() => {
             <span class="font-semibold">{{ vehicle.createdBy }}</span>
           </div>
         </div>
+        
+        <div class="mt-3 pt-3 border-t border-glass">
+          <button class="btn btn-secondary w-100 flex-center gap-1 glow-teal" @click.stop="openSimulatorForVehicle(vehicle)">
+            <Sparkles size="16" class="text-teal" /> Simuler l'achat
+          </button>
+        </div>
       </div>
+    </div>
+
+    <!-- Pagination -->
+    <div v-if="!formOpen && totalPages > 1" class="pagination-controls flex-center gap-3 mt-5">
+      <button 
+        class="btn btn-secondary btn-small" 
+        :disabled="page === 0" 
+        @click="prevPage"
+      >
+        Précédent
+      </button>
+      <span class="text-xs text-dimmed">Page {{ page + 1 }} sur {{ totalPages }}</span>
+      <button 
+        class="btn btn-secondary btn-small" 
+        :disabled="page + 1 >= totalPages" 
+        @click="nextPage"
+      >
+        Suivant
+      </button>
     </div>
   </div>
 </template>

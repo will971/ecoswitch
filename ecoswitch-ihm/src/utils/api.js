@@ -86,3 +86,45 @@ export async function apiDeleteSimulation(id) {
   if (res.status === 404) throw new Error('Simulation introuvable.')
   if (!res.ok) throw new Error('Impossible de supprimer la simulation.')
 }
+
+// ── User Vehicle Profile (Garage) ──────────────────────────────────────────
+
+export async function apiGetUserVehicleProfiles() {
+  const res = await apiFetch('/users/me/vehicle-profiles')
+  if (res.status === 401) throw new Error('SESSION_EXPIRED')
+  if (res.status === 204) return [] // No profiles found
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || 'Impossible de charger vos profils véhicules.')
+  return data || []
+}
+
+export async function apiCreateUserVehicleProfile(profileData) {
+  const res = await apiFetch('/users/me/vehicle-profiles', {
+    method: 'POST',
+    body: JSON.stringify(profileData)
+  })
+  if (res.status === 401) throw new Error('SESSION_EXPIRED')
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || 'Impossible de créer le profil véhicule.')
+  return data
+}
+
+export async function apiUpdateUserVehicleProfile(id, profileData) {
+  const res = await apiFetch(`/users/me/vehicle-profiles/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(profileData)
+  })
+  if (res.status === 401) throw new Error('SESSION_EXPIRED')
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || 'Impossible de mettre à jour le profil véhicule.')
+  return data
+}
+
+export async function apiDeleteUserVehicleProfile(id) {
+  const res = await apiFetch(`/users/me/vehicle-profiles/${id}`, {
+    method: 'DELETE'
+  })
+  if (res.status === 401) throw new Error('SESSION_EXPIRED')
+  if (res.status === 404) throw new Error('Profil introuvable.')
+  if (!res.ok) throw new Error('Impossible de supprimer le profil véhicule.')
+}

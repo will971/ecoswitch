@@ -27,6 +27,11 @@ public class VehiculeService {
 	}
 
 	@Transactional(readOnly = true)
+	public List<Vehicule> findAll(Integer page, Integer size, String name, String fuelType) {
+		return vehiculeRepository.findAll(page, size, name, fuelType);
+	}
+
+	@Transactional(readOnly = true)
 	public Vehicule findById(Long id) {
 		return vehiculeRepository.findById(id)
 			.orElseThrow(() -> new IllegalArgumentException("Vehicule introuvable avec l'id: " + id));
@@ -58,6 +63,16 @@ public class VehiculeService {
 		}
 		if (vehicule.getFuelType() == null) {
 			throw new IllegalArgumentException("Le type de carburant est obligatoire.");
+		}
+		if (vehicule.getUrl() != null && !vehicule.getUrl().isBlank()) {
+			try {
+				java.net.URI uri = new java.net.URI(vehicule.getUrl());
+				if (uri.getScheme() == null || (!uri.getScheme().equalsIgnoreCase("http") && !uri.getScheme().equalsIgnoreCase("https"))) {
+					throw new IllegalArgumentException("L'URL doit commencer par http:// ou https://");
+				}
+			} catch (Exception e) {
+				throw new IllegalArgumentException("L'URL du véhicule est invalide.");
+			}
 		}
 	}
 }

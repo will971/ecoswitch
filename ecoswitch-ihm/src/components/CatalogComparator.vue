@@ -1,19 +1,38 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue'
 import { Zap, HelpCircle, ArrowRight, ArrowLeft, DollarSign, TrendingUp, Sparkles, AlertCircle, RefreshCw, Wrench, ChevronDown, ChevronUp } from '@lucide/vue'
 import vehicleEcoSavingsImg from '../assets/vehicle_eco_savings.png'
+
+const props = defineProps({
+  currentUser: Object,
+  userProfiles: {
+    type: Array,
+    default: () => []
+  },
+  activeUserProfile: Object
+})
 
 const vehicles = ref([])
 const loading = ref(false)
 const calculating = ref(false)
 const error = ref(null)
 
-const currentVehicleId = ref(null)
+const selectedProfileId = ref(null)
 const selectedTargetIds = ref([])
 const maxYears = ref(15)
 const immediateRepairCost = ref(0)
 const isAdvanced = ref(false)
 const activeMobileView = ref('form') // form or results
+
+const manualVehicle = ref({
+  name: 'Mon véhicule',
+  fuelType: 'PETROL',
+  consumption: 7.0,
+  purchasePrice: 0,
+  resaleValue: 5000,
+  insuranceCost: 600,
+  maintenanceCost: 400
+})
 
 const fuelPrices = ref({
   PETROL: 1.88,
@@ -37,6 +56,15 @@ const fetchVehicles = async () => {
   }
 }
 
+watch(() => props.activeUserProfile, (newProfile) => {
+  if (newProfile) {
+    selectedProfileId.value = newProfile.id
+    if (newProfile.petrolPrice) fuelPrices.value.PETROL = newProfile.petrolPrice
+    if (newProfile.dieselPrice) fuelPrices.value.DIESEL = newProfile.dieselPrice
+    if (newProfile.electricPrice) fuelPrices.value.ELECTRIC = newProfile.electricPrice
+  }
+}, { immediate: true })
+
 const toggleTargetSelection = (id) => {
   const index = selectedTargetIds.value.indexOf(id)
   if (index > -1) {
@@ -46,11 +74,9 @@ const toggleTargetSelection = (id) => {
   }
 }
 
+const hasProfiles = computed(() => props.userProfiles && props.userProfiles.length > 0)
+
 const compare = async () => {
-  if (!currentVehicleId.value) {
-    error.value = "Veuillez sélectionner votre véhicule actuel."
-    return
-  }
   if (selectedTargetIds.value.length === 0) {
     error.value = "Veuillez cocher au moins un véhicule cible à comparer."
     return
@@ -60,12 +86,25 @@ const compare = async () => {
   error.value = null
   result.value = null
 
+  let currentVehicleData = null
+  if (hasProfiles.value) {
+    if (!selectedProfileId.value) {
+      error.value = "Veuillez sélectionner un de vos véhicules."
+      calculating.value = false
+      return
+    }
+    const profile = props.userProfiles.find(p => p.id === selectedProfileId.value)
+    currentVehicleData = { ...profile, purchasePrice: 0 }
+  } else {
+    currentVehicleData = { ...manualVehicle.value }
+  }
+
   try {
-    const response = await fetch('/api/v1/comparisons/profitability', {
+    const response = await fetch('/api/v1/comparisons/profitability/custom', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        currentVehicleId: currentVehicleId.value,
+        currentVehicle: currentVehicleData,
         targetVehicleIds: selectedTargetIds.value,
         fuelPricesByType: fuelPrices.value,
         maxYears: maxYears.value,
@@ -112,7 +151,7 @@ onMounted(() => {
         </div>
         <h2 class="hero-title font-heading">Comparateur du Catalogue</h2>
         <p class="hero-description">
-          Comparez un véhicule de votre choix (ou issu du catalogue existant) à une ou plusieurs alternatives cibles pour déterminer précisément le point de rentabilité et le retour sur investissement écologique.
+          Comparez votre véhicule actuel à une ou plusieurs alternatives cibles pour déterminer précisément le point de rentabilité et le retour sur investissement écologique.
         </p>
       </div>
       <div class="hero-image-wrapper hide-on-mobile">
@@ -162,30 +201,68 @@ onMounted(() => {
 
         <div v-else>
           <!-- Sélection Véhicule Actuel -->
-          <div class="form-group mb-4 p-3 border-glass rounded">
+          <div class="form-group mb-4 p-3 border-glass rounded bg-deep-glass">
             <label class="form-label text-cyan font-semibold">1. Votre véhicule actuel</label>
-            <select v-model="currentVehicleId" class="form-control form-select" @change="selectedTargetIds = selectedTargetIds.filter(id => id !== currentVehicleId); immediateRepairCost = 0">
-              <option :value="null" disabled>-- Sélectionner le véhicule --</option>
-              <option v-for="v in vehicles" :key="v.id" :value="v.id">
-                {{ v.name }} ({{ v.fuelType }})
-              </option>
-            </select>
+            
+            <div v-if="hasProfiles">
+              <p class="text-xs text-dimmed mb-2">Sélectionnez le véhicule à comparer depuis votre garage :</p>
+              <select v-model="selectedProfileId" class="form-control form-select border-cyan text-cyan">
+                <option v-for="p in userProfiles" :key="p.id" :value="p.id">
+                  {{ p.name }} ({{ p.fuelType }})
+                </option>
+              </select>
+            </div>
+            
+            <div v-else class="manual-vehicle-form">
+              <p class="text-xs text-amber mb-3">
+                Connectez-vous et créez un profil pour éviter la saisie manuelle.
+              </p>
+              <div class="form-group mb-2">
+                <label class="form-label text-xs">Nom du véhicule</label>
+                <input v-model="manualVehicle.name" type="text" class="form-control form-control-sm" />
+              </div>
+              <div class="flex gap-2 mb-2">
+                <div class="form-group w-100">
+                  <label class="form-label text-xs">Énergie</label>
+                  <select v-model="manualVehicle.fuelType" class="form-control form-select form-control-sm">
+                    <option value="PETROL">Essence</option>
+                    <option value="DIESEL">Diesel</option>
+                    <option value="ELECTRIC">Électrique</option>
+                    <option value="HYBRID">Hybride</option>
+                  </select>
+                </div>
+                <div class="form-group w-100">
+                  <label class="form-label text-xs">Conso</label>
+                  <input v-model.number="manualVehicle.consumption" type="number" step="0.1" class="form-control form-control-sm" />
+                </div>
+              </div>
+              <div class="flex gap-2">
+                <div class="form-group w-100">
+                  <label class="form-label text-xs">Revente (€)</label>
+                  <input v-model.number="manualVehicle.resaleValue" type="number" class="form-control form-control-sm" />
+                </div>
+                <div class="form-group w-100">
+                  <label class="form-label text-xs">Assurance (€/an)</label>
+                  <input v-model.number="manualVehicle.insuranceCost" type="number" class="form-control form-control-sm" />
+                </div>
+              </div>
+            </div>
 
-            <div v-if="currentVehicleId" class="form-group border-t border-glass pt-3 mt-3">
+            <div class="form-group border-t border-glass pt-3 mt-3">
               <label class="form-label text-rose font-semibold flex-between">
                 <span class="flex items-center gap-1"><Wrench size="14" /> Frais de réparations immédiats (€)</span>
-                <span class="badge badge-rose badge-small">Frais de garage</span>
+                <span class="badge badge-rose badge-small">Optionnel</span>
               </label>
               <input v-model.number="immediateRepairCost" type="number" min="0" class="form-control border-rose-focus" placeholder="ex: 3000" />
-              <p class="text-xxs text-dimmed mt-1">Saisissez le coût des réparations requises si vous décidez de conserver votre voiture actuelle.</p>
+              <p class="text-xxs text-dimmed mt-1">Coût des réparations imminentes si vous gardez votre voiture.</p>
             </div>
           </div>
 
           <!-- Sélection Véhicules Cibles -->
           <div class="form-group mb-4 p-3 border-glass rounded">
-            <label class="form-label text-teal font-semibold mb-3">2. Sélectionnez les véhicules cibles à comparer</label>
+            <label class="form-label text-teal font-semibold mb-3">2. Sélectionnez les alternatives du catalogue</label>
             <div class="targets-checklist">
-              <div v-for="v in vehicles.filter(v => v.id !== currentVehicleId)" :key="v.id" 
+              <div v-for="v in vehicles" :key="v.id" 
                    class="target-checkbox-item flex-between p-2 rounded mb-2 border-glass"
                    :class="selectedTargetIds.includes(v.id) ? 'bg-card-selected' : ''"
                    @click="toggleTargetSelection(v.id)">
@@ -197,9 +274,6 @@ onMounted(() => {
                   </div>
                 </div>
                 <div class="font-semibold text-sm">{{ formatCurrency(v.purchasePrice) }}</div>
-              </div>
-              <div v-if="vehicles.filter(v => v.id !== currentVehicleId).length === 0" class="text-center text-dimmed py-3 text-xs">
-                Aucune alternative disponible en base de données.
               </div>
             </div>
           </div>
@@ -301,7 +375,7 @@ onMounted(() => {
                   </div>
                 </div>
                 <div class="stat-mini text-center p-2 rounded border-glass">
-                  <div class="text-xxs text-dimmed uppercase">Bilan à {{ maxYears }} ans</div>
+                  <div class="text-xxs text-dimmed uppercase">Bilan à {{ result.maxYears }} ans</div>
                   <div class="font-heading text-sm mt-1" :class="alt.totalCostDeltaAtHorizon <= 0 ? 'text-teal' : 'text-rose'">
                     {{ alt.totalCostDeltaAtHorizon <= 0 ? '-' : '+' }}{{ formatCurrency(Math.abs(alt.totalCostDeltaAtHorizon)) }}
                   </div>
@@ -370,6 +444,11 @@ onMounted(() => {
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
 }
+.grid-3-fields {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
 .stat-mini {
   background: rgba(255, 255, 255, 0.02);
 }
@@ -384,12 +463,14 @@ onMounted(() => {
 .pt-3 { padding-top: 12px; }
 .mt-3 { margin-top: 12px; }
 .gap-1 { gap: 4px; }
+.gap-2 { gap: 8px; }
 .items-center { align-items: center; }
 .bg-deep-glass { background: rgba(0, 0, 0, 0.2); }
 .border-rose-focus:focus {
   border-color: hsl(var(--accent-rose)) !important;
   box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.2) !important;
 }
+.text-amber { color: #fbbf24; }
 .text-teal { color: hsl(var(--accent-teal)); }
 .text-rose { color: hsl(var(--accent-rose)); }
 .text-cyan { color: hsl(var(--accent-cyan)); }

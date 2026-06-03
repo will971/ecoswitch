@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -66,24 +67,51 @@ public class VehiculeController {
 	}
 
 	@GetMapping
-	@Operation(summary = "Lister tous les vehicules")
+	@Operation(summary = "Lister tous les vehicules avec pagination et filtres")
 	@ApiResponse(responseCode = "200", description = "Liste des vehicules")
-	public List<Vehicule> findAll(Principal principal) {
-		List<Vehicule> all = vehiculeService.findAll();
+	public ResponseEntity<List<Vehicule>> findAll(
+			@RequestParam(required = false) Integer page,
+			@RequestParam(required = false) Integer size,
+			@RequestParam(required = false) String name,
+			@RequestParam(required = false) String fuelType,
+			Principal principal) {
+		List<Vehicule> all = vehiculeService.findAll(null, null, name, fuelType);
+		List<Vehicule> filtered;
 		if (principal != null) {
 			AppUser user = userRepository.findByEmail(principal.getName()).orElse(null);
 			if (user != null && "ADMIN".equalsIgnoreCase(user.getRole())) {
-				return all;
+				filtered = all;
+			} else {
+				final String userEmail = (user != null) ? user.getEmail() : "";
+				filtered = all.stream()
+						.filter(v -> "PUBLIC".equalsIgnoreCase(v.getVisibility()) || userEmail.equalsIgnoreCase(v.getCreatedBy()))
+						.toList();
 			}
-			final String userEmail = (user != null) ? user.getEmail() : "";
-			return all.stream()
-					.filter(v -> "PUBLIC".equalsIgnoreCase(v.getVisibility()) || userEmail.equalsIgnoreCase(v.getCreatedBy()))
-					.toList();
 		} else {
-			return all.stream()
+			filtered = all.stream()
 					.filter(v -> "PUBLIC".equalsIgnoreCase(v.getVisibility()))
 					.toList();
 		}
+
+		int totalElements = filtered.size();
+		int totalPages = 1;
+		List<Vehicule> content = filtered;
+
+		if (page != null && size != null && size > 0) {
+			totalPages = (int) Math.ceil((double) totalElements / size);
+			if (totalPages == 0) {
+				totalPages = 1;
+			}
+			int fromIndex = Math.min(page * size, totalElements);
+			int toIndex = Math.min(fromIndex + size, totalElements);
+			content = filtered.subList(fromIndex, toIndex);
+		}
+
+		return ResponseEntity.ok()
+				.header("Access-Control-Expose-Headers", "X-Total-Count, X-Total-Pages")
+				.header("X-Total-Count", String.valueOf(totalElements))
+				.header("X-Total-Pages", String.valueOf(totalPages))
+				.body(content);
 	}
 
 	@GetMapping("/{id}")

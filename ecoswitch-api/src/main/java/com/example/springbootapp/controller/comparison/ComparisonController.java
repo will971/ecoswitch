@@ -106,6 +106,71 @@ public class ComparisonController {
 				alternatives);
 	}
 
+	@PostMapping("/profitability/custom")
+	@Operation(summary = "Comparer plusieurs véhicules à un véhicule actuel personnalisé (ex: issu du profil)")
+	@ApiResponses({
+			@ApiResponse(responseCode = "200", description = "Comparaison calculée"),
+			@ApiResponse(responseCode = "400", description = "Données invalides")
+	})
+	public ProfitabilityComparisonResponse compareCustomProfitability(@RequestBody CustomProfitabilityComparisonRequest request) {
+		if (request == null || request.currentVehicle() == null || request.targetVehicleIds() == null || request.targetVehicleIds().isEmpty()) {
+			throw new IllegalArgumentException("Requête invalide ou incomplète.");
+		}
+
+		Vehicule currentVehicle = request.currentVehicle();
+		Integer requestedMaxYears = request.maxYears();
+		int maxYears = requestedMaxYears == null ? DEFAULT_MAX_YEARS : requestedMaxYears;
+		List<VehicleProfitability> alternatives = new ArrayList<>();
+
+		for (Long targetVehicleId : request.targetVehicleIds()) {
+			Vehicule targetVehicle = vehiculeService.findById(targetVehicleId);
+			double currentAnnualCost = costCalculationService.calculateAnnualCost(
+					currentVehicle,
+					costCalculationService.resolveFuelPrice(currentVehicle, request.fuelPricesByType()));
+			double targetAnnualCost = costCalculationService.calculateAnnualCost(
+					targetVehicle,
+					costCalculationService.resolveFuelPrice(targetVehicle, request.fuelPricesByType()));
+			double annualSavings = currentAnnualCost - targetAnnualCost;
+			double switchInvestment = Math.max(0.0, targetVehicle.getPurchasePrice() - currentVehicle.getResaleValue());
+			double immediateRepairCost = request.immediateRepairCost() == null ? 0.0 : request.immediateRepairCost();
+			double totalCostDeltaAtHorizon = costCalculationService.calculateSwitchCostAtYear(
+					currentVehicle,
+					targetVehicle,
+					maxYears,
+					request.fuelPricesByType(),
+					immediateRepairCost);
+			Integer breakEvenYear = costCalculationService.calculateBreakEvenYear(
+					currentVehicle,
+					targetVehicle,
+					maxYears,
+					request.fuelPricesByType(),
+					immediateRepairCost);
+
+			alternatives.add(
+					new VehicleProfitability(
+							targetVehicle.getId(),
+							targetVehicle.getName(),
+							switchInvestment,
+							currentAnnualCost,
+							targetAnnualCost,
+							annualSavings,
+							breakEvenYear,
+							totalCostDeltaAtHorizon));
+		}
+
+		alternatives.sort(
+				Comparator
+						.comparing((VehicleProfitability item) -> item.breakEvenYear() == null)
+						.thenComparing(this::breakEvenSortingValue)
+						.thenComparing(VehicleProfitability::totalCostDeltaAtHorizon));
+
+		return new ProfitabilityComparisonResponse(
+				currentVehicle.getId() != null ? currentVehicle.getId() : -1L,
+				currentVehicle.getName(),
+				maxYears,
+				alternatives);
+	}
+
 	@PostMapping("/profitability/direct")
 	@Operation(summary = "Calculer la rentabilite en comparant deux vehicules saisis a la volee")
 	@ApiResponses({
@@ -313,6 +378,14 @@ public class ComparisonController {
 
 	public record ProfitabilityComparisonRequest(
 			Long currentVehicleId,
+			List<Long> targetVehicleIds,
+			Map<String, Double> fuelPricesByType,
+			Integer maxYears,
+			Double immediateRepairCost) {
+	}
+
+	public record CustomProfitabilityComparisonRequest(
+			Vehicule currentVehicle,
 			List<Long> targetVehicleIds,
 			Map<String, Double> fuelPricesByType,
 			Integer maxYears,
