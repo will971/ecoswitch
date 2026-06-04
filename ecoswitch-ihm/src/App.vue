@@ -229,7 +229,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="app-root flex flex-column min-h-screen">
+  <div class="app-shell min-h-screen">
 
     <!-- Décor de fond : icônes flottantes thématiques -->
     <div class="bg-decor" aria-hidden="true">
@@ -276,9 +276,9 @@ onMounted(async () => {
       <span class="bg-icon bg-currency" style="--x:10%;--y:45%;--s:3.5rem;--r:-30deg;--d:20s;--op:0.085">$</span>
     </div>
 
-    <!-- Navbar Premium -->
-    <header class="navbar-glass py-3 px-4 flex-between sticky-top">
-      <div class="brand flex-center gap-2">
+    <!-- Sidebar Gauche (Navigation) -->
+    <aside class="sidebar-left">
+      <div class="brand flex gap-2">
         <div class="logo-box flex-center">
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M19 10L17.5 6.5C17.2 5.8 16.5 5.3 15.7 5.3H8.3C7.5 5.3 6.8 5.8 6.5 6.5L5 10H3C2.4 10 2 10.4 2 11V15C2 15.6 2.4 16 3 16H4.1C4.5 17.7 6.1 19 8 19C9.9 19 11.5 17.7 11.9 16H12.1C12.5 17.7 14.1 19 16 19C17.9 19 19.5 17.7 19.9 16H21C21.6 16 22 15.6 22 15V11C22 10.4 21.6 10 21 10H19Z" fill="url(#logo-grad-car)" />
@@ -298,13 +298,13 @@ onMounted(async () => {
         </div>
         <div>
           <h1 class="brand-title text-gradient">EcoSwitch</h1>
-          <p class="brand-subtitle">Simulateur & Calculateur de Rentabilité</p>
+          <p class="brand-subtitle hide-on-mobile">Simulateur & Calculateur de Rentabilité</p>
         </div>
       </div>
 
       <!-- Navigation Onglets -->
-      <nav class="flex gap-2 hide-on-mobile">
-        <button class="nav-btn" :class="activeTab === 'direct' ? 'active' : ''" @click="setTab('direct')">
+      <nav class="sidebar-nav flex flex-column gap-2 mt-5">
+        <button class="nav-btn justify-start" :class="activeTab === 'direct' ? 'active' : ''" @click="setTab('direct')">
           <HelpCircle size="16" /> Simulateur direct
         </button>
         <button class="nav-btn" :class="activeTab === 'compare' ? 'active' : ''" @click="setTab('compare')">
@@ -322,78 +322,123 @@ onMounted(async () => {
       </nav>
 
       <!-- Lien vers Admin H2/Monitoring + Espace User -->
-      <div class="flex-center gap-3">
-        <a href="http://localhost:8080/admin/index.html" target="_blank" class="admin-link flex-center gap-1 text-xs">
+      <div class="sidebar-bottom mt-auto flex flex-column gap-3">
+        <a href="http://localhost:8080/admin/index.html" target="_blank" class="admin-link flex-center gap-1 text-xs hide-on-mobile">
           <ShieldCheck size="16" class="text-cyan" />
-          <span>Console H2</span>
+          <span class="admin-text">Console H2</span>
           <ExternalLink size="12" />
         </a>
 
-        <!-- Bouton bascule de thème -->
-        <button class="icon-btn-nav flex-center theme-toggle-btn" @click="toggleTheme" :title="currentTheme === 'light' ? 'Activer le mode sombre' : 'Activer le mode clair'">
-          <Sun v-if="currentTheme === 'light'" size="16" class="text-amber" />
-          <Moon v-else size="16" class="text-cyan" />
-        </button>
+        <div class="flex-between w-100 theme-toggle-container theme-toggle-mobile">
+          <!-- Bouton bascule de thème -->
+          <button class="icon-btn-nav flex-center theme-toggle-btn" @click="toggleTheme" :title="currentTheme === 'light' ? 'Activer le mode sombre' : 'Activer le mode clair'" :aria-label="currentTheme === 'light' ? 'Activer le mode sombre' : 'Activer le mode clair'">
+            <Sun v-if="currentTheme === 'light'" size="16" class="text-amber" />
+            <Moon v-else size="16" class="text-cyan" />
+          </button>
+        </div>
 
         <!-- Authentification Section -->
-        <div class="border-l border-glass pl-3 flex-center">
-          <div v-if="currentUser" class="user-session flex-center gap-2">
-            <div class="user-avatar flex-center">{{ currentUser.name.charAt(0) }}</div>
-            <div class="user-info-navbar">
-              <div class="text-xs font-semibold">{{ currentUser.name }}</div>
-              <div class="badge badge-teal text-xxs font-bold uppercase">{{ currentUser.plan }}</div>
+        <div class="user-auth-section border-t border-glass pt-3 w-100">
+          <div v-if="currentUser" class="user-session flex-between w-100 gap-2">
+            <div class="flex gap-2 items-center">
+              <div class="user-avatar flex-center">{{ currentUser.name.charAt(0) }}</div>
+              <div class="user-info-navbar hide-on-mobile">
+                <div class="text-xs font-semibold truncate" style="max-width: 120px;">{{ currentUser.name }}</div>
+                <div class="badge badge-teal text-xxs font-bold uppercase">{{ currentUser.plan }}</div>
+              </div>
             </div>
-            <button class="icon-btn-nav hover-text-rose" @click="logout" title="Se déconnecter">
+            <button class="icon-btn-nav hover-text-rose shrink-0" @click="logout" title="Se déconnecter" aria-label="Se déconnecter">
               <LogOut size="14" />
             </button>
           </div>
-          <button v-else class="btn btn-secondary btn-small flex-center gap-1 glow-teal" @click="openAuth">
+          <button v-else class="btn btn-secondary w-100 btn-small flex-center gap-1 glow-teal" @click="openAuth">
             <User size="14" />
-            <span>Espace Client</span>
+            <span class="auth-text">Espace Client</span>
           </button>
         </div>
       </div>
-    </header>
+    </aside>
 
-    <!-- Zone principale -->
-    <main class="main-content-area flex-1 py-5 px-4 max-w-7xl mx-auto w-100">
-      <Transition name="fade" mode="out-in">
-        <div :key="activeTab">
-          <DirectSimulator v-if="activeTab === 'direct'" :loadedSimulation="loadedSimulation" :currentUser="currentUser" :userProfile="activeUserProfile" />
-          <CatalogComparator v-else-if="activeTab === 'compare'" :currentUser="currentUser" :userProfiles="userProfiles" :activeUserProfile="activeUserProfile" />
-          <VehicleManager v-else-if="activeTab === 'catalog'" :currentUser="currentUser" :userProfile="activeUserProfile" @open-simulator="setTab('direct')" />
-          <SavedSimulations v-else-if="activeTab === 'saved' && currentUser" :currentUser="currentUser" @load-simulation="handleLoadSimulation" />
-          
+    <!-- Zone principale centrale -->
+    <main class="main-content-area py-5 px-4 w-100">
+      <div class="max-w-7xl mx-auto w-100 h-100 flex flex-column">
+        <div class="flex-1">
+          <Transition name="fade" mode="out-in">
+            <div :key="activeTab">
+              <DirectSimulator v-if="activeTab === 'direct'" :loadedSimulation="loadedSimulation" :currentUser="currentUser" :userProfile="activeUserProfile" />
+              <CatalogComparator v-else-if="activeTab === 'compare'" :currentUser="currentUser" :userProfiles="userProfiles" :activeUserProfile="activeUserProfile" />
+              <VehicleManager v-else-if="activeTab === 'catalog'" :currentUser="currentUser" :userProfile="activeUserProfile" @open-simulator="setTab('direct')" />
+              <SavedSimulations v-else-if="activeTab === 'saved' && currentUser" :currentUser="currentUser" @load-simulation="handleLoadSimulation" />
+            </div>
+          </Transition>
         </div>
-      </Transition>
+        <!-- Footer Premium -->
+        <footer class="footer-glass py-4 px-4 text-center text-xs text-dimmed mt-4 rounded-xl" style="border-radius: 12px;">
+          <p>&copy; 2026 EcoSwitch. Tous droits réservés. Propulsé par Spring Boot 4 et Vue.js 3 (Vite).</p>
+          <p class="mt-1">Interface SaaS Premium développée selon les standards esthétiques mode sombre.</p>
+        </footer>
+      </div>
     </main>
 
-    <!-- Footer Premium -->
-    <footer class="footer-glass py-4 px-4 text-center text-xs text-dimmed mt-auto">
-      <p>&copy; 2026 EcoSwitch. Tous droits réservés. Propulsé par Spring Boot 4 et Vue.js 3 (Vite).</p>
-      <p class="mt-1">Interface SaaS Premium développée selon les standards esthétiques mode sombre.</p>
-    </footer>
+    <!-- Sidebar Droite (Context & Value Add) -->
+    <aside class="sidebar-right hide-on-mobile">
+      <div class="card-glass glow-teal mb-4 p-4">
+        <h3 class="text-sm font-bold flex items-center gap-2 mb-3 text-gradient-teal">
+          <Sparkles size="16" /> Astuces EcoSwitch
+        </h3>
+        <ul class="text-xs text-muted list-none flex flex-column gap-3 m-0 p-0">
+          <li class="flex gap-2">
+            <Check size="14" class="text-teal mt-1 shrink-0" />
+            <span style="line-height: 1.4;">Roulez souple : une conduite apaisée économise jusqu'à 20% d'énergie.</span>
+          </li>
+          <li class="flex gap-2">
+            <Check size="14" class="text-teal mt-1 shrink-0" />
+            <span style="line-height: 1.4;">La pression des pneus influe directement sur l'autonomie électrique.</span>
+          </li>
+          <li class="flex gap-2">
+            <Check size="14" class="text-teal mt-1 shrink-0" />
+            <span style="line-height: 1.4;">Utilisez le freinage régénératif au maximum.</span>
+          </li>
+        </ul>
+      </div>
 
-    <!-- Barre de Navigation Basse sur Mobile (Style Snapchat/Instagram) -->
-    <nav class="mobile-bottom-nav">
-      <button class="mobile-nav-btn" :class="activeTab === 'direct' ? 'active' : ''" @click="setTab('direct')" title="Simulateur direct">
-        <HelpCircle size="22" />
+      <div v-if="currentUser" class="card-glass p-4 mt-auto">
+        <h3 class="text-xs text-dimmed mb-2 uppercase font-bold">Votre Impact</h3>
+        <div class="flex items-end gap-2 mb-1">
+          <span class="text-2xl font-bold text-teal" style="line-height: 1;">12%</span>
+          <span class="text-xs text-muted mb-1">d'économie</span>
+        </div>
+        <p class="text-xxs text-dimmed mt-1">Basé sur vos récentes simulations</p>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Barre de Navigation Basse sur Mobile (Style Snapchat/Instagram) -->
+  <nav class="mobile-bottom-nav">
+    <button class="mobile-nav-btn" :class="activeTab === 'direct' ? 'active' : ''" @click="setTab('direct')" title="Simulateur direct" aria-label="Simulateur direct">
+      <HelpCircle size="22" />
+    </button>
+    <button class="mobile-nav-btn" :class="activeTab === 'compare' ? 'active' : ''" @click="setTab('compare')" title="Comparateur" aria-label="Comparateur">
+      <BarChart3 size="22" />
+    </button>
+    <button class="mobile-nav-btn" :class="activeTab === 'catalog' ? 'active' : ''" @click="setTab('catalog')" title="Catalogue H2" aria-label="Catalogue H2">
+      <Car size="22" />
+    </button>
+    <template v-if="currentUser">
+      <button class="mobile-nav-btn" @click="showProfileModal = true" title="Profil Véhicule" aria-label="Profil Véhicule">
+        <Settings size="22" />
       </button>
-      <button class="mobile-nav-btn" :class="activeTab === 'compare' ? 'active' : ''" @click="setTab('compare')" title="Comparateur">
-        <BarChart3 size="22" />
-      </button>
-      <button class="mobile-nav-btn" :class="activeTab === 'catalog' ? 'active' : ''" @click="setTab('catalog')" title="Catalogue H2">
-        <Car size="22" />
-      </button>
-      <button v-if="currentUser" class="mobile-nav-btn" :class="activeTab === 'saved' ? 'active' : ''" @click="setTab('saved')" title="Mes Simulations">
+      <button class="mobile-nav-btn" :class="activeTab === 'saved' ? 'active' : ''" @click="setTab('saved')" title="Mes Simulations" aria-label="Mes Simulations">
         <Sparkles size="22" />
       </button>
-    </nav>
+    </template>
+  </nav>
 
+  <div>
     <!-- Modale d'Authentification (SaaS Sign In/Up) -->
     <div v-if="showAuthModal" class="auth-modal-overlay flex-center">
       <div class="card-glass glow-teal auth-modal-card p-4 relative max-w-md w-100">
-        <button class="absolute top-4 right-4 text-dimmed hover-text-main" @click="closeAuth">
+        <button class="absolute top-4 right-4 text-dimmed hover-text-main" @click="closeAuth" aria-label="Fermer la fenêtre">
           <X size="20" />
         </button>
 
@@ -523,11 +568,51 @@ onMounted(async () => {
 }
 
 /* S'assure que le contenu applicatif est au-dessus du décor */
-.app-root > header,
-.app-root > main,
-.app-root > footer {
+.app-shell > aside,
+.app-shell > main,
+.app-shell > nav {
   position: relative;
   z-index: 1;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 240px 1fr 280px;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+}
+
+.sidebar-left {
+  background: rgba(var(--bg-nav));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-right: 1px solid hsl(var(--border-glass));
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 1rem;
+  overflow-y: auto;
+  z-index: 10;
+}
+
+.sidebar-left .nav-btn {
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.sidebar-right {
+  background: rgba(var(--bg-footer));
+  border-left: 1px solid hsl(var(--border-glass));
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 1rem;
+  overflow-y: auto;
+  z-index: 10;
+}
+
+.main-content-area {
+  overflow-y: auto;
+  height: 100vh;
 }
 
 /* App Root variables and resets */
@@ -766,58 +851,70 @@ onMounted(async () => {
   text-align: center;
 }
 
-/* Responsive navbar design for mobile & tablet */
-@media (max-width: 992px) {
-  header.navbar-glass {
-    flex-wrap: wrap !important;
-    justify-content: space-between !important;
-    align-items: center !important;
-    padding: 0.75rem 1rem !important;
-    gap: 0.75rem !important;
+/* Layout adjustments for smaller screens */
+@media (max-width: 1200px) {
+  .app-shell {
+    grid-template-columns: 240px 1fr; /* Hide right sidebar */
   }
-  header.navbar-glass > .brand {
-    order: 1;
-  }
-  header.navbar-glass > div.flex-center.gap-3 {
-    order: 2;
-  }
-  header.navbar-glass > nav {
-    order: 3;
-    width: 100%;
-    display: flex;
-    justify-content: flex-start;
-    overflow-x: auto;
-    white-space: nowrap;
-    padding: 4px 0;
-    margin-top: 0.25rem;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-  header.navbar-glass > nav::-webkit-scrollbar {
+  .sidebar-right {
     display: none;
   }
-  header.navbar-glass > nav .nav-btn {
-    flex-shrink: 0;
-    white-space: nowrap;
-    padding: 8px 12px;
-    font-size: 0.82rem;
+}
+
+@media (max-width: 1024px) {
+  .app-shell {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    padding-bottom: 75px !important;
+    overflow: visible;
   }
-}
-
-/* Visibility rules & Bottom mobile menu styling */
-.hide-on-desktop {
-  display: none;
-}
-
-@media (max-width: 768px) {
+  .sidebar-left {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    border-right: none;
+    border-bottom: 1px solid hsl(var(--border-glass));
+    position: sticky;
+    top: 0;
+    width: 100%;
+    z-index: 50;
+  }
+  .sidebar-left .sidebar-nav {
+    display: none; /* Hidden on mobile, use bottom nav instead */
+  }
+  .sidebar-left .sidebar-bottom {
+    flex-direction: row;
+    margin-top: 0;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  .sidebar-left .user-auth-section {
+    border-top: none;
+    padding-top: 0;
+    width: auto !important;
+  }
+  .sidebar-left .theme-toggle-mobile {
+    width: auto !important;
+  }
+  .sidebar-left .user-session {
+    width: auto !important;
+  }
+  .sidebar-left .admin-text, .sidebar-left .auth-text {
+    display: none;
+  }
+  .main-content-area {
+    height: auto;
+    overflow-y: visible;
+  }
+  
   .hide-on-mobile {
     display: none !important;
   }
   .hide-on-desktop {
     display: flex !important;
-  }
-  .app-root {
-    padding-bottom: 75px !important;
   }
 }
 
@@ -828,7 +925,7 @@ onMounted(async () => {
   left: 0;
   right: 0;
   height: 65px;
-  background: hsl(var(--bg-glass));
+  background: hsl(var(--bg-deep) / 0.95);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-top: 1px solid hsl(var(--border-glass));
@@ -839,7 +936,7 @@ onMounted(async () => {
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .mobile-bottom-nav {
     display: flex;
   }

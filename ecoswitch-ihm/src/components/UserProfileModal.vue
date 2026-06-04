@@ -77,7 +77,7 @@ const searchByPlaque = async () => {
   searchLoading.value = true
   error.value = null
   try {
-    const res = await fetch(`/api/v1/vehicules/immatriculation/${encodeURIComponent(plaqueInput.value)}`)
+    const res = await fetch(`/api/v1/immatriculation/${encodeURIComponent(plaqueInput.value)}`)
     if (!res.ok) throw new Error('Véhicule introuvable pour cette plaque.')
     const data = await res.json()
     form.value.name = data.name || form.value.name
