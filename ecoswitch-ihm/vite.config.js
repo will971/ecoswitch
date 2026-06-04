@@ -10,7 +10,7 @@ export default defineConfig({
     // 2. allowedHosts: validates the HTTP Host header (prevents DNS rebinding attacks)
     // Safari triggers BOTH checks, so both must be explicitly configured for local dev.
     cors: true,
-    allowedHosts: ['localhost', '127.0.0.1'],
+    allowedHosts: true,
     proxy: {
       '/api': {
         target: 'http://localhost:8080',
