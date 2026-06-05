@@ -1,72 +1,69 @@
-# EcoSwitch Monorepo
+# EcoSwitch — Monorepo de Transition Écologique
 
-Monorepo du projet EcoSwitch avec :
-- une API backend Spring Boot
-- une IHM frontend Vue 3 / Vite
+EcoSwitch est un outil d'aide à la décision financière et écologique permettant de comparer le coût de détention de différents véhicules et d'identifier le seuil de rentabilité lors du passage au véhicule électrique ou hybride.
 
-## Structure
+Ce dépôt est un monorepo contenant :
+*   **ecoswitch-api** : Le serveur backend REST (Spring Boot / Java 24 / H2).
+*   **ecoswitch-ihm** : L'interface utilisateur Web monopage (Vue 3 / Vite).
+
+---
+
+## 📂 Structure du Projet
 
 ```text
 DEV/
-  ecoswitch-api/      # backend Spring Boot
-  ecoswitch-ihm/      # frontend Vue + Vite
-  docker-compose.yml  # lancement complet conteneurise
-  Makefile            # commandes unifiees
-  DOCKER-RUN.md       # guide docker detaille
+  ├── ecoswitch-api/      # Backend Spring Boot (API & Admin)
+  ├── ecoswitch-ihm/      # Frontend Vue.js (Interface Web & Proxy Nginx)
+  ├── docs/               # Documentations détaillées (Fonctionnelle, Technique, Dév)
+  ├── Makefile            # Raccourcis de commandes unifiées pour le projet
+  ├── docker-compose.yml  # Fichier d'orchestration multi-conteneurs
+  └── DOCKER-RUN.md       # Guide de déploiement Docker simplified
 ```
 
-> `springboot-app/` n'est pas utilise par le setup Docker actuel.
+---
 
-## Prerequis
+## 📖 Documentations Détaillées
 
-- Docker Desktop (ou Docker Engine + Compose plugin)
-- Optionnel pour developpement local :
-  - Java 24 (API)
-  - Node.js 22+ et npm (IHM)
+Pour faciliter l'intégration et la contribution au projet, la documentation est découpée en trois guides spécifiques :
 
-## Demarrage rapide (recommande)
+*   📘 **[Documentation Fonctionnelle](./docs/FUNCTIONAL.md)** : Règles métier, calcul du seuil de rentabilité (Break-Even), amortissement LOA/LLD, subventions gouvernementales (Bonus Écologique et Prime à la Conversion), émissions CO₂ et recherche de plaques d'immatriculation.
+*   📗 **[Documentation Technique](./docs/TECHNICAL.md)** : Architecture logicielle, double chaîne de sécurité Spring Security (JWT stateless pour l'API et session standard pour l'Admin), proxy Nginx, et solutions d'observabilité (AspectJ, JVM MXBeans, modification dynamique du niveau de log).
+*   📙 **[Guide de Développement & Intégration](./docs/DEVELOPMENT.md)** : Prérequis d'installation, lancement local avec/sans Docker, accès aux consoles Swagger & H2, peuplement initial des bases de données et lancement des tests JUnit.
 
-Depuis la racine `DEV` :
+---
 
+## 🚀 Démarrage Rapide
+
+Le moyen le plus simple de démarrer l'ensemble des services est d'utiliser Docker Compose via le `Makefile`.
+
+### Lancement Complet
+Depuis la racine du projet, exécutez :
 ```bash
 make up
 ```
 
-Acces :
-- IHM: <http://localhost:3000>
-- API: <http://localhost:8080>
-- Swagger: <http://localhost:8080/swagger-ui/index.html>
+### URL Utiles
+*   **Application Web (IHM)** : [http://localhost:3000](http://localhost:3000)
+*   **API Swagger (OpenAPI)** : [http://localhost:8080/swagger-ui/index.html](http://localhost:8080/swagger-ui/index.html)
+*   **Dashboard d'Administration** : [http://localhost:8080/admin](http://localhost:8080/admin) *(User: `admin` / Password: `admin`)*
+*   **Console Base de Données H2** : [http://localhost:8080/h2-console](http://localhost:8080/h2-console) *(JDBC URL : `jdbc:h2:mem:testdb`)*
 
-Arret :
-
+### Arrêt de l'Environnement
 ```bash
 make down
 ```
 
-## Developpement local sans Docker
+---
 
-### API
-```bash
-make dev-api
-```
+## 🛠️ Commandes Utiles (Raccourcis Makefile)
 
-### IHM
-```bash
-make dev-ihm
-```
-
-Par defaut, l'IHM locale tourne sur `http://localhost:5173` et proxifie `/api` vers l'API locale.
-
-## Commandes utiles
-
-- `make build` : rebuild des images Docker
-- `make logs` : logs des services Docker
-- `make ps` : etat des conteneurs
-- `make test-api` : tests backend
-- `make build-ihm` : build frontend
-
-## Documentation projet
-
-- API : `ecoswitch-api/README.md`
-- IHM : `ecoswitch-ihm/README.md`
-- Docker : `DOCKER-RUN.md`
+| Commande | Action |
+| :--- | :--- |
+| `make up` | Démarre et reconstruit l'ensemble des conteneurs Docker (API + IHM + Proxy) |
+| `make down` | Arrête et nettoie tous les conteneurs et réseaux Docker associés |
+| `make dev-api` | Lance le serveur backend en local sur le port `8080` (sans Docker) |
+| `make dev-ihm` | Installe les dépendances et lance le front en local sur le port `5173` |
+| `make test-api` | Exécute l'ensemble des tests automatisés JUnit du backend |
+| `make build` | Reconstruit uniquement les images Docker |
+| `make logs` | Affiche en continu les logs des conteneurs Docker |
+| `make ps` | Liste l'état des conteneurs en cours d'exécution |
