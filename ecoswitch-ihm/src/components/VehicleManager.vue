@@ -24,8 +24,14 @@ const successMsg = ref(null)
 const page = ref(0)
 const size = ref(6) // 6 véhicules par page
 const totalPages = ref(1)
-const searchName = ref('')
-const filterFuelType = ref('')
+
+// ADEME Filter states
+const brands = ref([])
+const models = ref([])
+const versions = ref([])
+const selectedBrand = ref('')
+const selectedModel = ref('')
+const selectedVersion = ref(null)
 
 // Formulaire
 const formOpen = ref(false)
@@ -53,6 +59,64 @@ const getHeaders = () => {
   }
 }
 
+// Catalog Service fetchers (conditioned strictly on available catalog inventory)
+const fetchBrands = async () => {
+  try {
+    const res = await fetch('/api/v1/vehicules/brands')
+    if (res.ok) {
+      brands.value = await res.json()
+    }
+  } catch (err) {
+    console.error('Erreur de chargement des marques:', err)
+  }
+}
+
+const fetchModels = async () => {
+  models.value = []
+  versions.value = []
+  selectedModel.value = ''
+  selectedVersion.value = null
+  
+  if (!selectedBrand.value) {
+    page.value = 0
+    fetchVehicles()
+    return
+  }
+
+  try {
+    const res = await fetch(`/api/v1/vehicules/models?brand=${encodeURIComponent(selectedBrand.value)}`)
+    if (res.ok) {
+      models.value = await res.json()
+    }
+  } catch (err) {
+    console.error('Erreur de chargement des modèles:', err)
+  }
+  page.value = 0
+  fetchVehicles()
+}
+
+const fetchVersions = async () => {
+  versions.value = []
+  selectedVersion.value = null
+  
+  if (!selectedBrand.value || !selectedModel.value) {
+    page.value = 0
+    fetchVehicles()
+    return
+  }
+
+  try {
+    const res = await fetch(`/api/v1/vehicules/versions?brand=${encodeURIComponent(selectedBrand.value)}&model=${encodeURIComponent(selectedModel.value)}`)
+    if (res.ok) {
+      versions.value = await res.json()
+    }
+  } catch (err) {
+    console.error('Erreur de chargement des versions:', err)
+  }
+  page.value = 0
+  fetchVehicles()
+}
+
 const fetchVehicles = async () => {
   loading.value = true
   error.value = null
@@ -60,11 +124,15 @@ const fetchVehicles = async () => {
     const params = new URLSearchParams()
     params.append('page', page.value)
     params.append('size', size.value)
-    if (searchName.value.trim()) {
-      params.append('name', searchName.value.trim())
+    if (selectedBrand.value) {
+      params.append('brand', selectedBrand.value)
     }
-    if (filterFuelType.value) {
-      params.append('fuelType', filterFuelType.value)
+    if (selectedModel.value) {
+      params.append('model', selectedModel.value)
+    }
+    if (selectedVersion.value) {
+      // If version is selected, match exactly using its clean version string
+      params.append('version', selectedVersion.value.version)
     }
     const response = await fetch(`/api/v1/vehicules?${params.toString()}`, {
       headers: getHeaders()
@@ -82,7 +150,15 @@ const fetchVehicles = async () => {
   }
 }
 
-const onSearch = () => {
+const onBrandChange = () => {
+  fetchModels()
+}
+
+const onModelChange = () => {
+  fetchVersions()
+}
+
+const onVersionChange = () => {
   page.value = 0
   fetchVehicles()
 }
@@ -106,6 +182,10 @@ const openAddForm = () => {
   activeVehicleId.value = null
   form.value = {
     name: '',
+    brand: '',
+    model: '',
+    generation: '',
+    version: '',
     purchasePrice: 20000,
     fuelType: 'PETROL',
     consumption: 6.0,
@@ -124,6 +204,10 @@ const openEditForm = (vehicle) => {
   activeVehicleId.value = vehicle.id
   form.value = { 
     ...vehicle,
+    brand: vehicle.brand || '',
+    model: vehicle.model || '',
+    generation: vehicle.generation || '',
+    version: vehicle.version || '',
     url: vehicle.url || '',
     visibility: vehicle.visibility || 'PUBLIC'
   }
@@ -131,6 +215,19 @@ const openEditForm = (vehicle) => {
 }
 
 const saveVehicle = async () => {
+  if (!form.value.brand || !form.value.brand.trim()) {
+    error.value = "La marque est obligatoire."
+    return
+  }
+  if (!form.value.model || !form.value.model.trim()) {
+    error.value = "Le modèle est obligatoire."
+    return
+  }
+  if (!form.value.version || !form.value.version.trim()) {
+    error.value = "La version est obligatoire."
+    return
+  }
+
   loading.value = true
   error.value = null
   successMsg.value = null
@@ -259,6 +356,7 @@ const openSimulatorForVehicle = (vehicle) => {
 
 onMounted(() => {
   fetchVehicles()
+  fetchBrands()
 })
 </script>
 
@@ -289,25 +387,28 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Filtres et Recherche -->
-    <div v-if="!formOpen" class="filters-bar card-glass p-3 mb-4 flex-between gap-3">
-      <div class="flex-1">
-        <input 
-          v-model="searchName" 
-          @input="onSearch" 
-          type="text" 
-          class="form-control" 
-          placeholder="Rechercher par nom (ex: Peugeot)..." 
-        />
-      </div>
-      <div style="min-width: 180px;">
-        <select v-model="filterFuelType" @change="onSearch" class="form-control form-select">
-          <option value="">Tous les carburants</option>
-          <option value="PETROL">Essence</option>
-          <option value="DIESEL">Diesel</option>
-          <option value="HYBRID">Hybride</option>
-          <option value="ELECTRIC">Électrique</option>
-        </select>
+    <!-- Filtres et Recherche Cascading (Marque -> Modèle -> Version) -->
+    <div v-if="!formOpen" class="filters-bar card-glass p-3 mb-4 flex flex-column gap-3">
+      <div class="text-xxs text-cyan uppercase font-semibold">⚡ Rechercher par critères</div>
+      <div class="grid-3-fields w-100">
+        <div class="form-group mb-0">
+          <select v-model="selectedBrand" class="form-control form-select text-xs" @change="onBrandChange">
+            <option value="">Marque</option>
+            <option v-for="b in brands" :key="b" :value="b">{{ b }}</option>
+          </select>
+        </div>
+        <div class="form-group mb-0">
+          <select v-model="selectedModel" :disabled="!selectedBrand" class="form-control form-select text-xs" @change="onModelChange">
+            <option value="">Modèle</option>
+            <option v-for="m in models" :key="m" :value="m">{{ m }}</option>
+          </select>
+        </div>
+        <div class="form-group mb-0">
+          <select v-model="selectedVersion" :disabled="!selectedModel" class="form-control form-select text-xs" @change="onVersionChange">
+            <option :value="null">Version (Tout afficher)</option>
+            <option v-for="v in versions" :key="v.version" :value="v">{{ v.version }}</option>
+          </select>
+        </div>
       </div>
     </div>
 
@@ -323,8 +424,20 @@ onMounted(() => {
       <div class="grid-cols-2">
         <div>
           <div class="form-group">
-            <label class="form-label">Nom du modèle</label>
-            <input v-model="form.name" type="text" class="form-control" placeholder="ex: Peugeot 308 BlueHDi" required />
+            <label class="form-label">Marque</label>
+            <input v-model="form.brand" type="text" class="form-control" placeholder="ex: Peugeot" @input="form.name = `${form.brand} ${form.model} ${form.generation} ${form.version}`.replace(/\s+/g, ' ').trim()" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Modèle</label>
+            <input v-model="form.model" type="text" class="form-control" placeholder="ex: 308" @input="form.name = `${form.brand} ${form.model} ${form.generation} ${form.version}`.replace(/\s+/g, ' ').trim()" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Génération (Code Génération)</label>
+            <input v-model="form.generation" type="text" class="form-control" placeholder="ex: III (optionnel)" @input="form.name = `${form.brand} ${form.model} ${form.generation} ${form.version}`.replace(/\s+/g, ' ').trim()" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Version / Finition</label>
+            <input v-model="form.version" type="text" class="form-control" placeholder="ex: BlueHDi 130 EAT8" @input="form.name = `${form.brand} ${form.model} ${form.generation} ${form.version}`.replace(/\s+/g, ' ').trim()" required />
           </div>
           <div class="form-group">
             <label class="form-label">Type d'énergie</label>

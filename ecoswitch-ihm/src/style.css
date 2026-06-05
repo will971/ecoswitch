@@ -311,6 +311,16 @@ h1, h2, h3, h4, h5, h6 {
   color: hsl(var(--text-main));
 }
 
+.table-glass th:first-child,
+.table-glass td:first-child {
+  padding-left: 24px;
+}
+
+.table-glass th:last-child,
+.table-glass td:last-child {
+  padding-right: 24px;
+}
+
 .table-glass tr:last-child td {
   border-bottom: none;
 }

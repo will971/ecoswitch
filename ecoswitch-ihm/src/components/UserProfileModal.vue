@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onMounted } from 'vue'
 import { X, Save, Car, Fuel, Zap, AlertCircle, Plus, Star, Search, Trash2 } from '@lucide/vue'
 import { apiCreateUserVehicleProfile, apiUpdateUserVehicleProfile, apiDeleteUserVehicleProfile } from '../utils/api.js'
 
@@ -14,12 +14,18 @@ const props = defineProps({
 const emit = defineEmits(['close', 'profiles-updated'])
 
 const loading = ref(false)
-const searchLoading = ref(false)
 const error = ref(null)
 const successMsg = ref(null)
 
 const activeProfileId = ref('new') // 'new' ou ID du profil
-const plaqueInput = ref('')
+
+// ADEME States
+const brands = ref([])
+const models = ref([])
+const versions = ref([])
+const selectedBrand = ref('')
+const selectedModel = ref('')
+const selectedVersion = ref(null)
 
 const defaultForm = {
   name: '',
@@ -40,6 +46,13 @@ const form = ref({ ...defaultForm })
 // Synchroniser form quand activeProfileId change ou quand profiles change
 watch(() => [props.show, activeProfileId.value, props.profiles], () => {
   if (props.show) {
+    // RàZ du sélecteur ADEME lors du changement de tab
+    selectedBrand.value = ''
+    selectedModel.value = ''
+    selectedVersion.value = null
+    models.value = []
+    versions.value = []
+
     if (activeProfileId.value === 'new') {
       // Hériter des prix d'énergie du dernier profil si existant
       const inheritedPrices = props.profiles.length > 0 ? {
@@ -62,7 +75,9 @@ watch(() => props.show, (newVal) => {
   if (newVal) {
     error.value = null
     successMsg.value = null
-    plaqueInput.value = ''
+    selectedBrand.value = ''
+    selectedModel.value = ''
+    selectedVersion.value = null
     if (props.profiles.length > 0) {
       const defaultP = props.profiles.find(p => p.default) || props.profiles[props.profiles.length - 1]
       activeProfileId.value = defaultP.id
@@ -72,24 +87,62 @@ watch(() => props.show, (newVal) => {
   }
 })
 
-const searchByPlaque = async () => {
-  if (!plaqueInput.value) return
-  searchLoading.value = true
-  error.value = null
+// ADEME methods
+const fetchBrands = async () => {
   try {
-    const res = await fetch(`/api/v1/immatriculation/${encodeURIComponent(plaqueInput.value)}`)
-    if (!res.ok) throw new Error('Véhicule introuvable pour cette plaque.')
-    const data = await res.json()
-    form.value.name = data.name || form.value.name
-    if (data.fuelType) form.value.fuelType = data.fuelType
-    if (data.consumption) form.value.consumption = data.consumption
-    successMsg.value = `Véhicule trouvé : ${data.name}`
-    setTimeout(() => successMsg.value = null, 3000)
+    const res = await fetch('/api/v1/ademe/brands')
+    if (res.ok) {
+      brands.value = await res.json()
+    }
   } catch (err) {
-    error.value = err.message
-  } finally {
-    searchLoading.value = false
+    console.error('Erreur ADEME marques:', err)
   }
+}
+
+const fetchModels = async () => {
+  models.value = []
+  versions.value = []
+  selectedModel.value = ''
+  selectedVersion.value = null
+  if (!selectedBrand.value) return
+  try {
+    const res = await fetch(`/api/v1/ademe/models?brand=${encodeURIComponent(selectedBrand.value)}`)
+    if (res.ok) {
+      models.value = await res.json()
+    }
+  } catch (err) {
+    console.error('Erreur ADEME modèles:', err)
+  }
+}
+
+const fetchVersions = async () => {
+  versions.value = []
+  selectedVersion.value = null
+  if (!selectedBrand.value || !selectedModel.value) return
+  try {
+    const res = await fetch(`/api/v1/ademe/versions?brand=${encodeURIComponent(selectedBrand.value)}&model=${encodeURIComponent(selectedModel.value)}`)
+    if (res.ok) {
+      versions.value = await res.json()
+    }
+  } catch (err) {
+    console.error('Erreur ADEME versions:', err)
+  }
+}
+
+const onVersionChange = () => {
+  if (!selectedVersion.value) return
+  const v = selectedVersion.value
+  form.value.name = `${v.brand} ${v.model} ${v.version}`
+  form.value.fuelType = v.fuelType
+  form.value.consumption = v.consumption
+  
+  if (v.annualMileage) form.value.annualMileage = v.annualMileage
+  form.value.insuranceCost = v.insuranceCost || 600
+  form.value.maintenanceCost = v.maintenanceCost || 400
+  if (v.resaleValue) form.value.resaleValue = v.resaleValue
+  
+  successMsg.value = `Véhicule trouvé : ${form.value.name}`
+  setTimeout(() => successMsg.value = null, 3000)
 }
 
 const saveProfile = async () => {
@@ -136,6 +189,10 @@ const deleteProfile = async () => {
     loading.value = false
   }
 }
+
+onMounted(() => {
+  fetchBrands()
+})
 </script>
 
 <template>
@@ -181,17 +238,30 @@ const deleteProfile = async () => {
         </div>
       </div>
 
-      <!-- Recherche par Plaque (uniquement si nouveau) -->
+      <!-- Sélection ADEME (uniquement si nouveau) -->
       <div v-if="activeProfileId === 'new'" class="p-3 mb-4 rounded border-glass bg-deep-glass">
-        <label class="form-label text-cyan text-sm flex items-center gap-1 mb-2">
-          <Search size="14" /> Recherche rapide par plaque
+        <label class="form-label text-cyan text-sm flex items-center gap-1 mb-2 font-semibold">
+          ⚡ Remplissage rapide par Marque / Modèle / Version
         </label>
-        <div class="flex gap-2">
-          <input v-model="plaqueInput" type="text" class="form-control font-heading text-center tracking-widest uppercase" placeholder="AA-123-AA" @keyup.enter="searchByPlaque" />
-          <button class="btn btn-secondary flex-center whitespace-nowrap" @click="searchByPlaque" :disabled="searchLoading">
-            <span v-if="searchLoading" class="spinner"><Search size="16" /></span>
-            <span v-else>Chercher</span>
-          </button>
+        <div class="grid-3-fields">
+          <div class="form-group mb-0">
+            <select v-model="selectedBrand" class="form-control form-select text-xs" @change="fetchModels">
+              <option value="">Marque</option>
+              <option v-for="b in brands" :key="b" :value="b">{{ b }}</option>
+            </select>
+          </div>
+          <div class="form-group mb-0">
+            <select v-model="selectedModel" :disabled="!selectedBrand" class="form-control form-select text-xs" @change="fetchVersions">
+              <option value="">Modèle</option>
+              <option v-for="m in models" :key="m" :value="m">{{ m }}</option>
+            </select>
+          </div>
+          <div class="form-group mb-0">
+            <select v-model="selectedVersion" :disabled="!selectedModel" class="form-control form-select text-xs" @change="onVersionChange">
+              <option :value="null">Version</option>
+              <option v-for="v in versions" :key="v.version" :value="v">{{ v.version }}</option>
+            </select>
+          </div>
         </div>
       </div>
 

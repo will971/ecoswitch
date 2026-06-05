@@ -23,23 +23,27 @@ public class VehiculeRepository {
 	public Vehicule save(Vehicule vehicule) {
 		final String sql = """
 			INSERT INTO vehicule
-			(name, purchase_price, fuel_type, consumption, annual_mileage, insurance_cost, maintenance_cost, resale_value, url, visibility, created_by)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			(name, brand, model, generation, version, purchase_price, fuel_type, consumption, annual_mileage, insurance_cost, maintenance_cost, resale_value, url, visibility, created_by)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			""";
 		KeyHolder keyHolder = new GeneratedKeyHolder();
 		jdbcTemplate.update(connection -> {
 			PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
 			statement.setString(1, vehicule.getName());
-			statement.setDouble(2, vehicule.getPurchasePrice());
-			statement.setString(3, vehicule.getFuelType().name());
-			statement.setDouble(4, vehicule.getConsumption());
-			statement.setInt(5, vehicule.getAnnualMileage());
-			statement.setDouble(6, vehicule.getInsuranceCost());
-			statement.setDouble(7, vehicule.getMaintenanceCost());
-			statement.setDouble(8, vehicule.getResaleValue());
-			statement.setString(9, vehicule.getUrl());
-			statement.setString(10, vehicule.getVisibility());
-			statement.setString(11, vehicule.getCreatedBy());
+			statement.setString(2, vehicule.getBrand());
+			statement.setString(3, vehicule.getModel());
+			statement.setString(4, vehicule.getGeneration());
+			statement.setString(5, vehicule.getVersion());
+			statement.setDouble(6, vehicule.getPurchasePrice());
+			statement.setString(7, vehicule.getFuelType().name());
+			statement.setDouble(8, vehicule.getConsumption());
+			statement.setInt(9, vehicule.getAnnualMileage());
+			statement.setDouble(10, vehicule.getInsuranceCost());
+			statement.setDouble(11, vehicule.getMaintenanceCost());
+			statement.setDouble(12, vehicule.getResaleValue());
+			statement.setString(13, vehicule.getUrl());
+			statement.setString(14, vehicule.getVisibility());
+			statement.setString(15, vehicule.getCreatedBy());
 			return statement;
 		}, keyHolder);
 
@@ -52,7 +56,7 @@ public class VehiculeRepository {
 
 	public List<Vehicule> findAll() {
 		final String sql = """
-			SELECT id, name, purchase_price, fuel_type, consumption, annual_mileage, insurance_cost, maintenance_cost, resale_value, url, visibility, created_by
+			SELECT id, name, brand, model, generation, version, purchase_price, fuel_type, consumption, annual_mileage, insurance_cost, maintenance_cost, resale_value, url, visibility, created_by
 			FROM vehicule
 			ORDER BY id DESC
 			""";
@@ -60,19 +64,48 @@ public class VehiculeRepository {
 	}
 
 	public List<Vehicule> findAll(Integer page, Integer size, String name, String fuelType) {
+		return findAll(page, size, name, fuelType, null, null, null);
+	}
+
+	public List<Vehicule> findAll(Integer page, Integer size, String name, String fuelType, String brand, String model, String version) {
 		StringBuilder sql = new StringBuilder("""
-			SELECT id, name, purchase_price, fuel_type, consumption, annual_mileage, insurance_cost, maintenance_cost, resale_value, url, visibility, created_by
+			SELECT id, name, brand, model, generation, version, purchase_price, fuel_type, consumption, annual_mileage, insurance_cost, maintenance_cost, resale_value, url, visibility, created_by
 			FROM vehicule
 			WHERE 1=1
 			""");
 		List<Object> params = new java.util.ArrayList<>();
 		if (name != null && !name.isBlank()) {
-			sql.append(" AND LOWER(name) LIKE ?");
-			params.add("%" + name.trim().toLowerCase() + "%");
+			String[] words = name.trim().split("\\s+");
+			for (String word : words) {
+				if (!word.isBlank()) {
+					sql.append(" AND LOWER(name) LIKE ?");
+					params.add("%" + word.toLowerCase() + "%");
+				}
+			}
 		}
 		if (fuelType != null && !fuelType.isBlank()) {
 			sql.append(" AND fuel_type = ?");
 			params.add(fuelType.trim().toUpperCase());
+		}
+		if (brand != null && !brand.isBlank()) {
+			sql.append(" AND LOWER(brand) = ?");
+			params.add(brand.trim().toLowerCase());
+		}
+		if (model != null && !model.isBlank()) {
+			// Extract generation inside model name if it contains bracketed info e.g. "Série 1 (F40)" or "Série 1"
+			String cleanModel = model.split("\\(")[0].trim().toLowerCase();
+			sql.append(" AND LOWER(model) = ?");
+			params.add(cleanModel);
+			if (model.contains("(")) {
+				String gen = model.substring(model.indexOf("(") + 1, model.indexOf(")")).trim().toLowerCase();
+				sql.append(" AND LOWER(generation) = ?");
+				params.add(gen);
+			}
+		}
+		if (version != null && !version.isBlank()) {
+			String cleanVersion = version.split("\\(")[0].trim().toLowerCase();
+			sql.append(" AND LOWER(version) LIKE ?");
+			params.add("%" + cleanVersion + "%");
 		}
 		sql.append(" ORDER BY id DESC");
 		if (page != null && size != null) {
@@ -85,7 +118,7 @@ public class VehiculeRepository {
 
 	public Optional<Vehicule> findById(Long id) {
 		final String sql = """
-			SELECT id, name, purchase_price, fuel_type, consumption, annual_mileage, insurance_cost, maintenance_cost, resale_value, url, visibility, created_by
+			SELECT id, name, brand, model, generation, version, purchase_price, fuel_type, consumption, annual_mileage, insurance_cost, maintenance_cost, resale_value, url, visibility, created_by
 			FROM vehicule
 			WHERE id = ?
 			""";
@@ -96,13 +129,17 @@ public class VehiculeRepository {
 	public int update(Vehicule vehicule) {
 		final String sql = """
 			UPDATE vehicule
-			SET name = ?, purchase_price = ?, fuel_type = ?, consumption = ?, annual_mileage = ?, insurance_cost = ?,
+			SET name = ?, brand = ?, model = ?, generation = ?, version = ?, purchase_price = ?, fuel_type = ?, consumption = ?, annual_mileage = ?, insurance_cost = ?,
 			    maintenance_cost = ?, resale_value = ?, url = ?, visibility = ?, created_by = ?
 			WHERE id = ?
 			""";
 		return jdbcTemplate.update(
 			sql,
 			vehicule.getName(),
+			vehicule.getBrand(),
+			vehicule.getModel(),
+			vehicule.getGeneration(),
+			vehicule.getVersion(),
 			vehicule.getPurchasePrice(),
 			vehicule.getFuelType().name(),
 			vehicule.getConsumption(),
@@ -126,6 +163,10 @@ public class VehiculeRepository {
 		Vehicule vehicule = new Vehicule();
 		vehicule.setId(resultSet.getLong("id"));
 		vehicule.setName(resultSet.getString("name"));
+		vehicule.setBrand(resultSet.getString("brand"));
+		vehicule.setModel(resultSet.getString("model"));
+		vehicule.setGeneration(resultSet.getString("generation"));
+		vehicule.setVersion(resultSet.getString("version"));
 		vehicule.setPurchasePrice(resultSet.getDouble("purchase_price"));
 		vehicule.setFuelType(FuelType.valueOf(resultSet.getString("fuel_type")));
 		vehicule.setConsumption(resultSet.getDouble("consumption"));

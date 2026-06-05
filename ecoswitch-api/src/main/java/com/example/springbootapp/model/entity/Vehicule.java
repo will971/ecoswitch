@@ -20,6 +20,18 @@ public class Vehicule {
     @Column(nullable = false)
     private String name; // ex: "Mazda 3 2.0 Skyactiv-G"
 
+    @Column(name = "brand", length = 100)
+    private String brand;
+
+    @Column(name = "model", length = 100)
+    private String model;
+
+    @Column(name = "generation", length = 100)
+    private String generation;
+
+    @Column(name = "version", length = 300)
+    private String version;
+
     @Column(name = "purchase_price")
     private double purchasePrice; // prix d'achat €
 
@@ -151,6 +163,18 @@ public class Vehicule {
     public void setCreatedBy(String createdBy) {
         this.createdBy = createdBy;
     }
+
+    public String getBrand() { return brand; }
+    public void setBrand(String brand) { this.brand = brand; }
+
+    public String getModel() { return model; }
+    public void setModel(String model) { this.model = model; }
+
+    public String getGeneration() { return generation; }
+    public void setGeneration(String generation) { this.generation = generation; }
+
+    public String getVersion() { return version; }
+    public void setVersion(String version) { this.version = version; }
 
     public record VehicleCost(
             double annualFuelCost,

@@ -74,8 +74,12 @@ public class VehiculeController {
 			@RequestParam(required = false) Integer size,
 			@RequestParam(required = false) String name,
 			@RequestParam(required = false) String fuelType,
+			@RequestParam(required = false) String brand,
+			@RequestParam(required = false) String model,
+			@RequestParam(required = false) String version,
 			Principal principal) {
-		List<Vehicule> all = vehiculeService.findAll(null, null, name, fuelType);
+		
+		List<Vehicule> all = vehiculeService.findAll(null, null, name, fuelType, brand, model, version);
 		List<Vehicule> filtered;
 		if (principal != null) {
 			AppUser user = userRepository.findByEmail(principal.getName()).orElse(null);
@@ -183,6 +187,49 @@ public class VehiculeController {
 		}
 		vehiculeService.delete(id);
 		return ResponseEntity.noContent().build();
+	}
+
+	@GetMapping("/brands")
+	@Operation(summary = "Lister toutes les marques uniques présentes dans le catalogue")
+	public ResponseEntity<List<String>> getCatalogBrands() {
+		List<String> list = vehiculeService.findAll().stream()
+				.map(Vehicule::getBrand)
+				.filter(b -> b != null && !b.isBlank())
+				.distinct()
+				.sorted()
+				.toList();
+		return ResponseEntity.ok(list);
+	}
+
+	@GetMapping("/models")
+	@Operation(summary = "Lister tous les modèles pour une marque présente dans le catalogue")
+	public ResponseEntity<List<String>> getCatalogModels(@RequestParam String brand) {
+		List<String> list = vehiculeService.findAll().stream()
+				.filter(v -> brand.equalsIgnoreCase(v.getBrand()))
+				.map(v -> {
+					if (v.getGeneration() != null && !v.getGeneration().isBlank()) {
+						return v.getModel() + " (" + v.getGeneration() + ")";
+					}
+					return v.getModel();
+				})
+				.filter(m -> m != null && !m.isBlank())
+				.distinct()
+				.sorted()
+				.toList();
+		return ResponseEntity.ok(list);
+	}
+
+	@GetMapping("/versions")
+	@Operation(summary = "Lister toutes les versions pour un couple marque et modèle dans le catalogue")
+	public ResponseEntity<List<Map<String, String>>> getCatalogVersions(@RequestParam String brand, @RequestParam String model) {
+		String cleanModel = model.split("\\(")[0].trim();
+		List<Map<String, String>> list = vehiculeService.findAll().stream()
+				.filter(v -> brand.equalsIgnoreCase(v.getBrand()) && cleanModel.equalsIgnoreCase(v.getModel()))
+				.map(v -> Map.of("version", v.getVersion()))
+				.distinct()
+				.sorted((a, b) -> a.get("version").compareTo(b.get("version")))
+				.toList();
+		return ResponseEntity.ok(list);
 	}
 
 	@ExceptionHandler(IllegalArgumentException.class)

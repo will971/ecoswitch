@@ -1,5 +1,5 @@
 <script setup>
-import { Leaf, Trees, Plane } from '@lucide/vue'
+import { Leaf, Trees, Plane, AlertCircle } from '@lucide/vue'
 
 defineProps({
   result: {
@@ -14,78 +14,172 @@ const formatNumber = (val) => {
 </script>
 
 <template>
-  <div v-if="result.annualCO2Savings > 0" class="carbon-footprint-card p-4 border-glass rounded mb-4 glow-green bg-green-glass">
-    <h4 class="text-md font-heading text-green mb-3 flex items-center gap-2">
-      <Leaf size="20" class="text-green animate-pulse" />
-      <span>Bilan Écologique : Votre Impact Planétaire</span>
+  <div v-if="result.annualCO2Savings > 0" class="apple-carbon-card p-5">
+    <span class="card-tag">Bilan Environnemental</span>
+    <h4 class="card-title text-teal flex items-center gap-2">
+      <Leaf size="20" class="animate-pulse" />
+      <span>Votre Impact Planétaire</span>
     </h4>
     
-    <p class="text-xs text-muted mb-4">
+    <p class="card-subtitle mt-2 mb-4">
       En changeant de véhicule, vous réduisez considérablement vos rejets de CO₂ dans l'atmosphère. Voici ce que cela représente concrètement par an :
     </p>
 
-    <div class="grid-cols-3 gap-3">
+    <!-- Bento style items inside the card -->
+    <div class="carbon-grid">
       <!-- CO2 Économisé -->
-      <div class="p-3 border-glass rounded bg-deep-glass text-center">
-        <Leaf class="text-green mb-2 mx-auto" size="24" />
-        <div class="text-xxs text-dimmed uppercase font-semibold">CO₂ Économisé</div>
-        <div class="font-heading text-lg mt-1 text-green font-bold">
-          -{{ formatNumber(result.annualCO2Savings) }} kg / an
+      <div class="carbon-item">
+        <Leaf class="text-teal mb-2 mx-auto" size="24" />
+        <div class="carbon-label">CO₂ Économisé</div>
+        <div class="carbon-value text-teal">
+          -{{ formatNumber(result.annualCO2Savings) }} kg<span class="carbon-unit">/an</span>
         </div>
       </div>
 
       <!-- Équivalent en Arbres -->
-      <div class="p-3 border-glass rounded bg-deep-glass text-center">
-        <Trees class="text-emerald mb-2 mx-auto" size="24" />
-        <div class="text-xxs text-dimmed uppercase font-semibold">Équivalent Arbres</div>
-        <div class="font-heading text-lg mt-1 text-emerald font-bold">
-          +{{ formatNumber(result.annualCO2Savings / 25.0) }} arbres
+      <div class="carbon-item">
+        <Trees class="text-teal mb-2 mx-auto" size="24" />
+        <div class="carbon-label">Équivalent Arbres</div>
+        <div class="carbon-value text-teal">
+          +{{ formatNumber(result.annualCO2Savings / 25.0) }}<span class="carbon-unit"> arbres</span>
         </div>
-        <div class="text-xxs text-muted mt-1">(absorbé en 1 an)</div>
+        <div class="carbon-subtext">absorbé en 1 an</div>
       </div>
 
       <!-- Équivalent en Vols -->
-      <div class="p-3 border-glass rounded bg-deep-glass text-center">
+      <div class="carbon-item">
         <Plane class="text-cyan mb-2 mx-auto" size="24" />
-        <div class="text-xxs text-dimmed uppercase font-semibold">Vols évités</div>
-        <div class="font-heading text-lg mt-1 text-cyan font-bold">
-          {{ formatNumber(result.annualCO2Savings / 200.0) }} vols
+        <div class="carbon-label">Vols évités</div>
+        <div class="carbon-value text-cyan">
+          {{ formatNumber(result.annualCO2Savings / 200.0) }}<span class="carbon-unit"> vols</span>
         </div>
-        <div class="text-xxs text-muted mt-1">Paris - Nice</div>
+        <div class="carbon-subtext">Paris - Nice</div>
       </div>
     </div>
   </div>
-  <div v-else class="carbon-footprint-card p-4 border-glass rounded mb-4 bg-card-glass text-center">
-    <Leaf size="32" class="text-rose mb-2 mx-auto" />
-    <h4 class="text-sm font-heading text-rose mb-1">Pas d'économie carbone</h4>
-    <p class="text-xs text-muted">
-      Le véhicule cible émet autant ou plus de gaz à effet de serre que le véhicule actuel sur votre kilométrage annuel.
-    </p>
+  
+  <div v-else class="apple-carbon-card carbon-negative p-5 flex items-center gap-4">
+    <div class="negative-icon-circle">
+      <AlertCircle size="28" class="text-rose" />
+    </div>
+    <div class="negative-content">
+      <span class="card-tag">Bilan Environnemental</span>
+      <h4 class="card-title text-rose m-0">Aucun gain carbone identifié</h4>
+      <p class="card-subtitle mt-1 mb-0">
+        Le véhicule cible émet autant ou plus de gaz à effet de serre que le véhicule actuel sur votre kilométrage annuel.
+      </p>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.bg-green-glass {
-  background: rgba(16, 185, 129, 0.05);
+.apple-carbon-card {
+  background: hsl(var(--bg-glass));
+  border: 1px solid hsl(var(--border-glass));
+  border-radius: 22px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.02);
+  transition: transform 0.3s ease, border-color 0.2s ease;
 }
-.border-glass {
-  border: 1px solid rgba(255, 255, 255, 0.08);
+.apple-carbon-card:hover {
+  border-color: hsl(var(--border-glass-focus));
 }
-.glow-green {
-  box-shadow: 0 0 15px -3px rgba(16, 185, 129, 0.1);
+
+.carbon-negative {
+  background: hsla(var(--accent-rose) / 0.04);
+  border-color: hsla(var(--accent-rose) / 0.15);
 }
-.text-green {
-  color: #10b981;
+
+.card-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: hsl(var(--text-dimmed));
+  margin-bottom: 6px;
+  display: block;
 }
-.text-emerald {
-  color: #34d399;
+
+.card-title {
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
 }
-.text-cyan {
-  color: #22d3ee;
+
+.card-subtitle {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: hsl(var(--text-muted));
 }
-.text-rose {
-  color: #f43f5e;
+
+/* Carbon grid layout */
+.carbon-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
 }
+@media (max-width: 768px) {
+  .carbon-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+.carbon-item {
+  background: hsl(var(--bg-deep) / 0.2);
+  border: 1px solid hsl(var(--border-glass));
+  border-radius: 16px;
+  padding: 16px;
+  text-align: center;
+}
+
+.carbon-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: hsl(var(--text-dimmed));
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.carbon-value {
+  font-family: var(--font-heading);
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.carbon-unit {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: hsl(var(--text-muted));
+  margin-left: 2px;
+}
+
+.carbon-subtext {
+  font-size: 0.65rem;
+  color: hsl(var(--text-dimmed));
+  margin-top: 4px;
+}
+
+.negative-icon-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: hsla(var(--accent-rose) / 0.1);
+  flex-shrink: 0;
+}
+
+.negative-content {
+  flex: 1;
+}
+
+.text-teal { color: hsl(var(--accent-teal)) !important; }
+.text-rose { color: hsl(var(--accent-rose)) !important; }
+.text-cyan { color: hsl(var(--accent-cyan)) !important; }
+
 .animate-pulse {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }

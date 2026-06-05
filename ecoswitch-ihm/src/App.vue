@@ -344,7 +344,6 @@ onMounted(async () => {
               <div class="user-avatar flex-center">{{ currentUser.name.charAt(0) }}</div>
               <div class="user-info-navbar hide-on-mobile">
                 <div class="text-xs font-semibold truncate" style="max-width: 120px;">{{ currentUser.name }}</div>
-                <div class="badge badge-teal text-xxs font-bold uppercase">{{ currentUser.plan }}</div>
               </div>
             </div>
             <button class="icon-btn-nav hover-text-rose shrink-0" @click="logout" title="Se déconnecter" aria-label="Se déconnecter">
@@ -374,8 +373,7 @@ onMounted(async () => {
         </div>
         <!-- Footer Premium -->
         <footer class="footer-glass py-4 px-4 text-center text-xs text-dimmed mt-4 rounded-xl" style="border-radius: 12px;">
-          <p>&copy; 2026 EcoSwitch. Tous droits réservés. Propulsé par Spring Boot 4 et Vue.js 3 (Vite).</p>
-          <p class="mt-1">Interface SaaS Premium développée selon les standards esthétiques mode sombre.</p>
+          <p>&copy; 2026 EcoSwitch. Tous droits réservés.</p>
         </footer>
       </div>
     </main>
@@ -469,7 +467,7 @@ onMounted(async () => {
           <div v-if="authError" class="auth-error-msg mb-2">{{ authError }}</div>
 
           <button class="btn btn-primary w-100 mb-2" @click="handleAuth" :disabled="authLoading">
-            <span>{{ authLoading ? 'Connexion...' : (isRegister ? 'Créer mon compte Pro' : 'Se connecter au compte Pro') }}</span>
+            <span>{{ authLoading ? 'Connexion...' : (isRegister ? 'Créer mon compte' : 'Se connecter') }}</span>
             <Lock size="16" />
           </button>
 
@@ -582,6 +580,16 @@ onMounted(async () => {
   width: 100%;
   overflow: hidden;
 }
+@media (min-width: 1920px) {
+  .app-shell {
+    grid-template-columns: 260px 1fr 320px;
+  }
+}
+@media (min-width: 2560px) {
+  .app-shell {
+    grid-template-columns: 280px 1fr 360px;
+  }
+}
 
 .sidebar-left {
   background: rgba(var(--bg-nav));
@@ -626,7 +634,20 @@ onMounted(async () => {
 .gap-3 { gap: 12px; }
 .list-none { list-style: none; }
 .items-center { align-items: center; }
-.max-w-7xl { max-width: 80rem; }
+.max-w-7xl { 
+  max-width: 80rem; 
+  width: 100%;
+}
+@media (min-width: 1920px) {
+  .max-w-7xl {
+    max-width: 110rem;
+  }
+}
+@media (min-width: 2560px) {
+  .max-w-7xl {
+    max-width: 140rem;
+  }
+}
 .mx-auto { margin-left: auto; margin-right: auto; }
 .w-100 { width: 100%; }
 .mt-auto { margin-top: auto; }

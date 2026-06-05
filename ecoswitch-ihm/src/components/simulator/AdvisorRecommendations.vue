@@ -25,13 +25,13 @@ const scrollCarousel = (direction) => {
 </script>
 
 <template>
-  <div class="recommendations-container p-3 border-glass rounded mb-4 bg-card-glass glow-teal">
-    <div class="rec-header flex-between mb-2">
-      <h4 class="text-sm font-heading text-teal flex items-center gap-1">
-        <Sparkles size="16" />
-        <span>💡 Recommandations de l'Assistant</span>
-      </h4>
-      <!-- Boutons de navigation du carrousel (desktop) -->
+  <div class="recommendations-container p-4 border-glass rounded mb-4">
+    <div class="rec-header flex-between mb-3">
+      <div class="flex items-center gap-2">
+        <Sparkles size="18" class="text-teal" />
+        <h4 class="text-sm font-heading text-main m-0 font-bold">Recommandations de l'Assistant</h4>
+      </div>
+      <!-- Boutons de navigation du carrousel -->
       <div class="carousel-nav-btns flex gap-1">
         <button class="carousel-nav-btn" aria-label="Précédent" @click="scrollCarousel(-1)">
           <ChevronLeft size="16" />
@@ -41,7 +41,7 @@ const scrollCarousel = (direction) => {
         </button>
       </div>
     </div>
-    <p class="text-xs text-muted mb-3">Faites défiler et cliquez pour charger une alternative :</p>
+    <p class="text-xs text-muted mb-4">L'assistant a identifié des alternatives pertinentes du catalogue. Cliquez pour simuler :</p>
 
     <!-- Carrousel horizontal de pastilles carrées -->
     <div ref="carouselRef" class="rec-carousel" role="listbox" aria-label="Véhicules recommandés">
@@ -53,21 +53,23 @@ const scrollCarousel = (direction) => {
         :aria-label="rec.vehicleName + ', économie de ' + formatCurrency(rec.annualSavings) + ' par an'"
         @click="emit('load-alternative', rec)"
       >
-        <!-- Badge badge-teal en haut -->
-        <div class="rec-badge">Catalogue</div>
+        <!-- Badge Catalogue -->
+        <span class="rec-badge">Catalogue</span>
 
         <!-- Nom du véhicule -->
         <div class="rec-vehicle-name">{{ rec.vehicleName }}</div>
 
+        <div class="rec-card-divider"></div>
+
         <!-- Gain annuel mis en valeur -->
         <div class="rec-savings-block">
           <span class="rec-savings-label">Gain / an</span>
-          <span class="rec-savings-value">{{ formatCurrency(rec.annualSavings) }}</span>
+          <span class="rec-savings-value text-teal">{{ formatCurrency(rec.annualSavings) }}</span>
         </div>
 
         <!-- Prix achat/transition en bas -->
         <div class="rec-purchase-row">
-          <span class="rec-purchase-label">Achat</span>
+          <span class="rec-purchase-label">Prix d'achat</span>
           <span class="rec-purchase-value">{{ formatCurrency(rec.switchInvestment) }}</span>
         </div>
       </button>
@@ -77,7 +79,10 @@ const scrollCarousel = (direction) => {
 
 <style scoped>
 .recommendations-container {
-  background: hsl(var(--bg-card) / 0.4);
+  background: hsl(var(--bg-glass));
+  border: 1px solid hsl(var(--border-glass));
+  border-radius: 22px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.02);
 }
 
 .rec-header {
@@ -86,13 +91,17 @@ const scrollCarousel = (direction) => {
   justify-content: space-between;
 }
 
+.text-main {
+  color: hsl(var(--text-main));
+}
+
 /* ── Carousel scroll container ── */
 .rec-carousel {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
-  padding: 6px 4px 12px;
+  padding: 4px 2px 14px;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -112,65 +121,55 @@ const scrollCarousel = (direction) => {
 
 /* ── Square card ── */
 .rec-card {
-  /* Fixed square dimensions */
-  flex: 0 0 152px;
-  width: 152px;
-  height: 152px;
+  flex: 0 0 156px;
+  width: 156px;
+  height: 168px;
   scroll-snap-align: start;
 
-  /* Stack contents vertically */
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  padding: 12px;
-  gap: 4px;
-
-  /* Visual style */
-  background: rgba(0, 0, 0, 0.2);
+  padding: 14px;
+  background: hsl(var(--bg-deep) / 0.25);
   border: 1px solid hsl(var(--border-glass));
-  border-radius: 14px;
+  border-radius: 18px;
   cursor: pointer;
   outline: none;
-
-  /* Animation */
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .rec-card:hover,
 .rec-card:focus-visible {
-  border-color: hsl(var(--accent-cyan));
-  box-shadow: 0 0 18px 0 hsl(var(--accent-cyan) / 0.3);
-  background: rgba(8, 145, 178, 0.06);
-  transform: translateY(-3px);
+  border-color: hsl(var(--border-glass-focus));
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+  background: hsl(var(--bg-deep) / 0.6);
+  transform: translateY(-2px);
 }
 
 .rec-card:active {
-  transform: scale(0.97);
-  box-shadow: none;
+  transform: scale(0.98);
 }
 
-/* Small "Catalogue" badge */
+/* Small Catalogue badge */
 .rec-badge {
   font-size: 0.6rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  background: hsl(var(--accent-teal) / 0.15);
+  background: hsla(var(--accent-teal) / 0.12);
   color: hsl(var(--accent-teal));
   padding: 2px 8px;
   border-radius: 20px;
-  width: 100%;
   text-align: center;
 }
 
-/* Vehicle name – two-line clamp */
+/* Vehicle name */
 .rec-vehicle-name {
-  font-size: 0.78rem;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
   font-weight: 600;
-  background: linear-gradient(135deg, hsl(var(--text-main)) 30%, hsl(var(--accent-cyan)) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: hsl(var(--text-main));
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -178,6 +177,13 @@ const scrollCarousel = (direction) => {
   text-align: center;
   width: 100%;
   line-height: 1.3;
+}
+
+.rec-card-divider {
+  width: 100%;
+  height: 1px;
+  background: hsl(var(--border-glass));
+  margin: 6px 0;
 }
 
 /* Annual savings block */
@@ -194,9 +200,9 @@ const scrollCarousel = (direction) => {
   font-weight: 600;
 }
 .rec-savings-value {
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: hsl(var(--accent-teal));
+  font-family: var(--font-heading);
+  font-size: 0.875rem;
+  font-weight: 800;
   line-height: 1.2;
 }
 
@@ -205,8 +211,6 @@ const scrollCarousel = (direction) => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  padding-top: 6px;
   width: 100%;
 }
 .rec-purchase-label {
@@ -217,7 +221,7 @@ const scrollCarousel = (direction) => {
   font-weight: 600;
 }
 .rec-purchase-value {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 600;
   color: hsl(var(--text-muted));
 }
@@ -245,15 +249,17 @@ const scrollCarousel = (direction) => {
   color: hsl(var(--accent-teal));
 }
 
+.text-teal { color: hsl(var(--accent-teal)) !important; }
+
 /* ── Responsive tweaks ── */
 @media (max-width: 480px) {
   .rec-card {
     flex: 0 0 140px;
     width: 140px;
-    height: 140px;
+    height: 160px;
   }
   .carousel-nav-btns {
-    display: none; /* touch users scroll naturally */
+    display: none;
   }
 }
 </style>

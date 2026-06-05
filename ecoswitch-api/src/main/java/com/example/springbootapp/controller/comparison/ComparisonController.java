@@ -232,7 +232,23 @@ public class ComparisonController {
 			if (request.customLeasingMonthlyPrice() != null && request.customLeasingMonthlyPrice() > 0) {
 				leasingMonthlyPrice = request.customLeasingMonthlyPrice();
 			} else {
-				leasingMonthlyPrice = target.getPurchasePrice() * 0.0125; // 1.25% estimation standard LOA
+				// Estimation réaliste LOA/LLD basée sur les paramètres marché standards
+				// - Premier loyer majoré (apport) : 10% du prix
+				// - Valeur résiduelle en fin de contrat : 45% du prix (48 mois)
+				// - Taux annuel : 3.9% (money factor marché moyen)
+				// - Durée : 48 mois
+				double prix = target.getPurchasePrice();
+				double apport = prix * 0.10;
+				double residuel = prix * 0.45;
+				double capitalFinance = prix - apport - residuel; // part amortie sur la durée
+				double dureeMois = 48.0;
+				double tauxAnnuel = 0.039;
+				double tauxMensuel = tauxAnnuel / 12.0;
+
+				// Loyer = amortissement de la part financée + coût de l'argent sur la valeur résiduelle
+				double loyerAmortissement = (capitalFinance * tauxMensuel) / (1.0 - Math.pow(1.0 + tauxMensuel, -dureeMois));
+				double loyerResiduel = residuel * tauxMensuel;
+				leasingMonthlyPrice = loyerAmortissement + loyerResiduel;
 			}
 		}
 		double currentMonthlyTotalCost = currentAnnualCost / 12.0;

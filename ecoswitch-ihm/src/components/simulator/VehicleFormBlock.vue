@@ -1,6 +1,6 @@
 <script setup>
-import { ref, computed } from 'vue'
-import { Search, CheckCircle2, AlertCircle, Wrench } from '@lucide/vue'
+import { ref, computed, onMounted } from 'vue'
+import { CheckCircle2, AlertCircle, Wrench } from '@lucide/vue'
 
 const props = defineProps({
   vehicle: {
@@ -32,10 +32,13 @@ const emit = defineEmits([
   'annual-mileage-change'
 ])
 
-const registrationPlate = ref('')
-const searchingPlate = ref(false)
-const plateSuccessMessage = ref(null)
-const plateErrorMessage = ref(null)
+// ADEME select states
+const brands = ref([])
+const models = ref([])
+const versions = ref([])
+const selectedBrand = ref('')
+const selectedModel = ref('')
+const selectedVersion = ref(null)
 
 const showSuggestions = ref(false)
 const suggestions = ref([])
@@ -122,45 +125,77 @@ const onMileageInput = () => {
   }
 }
 
-const searchByPlate = async () => {
-  if (!registrationPlate.value || !registrationPlate.value.trim()) return
-  searchingPlate.value = true
-  plateSuccessMessage.value = null
-  plateErrorMessage.value = null
-  
+// ADEME Service fetchers
+const fetchBrands = async () => {
   try {
-    const formattedPlate = registrationPlate.value.trim().toUpperCase()
-    const res = await fetch(`/api/v1/immatriculation/${formattedPlate}`)
-    if (!res.ok) {
-      const err = await res.json()
-      throw new Error(err.error || "Plaque d'immatriculation introuvable.")
+    const res = await fetch('/api/v1/ademe/brands')
+    if (res.ok) {
+      brands.value = await res.json()
     }
-    
-    const carData = await res.json()
-    
-    // Remplissage automatique des informations
-    props.vehicle.name = carData.name
-    props.vehicle.fuelType = carData.fuelType
-    props.vehicle.consumption = carData.consumption
-    
-    if (carData.annualMileage) props.vehicle.annualMileage = carData.annualMileage
-    props.vehicle.insuranceCost = carData.insuranceCost || getDefaultInsuranceCost(carData.fuelType)
-    props.vehicle.maintenanceCost = carData.maintenanceCost || getDefaultMaintenanceCost(carData.fuelType)
-    if (carData.resaleValue) props.vehicle.resaleValue = carData.resaleValue
-    
-    let sourceLabel = 'Base locale de secours'
-    if (carData.source === 'OSCARO') {
-      sourceLabel = 'Oscaro API'
-    }
-    plateSuccessMessage.value = `Véhicule identifié avec succès via ${sourceLabel} !`
-    
-    emit('suggestion-selected', props.vehicle)
   } catch (err) {
-    plateErrorMessage.value = err.message
-  } finally {
-    searchingPlate.value = false
+    console.error('Erreur de chargement des marques:', err)
   }
 }
+
+const fetchModels = async () => {
+  models.value = []
+  versions.value = []
+  selectedModel.value = ''
+  selectedVersion.value = null
+  
+  if (!selectedBrand.value) return
+
+  try {
+    const res = await fetch(`/api/v1/ademe/models?brand=${encodeURIComponent(selectedBrand.value)}`)
+    if (res.ok) {
+      models.value = await res.json()
+    }
+  } catch (err) {
+    console.error('Erreur de chargement des modèles:', err)
+  }
+}
+
+const fetchVersions = async () => {
+  versions.value = []
+  selectedVersion.value = null
+  
+  if (!selectedBrand.value || !selectedModel.value) return
+
+  try {
+    const res = await fetch(`/api/v1/ademe/versions?brand=${encodeURIComponent(selectedBrand.value)}&model=${encodeURIComponent(selectedModel.value)}`)
+    if (res.ok) {
+      versions.value = await res.json()
+    }
+  } catch (err) {
+    console.error('Erreur de chargement des versions:', err)
+  }
+}
+
+const onVersionChange = () => {
+  if (!selectedVersion.value) return
+
+  const v = selectedVersion.value
+  props.vehicle.name = `${v.brand} ${v.model} ${v.version}`
+  props.vehicle.fuelType = v.fuelType
+  props.vehicle.consumption = v.consumption
+  
+  if (v.annualMileage) props.vehicle.annualMileage = v.annualMileage
+  props.vehicle.insuranceCost = v.insuranceCost || getDefaultInsuranceCost(v.fuelType)
+  props.vehicle.maintenanceCost = v.maintenanceCost || getDefaultMaintenanceCost(v.fuelType)
+  
+  if (props.type === 'current' && v.resaleValue !== undefined) {
+    props.vehicle.resaleValue = v.resaleValue
+  }
+  if (props.type === 'target' && v.purchasePrice !== undefined) {
+    props.vehicle.purchasePrice = v.purchasePrice
+  }
+
+  emit('suggestion-selected', props.vehicle)
+}
+
+onMounted(() => {
+  fetchBrands()
+})
 </script>
 
 <template>
@@ -174,22 +209,29 @@ const searchByPlate = async () => {
       <span class="badge badge-teal badge-small">Cible</span>
     </h4>
 
-    <!-- Recherche par Plaque d'Immatriculation (Uniquement pour le véhicule actuel) -->
-    <div v-if="type === 'current'" class="form-group mb-3 pb-3 border-b border-glass">
-      <label class="form-label text-xxs text-dimmed uppercase">⚡ Remplissage rapide par plaque d'immatriculation</label>
-      <div class="flex gap-2">
-        <input v-model="registrationPlate" type="text" class="form-control text-center font-bold tracking-wider border-cyan-focus text-cyan" placeholder="ex: EZ-999-ZZ" @keyup.enter="searchByPlate" />
-        <button type="button" :disabled="searchingPlate || !registrationPlate" class="btn btn-secondary flex-center gap-1 py-2 px-3 text-xs" @click="searchByPlate">
-          <span v-if="searchingPlate" class="spinner-small mr-1"></span>
-          <span v-else class="flex items-center gap-1"><Search size="14" /> Rechercher</span>
-        </button>
+    <!-- Sélection ADEME à 3 critères (Remplacement de la plaque d'immatriculation) -->
+    <div class="form-group mb-3 pb-3 border-b border-glass">
+      <label class="form-label text-xxs text-cyan uppercase mb-2 block font-semibold">⚡ Remplissage rapide par Marque / Modèle / Version</label>
+      <div class="grid-3-fields">
+        <div class="form-group mb-0">
+          <select v-model="selectedBrand" class="form-control form-select text-xs" @change="fetchModels">
+            <option value="">Marque</option>
+            <option v-for="b in brands" :key="b" :value="b">{{ b }}</option>
+          </select>
+        </div>
+        <div class="form-group mb-0">
+          <select v-model="selectedModel" :disabled="!selectedBrand" class="form-control form-select text-xs" @change="fetchVersions">
+            <option value="">Modèle</option>
+            <option v-for="m in models" :key="m" :value="m">{{ m }}</option>
+          </select>
+        </div>
+        <div class="form-group mb-0">
+          <select v-model="selectedVersion" :disabled="!selectedModel" class="form-control form-select text-xs" @change="onVersionChange">
+            <option :value="null">Version</option>
+            <option v-for="v in versions" :key="v.version" :value="v">{{ v.version }}</option>
+          </select>
+        </div>
       </div>
-      <p v-if="plateSuccessMessage" class="text-xxs text-teal mt-1 font-semibold flex items-center gap-1">
-        <CheckCircle2 size="12" /> {{ plateSuccessMessage }}
-      </p>
-      <p v-if="plateErrorMessage" class="text-xxs text-rose mt-1 font-semibold flex items-center gap-1">
-        <AlertCircle size="12" /> {{ plateErrorMessage }}
-      </p>
     </div>
 
     <!-- Nom du modèle -->

@@ -164,6 +164,57 @@ public class VehiculeSeedLoader implements ApplicationRunner {
 		vehicule.setInsuranceCost(item.insuranceCost());
 		vehicule.setMaintenanceCost(item.maintenanceCost());
 		vehicule.setResaleValue(item.resaleValue());
+
+		// Parse brand, model, generation, version from full name
+		int firstSpace = item.name().indexOf(' ');
+		if (firstSpace == -1) {
+			vehicule.setBrand(item.name());
+			vehicule.setModel("Autre");
+			vehicule.setVersion("Standard");
+		} else {
+			String brand = item.name().substring(0, firstSpace);
+			if (brand.equalsIgnoreCase("b.m.w.")) brand = "BMW";
+			else brand = brand.substring(0, 1).toUpperCase() + brand.substring(1).toLowerCase();
+			vehicule.setBrand(brand);
+
+			String remaining = item.name().substring(firstSpace + 1);
+			if (brand.equalsIgnoreCase("BMW")) {
+				if (remaining.contains("F20")) {
+					vehicule.setModel("Série 1");
+					vehicule.setGeneration("F20");
+					vehicule.setVersion(remaining.replace("F20", "").replaceAll(" +", " ").trim());
+				} else if (remaining.contains("E46")) {
+					vehicule.setModel("Série 3");
+					vehicule.setGeneration("E46");
+					vehicule.setVersion(remaining.replace("E46", "").replaceAll(" +", " ").trim());
+				} else if (remaining.contains("F30")) {
+					vehicule.setModel("Série 3");
+					vehicule.setGeneration("F30");
+					vehicule.setVersion(remaining.replace("F30", "").replaceAll(" +", " ").trim());
+				} else if (remaining.contains("E36")) {
+					vehicule.setModel("Série 3");
+					vehicule.setGeneration("E36");
+					vehicule.setVersion(remaining.replace("E36", "").replaceAll(" +", " ").trim());
+				} else if (remaining.contains("E81") || remaining.contains("E87")) {
+					vehicule.setModel("Série 1");
+					vehicule.setGeneration("E81/E87");
+					vehicule.setVersion(remaining.replace("E81", "").replace("E87", "").replaceAll(" +", " ").trim());
+				} else {
+					vehicule.setModel("Autres Modèles");
+					vehicule.setVersion(remaining);
+				}
+			} else {
+				// Fallback generic split
+				int nextSpace = remaining.indexOf(' ');
+				if (nextSpace != -1) {
+					vehicule.setModel(remaining.substring(0, nextSpace));
+					vehicule.setVersion(remaining.substring(nextSpace + 1).trim());
+				} else {
+					vehicule.setModel(remaining);
+					vehicule.setVersion("Standard");
+				}
+			}
+		}
 		return vehicule;
 	}
 

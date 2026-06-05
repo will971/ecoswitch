@@ -28,7 +28,12 @@ public class VehiculeService {
 
 	@Transactional(readOnly = true)
 	public List<Vehicule> findAll(Integer page, Integer size, String name, String fuelType) {
-		return vehiculeRepository.findAll(page, size, name, fuelType);
+		return vehiculeRepository.findAll(page, size, name, fuelType, null, null, null);
+	}
+
+	@Transactional(readOnly = true)
+	public List<Vehicule> findAll(Integer page, Integer size, String name, String fuelType, String brand, String model, String version) {
+		return vehiculeRepository.findAll(page, size, name, fuelType, brand, model, version);
 	}
 
 	@Transactional(readOnly = true)
@@ -60,6 +65,15 @@ public class VehiculeService {
 	private void validateVehicule(Vehicule vehicule) {
 		if (vehicule.getName() == null || vehicule.getName().isBlank()) {
 			throw new IllegalArgumentException("Le nom du vehicule est obligatoire.");
+		}
+		if (vehicule.getBrand() == null || vehicule.getBrand().isBlank()) {
+			throw new IllegalArgumentException("La marque du vehicule est obligatoire.");
+		}
+		if (vehicule.getModel() == null || vehicule.getModel().isBlank()) {
+			throw new IllegalArgumentException("Le modèle du vehicule est obligatoire.");
+		}
+		if (vehicule.getVersion() == null || vehicule.getVersion().isBlank()) {
+			throw new IllegalArgumentException("La version du vehicule est obligatoire.");
 		}
 		if (vehicule.getFuelType() == null) {
 			throw new IllegalArgumentException("Le type de carburant est obligatoire.");
