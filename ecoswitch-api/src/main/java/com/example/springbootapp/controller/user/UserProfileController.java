@@ -1,7 +1,7 @@
 package com.example.springbootapp.controller.user;
 
 import com.example.springbootapp.model.entity.UserVehicleProfile;
-import com.example.springbootapp.repository.UserVehicleProfileRepository;
+import com.example.springbootapp.business.user.UserProfileBusiness;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -17,10 +17,10 @@ import java.util.Optional;
 @Tag(name = "User Profile", description = "Gestion du profil véhicule de l'utilisateur")
 public class UserProfileController {
 
-    private final UserVehicleProfileRepository userVehicleProfileRepository;
+    private final UserProfileBusiness userProfileBusiness;
 
-    public UserProfileController(UserVehicleProfileRepository userVehicleProfileRepository) {
-        this.userVehicleProfileRepository = userVehicleProfileRepository;
+    public UserProfileController(UserProfileBusiness userProfileBusiness) {
+        this.userProfileBusiness = userProfileBusiness;
     }
 
     @GetMapping
@@ -30,7 +30,7 @@ public class UserProfileController {
             return ResponseEntity.status(401).build();
         }
         String email = authentication.getName();
-        List<UserVehicleProfile> profiles = userVehicleProfileRepository.findByUserEmail(email);
+        List<UserVehicleProfile> profiles = userProfileBusiness.getProfiles(email);
         return ResponseEntity.ok(profiles);
     }
 
@@ -43,23 +43,7 @@ public class UserProfileController {
             return ResponseEntity.status(401).build();
         }
         String email = authentication.getName();
-        List<UserVehicleProfile> existingProfiles = userVehicleProfileRepository.findByUserEmail(email);
-        
-        UserVehicleProfile profile = new UserVehicleProfile();
-        profile.setUserEmail(email);
-        
-        // Si c'est le premier profil ou s'il est explicitement marqué par défaut
-        if (existingProfiles.isEmpty() || profileInput.isDefault()) {
-            profile.setDefault(true);
-            if (profileInput.isDefault()) {
-                clearOtherDefaults(existingProfiles);
-            }
-        } else {
-            profile.setDefault(false);
-        }
-
-        updateProfileFields(profile, profileInput);
-        UserVehicleProfile saved = userVehicleProfileRepository.save(profile);
+        UserVehicleProfile saved = userProfileBusiness.createProfile(profileInput, email);
         return ResponseEntity.ok(saved);
     }
 
@@ -73,27 +57,9 @@ public class UserProfileController {
             return ResponseEntity.status(401).build();
         }
         String email = authentication.getName();
-
-        Optional<UserVehicleProfile> optionalProfile = userVehicleProfileRepository.findById(id);
-        if (optionalProfile.isEmpty() || !optionalProfile.get().getUserEmail().equals(email)) {
-            return ResponseEntity.notFound().build();
-        }
-
-        UserVehicleProfile profile = optionalProfile.get();
-        List<UserVehicleProfile> existingProfiles = userVehicleProfileRepository.findByUserEmail(email);
-
-        if (profileInput.isDefault() && !profile.isDefault()) {
-            profile.setDefault(true);
-            clearOtherDefaults(existingProfiles);
-        } else if (!profileInput.isDefault() && profile.isDefault()) {
-            // Si l'utilisateur essaie d'enlever le statut par défaut, on l'autorise mais un autre devrait le devenir ?
-            // On laisse l'utilisateur gérer
-            profile.setDefault(false);
-        }
-
-        updateProfileFields(profile, profileInput);
-        UserVehicleProfile saved = userVehicleProfileRepository.save(profile);
-        return ResponseEntity.ok(saved);
+        Optional<UserVehicleProfile> saved = userProfileBusiness.updateProfile(id, profileInput, email);
+        return saved.map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/{id}")
@@ -103,46 +69,10 @@ public class UserProfileController {
             return ResponseEntity.status(401).build();
         }
         String email = authentication.getName();
-        Optional<UserVehicleProfile> optionalProfile = userVehicleProfileRepository.findById(id);
-        if (optionalProfile.isEmpty() || !optionalProfile.get().getUserEmail().equals(email)) {
+        boolean deleted = userProfileBusiness.deleteProfile(id, email);
+        if (!deleted) {
             return ResponseEntity.notFound().build();
         }
-
-        UserVehicleProfile profileToDelete = optionalProfile.get();
-        userVehicleProfileRepository.delete(profileToDelete);
-
-        // Si le profil supprimé était par défaut, on assigne un nouveau par défaut si possible
-        if (profileToDelete.isDefault()) {
-            List<UserVehicleProfile> remaining = userVehicleProfileRepository.findByUserEmail(email);
-            if (!remaining.isEmpty()) {
-                UserVehicleProfile newDefault = remaining.get(0);
-                newDefault.setDefault(true);
-                userVehicleProfileRepository.save(newDefault);
-            }
-        }
-
         return ResponseEntity.noContent().build();
-    }
-
-    private void clearOtherDefaults(List<UserVehicleProfile> profiles) {
-        for (UserVehicleProfile p : profiles) {
-            if (p.isDefault()) {
-                p.setDefault(false);
-                userVehicleProfileRepository.save(p);
-            }
-        }
-    }
-
-    private void updateProfileFields(UserVehicleProfile profile, UserVehicleProfile input) {
-        profile.setName(input.getName());
-        profile.setFuelType(input.getFuelType());
-        profile.setConsumption(input.getConsumption());
-        profile.setAnnualMileage(input.getAnnualMileage());
-        profile.setInsuranceCost(input.getInsuranceCost());
-        profile.setMaintenanceCost(input.getMaintenanceCost());
-        profile.setResaleValue(input.getResaleValue());
-        profile.setPetrolPrice(input.getPetrolPrice());
-        profile.setDieselPrice(input.getDieselPrice());
-        profile.setElectricPrice(input.getElectricPrice());
     }
 }

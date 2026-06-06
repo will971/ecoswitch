@@ -70,4 +70,9 @@ public class UserService {
             return userRepository.save(newUser);
         });
     }
+
+    public java.util.Optional<AppUser> findByEmail(String email) {
+        return userRepository.findByEmail(email);
+    }
 }
+

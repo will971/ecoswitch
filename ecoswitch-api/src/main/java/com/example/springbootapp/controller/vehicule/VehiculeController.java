@@ -20,8 +20,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.springbootapp.model.entity.AppUser;
 import com.example.springbootapp.model.entity.Vehicule;
-import com.example.springbootapp.repository.AppUserRepository;
-import com.example.springbootapp.service.VehiculeService;
+import com.example.springbootapp.business.vehicule.VehiculeBusiness;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -36,12 +35,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @Tag(name = "Vehicules", description = "Operations CRUD sur les vehicules")
 public class VehiculeController {
 
-	private final VehiculeService vehiculeService;
-	private final AppUserRepository userRepository;
+	private final VehiculeBusiness vehiculeBusiness;
 
-	public VehiculeController(VehiculeService vehiculeService, AppUserRepository userRepository) {
-		this.vehiculeService = vehiculeService;
-		this.userRepository = userRepository;
+	public VehiculeController(VehiculeBusiness vehiculeBusiness) {
+		this.vehiculeBusiness = vehiculeBusiness;
 	}
 
 	@PostMapping
@@ -53,17 +50,8 @@ public class VehiculeController {
 			@ApiResponse(responseCode = "401", description = "Non authentifie")
 	})
 	public ResponseEntity<Vehicule> create(@RequestBody Vehicule vehicule, Principal principal) {
-		if (principal == null) {
-			throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Vous devez être connecté pour ajouter un véhicule.");
-		}
-		AppUser user = userRepository.findByEmail(principal.getName())
-				.orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Utilisateur introuvable."));
-		
-		vehicule.setCreatedBy(user.getEmail());
-		if (vehicule.getVisibility() == null || vehicule.getVisibility().isBlank()) {
-			vehicule.setVisibility("PUBLIC");
-		}
-		return ResponseEntity.status(HttpStatus.CREATED).body(vehiculeService.create(vehicule));
+		String email = principal != null ? principal.getName() : null;
+		return ResponseEntity.status(HttpStatus.CREATED).body(vehiculeBusiness.create(vehicule, email));
 	}
 
 	@GetMapping
@@ -79,23 +67,8 @@ public class VehiculeController {
 			@RequestParam(required = false) String version,
 			Principal principal) {
 		
-		List<Vehicule> all = vehiculeService.findAll(null, null, name, fuelType, brand, model, version);
-		List<Vehicule> filtered;
-		if (principal != null) {
-			AppUser user = userRepository.findByEmail(principal.getName()).orElse(null);
-			if (user != null && "ADMIN".equalsIgnoreCase(user.getRole())) {
-				filtered = all;
-			} else {
-				final String userEmail = (user != null) ? user.getEmail() : "";
-				filtered = all.stream()
-						.filter(v -> "PUBLIC".equalsIgnoreCase(v.getVisibility()) || userEmail.equalsIgnoreCase(v.getCreatedBy()))
-						.toList();
-			}
-		} else {
-			filtered = all.stream()
-					.filter(v -> "PUBLIC".equalsIgnoreCase(v.getVisibility()))
-					.toList();
-		}
+		String principalName = principal != null ? principal.getName() : null;
+		List<Vehicule> filtered = vehiculeBusiness.findAll(name, fuelType, brand, model, version, principalName);
 
 		int totalElements = filtered.size();
 		int totalPages = 1;
@@ -126,18 +99,8 @@ public class VehiculeController {
 			@ApiResponse(responseCode = "403", description = "Acces refuse")
 	})
 	public Vehicule findById(@PathVariable Long id, Principal principal) {
-		Vehicule v = vehiculeService.findById(id);
-		if ("PRIVATE".equalsIgnoreCase(v.getVisibility())) {
-			if (principal == null) {
-				throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Accès refusé.");
-			}
-			AppUser user = userRepository.findByEmail(principal.getName())
-					.orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Accès refusé."));
-			if (!"ADMIN".equalsIgnoreCase(user.getRole()) && !user.getEmail().equalsIgnoreCase(v.getCreatedBy())) {
-				throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Accès refusé.");
-			}
-		}
-		return v;
+		String principalName = principal != null ? principal.getName() : null;
+		return vehiculeBusiness.findById(id, principalName);
 	}
 
 	@PutMapping("/{id}")
@@ -150,20 +113,8 @@ public class VehiculeController {
 			@ApiResponse(responseCode = "403", description = "Permissions insuffisantes")
 	})
 	public Vehicule update(@PathVariable Long id, @RequestBody Vehicule vehicule, Principal principal) {
-		if (principal == null) {
-			throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Connexion requise.");
-		}
-		AppUser user = userRepository.findByEmail(principal.getName())
-				.orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Utilisateur introuvable."));
-		Vehicule existing = vehiculeService.findById(id);
-		if (!"ADMIN".equalsIgnoreCase(user.getRole()) && !user.getEmail().equalsIgnoreCase(existing.getCreatedBy())) {
-			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Seul le créateur ou un administrateur peut modifier ce véhicule.");
-		}
-		vehicule.setCreatedBy(existing.getCreatedBy());
-		if (vehicule.getVisibility() == null || vehicule.getVisibility().isBlank()) {
-			vehicule.setVisibility(existing.getVisibility());
-		}
-		return vehiculeService.update(id, vehicule);
+		String principalName = principal != null ? principal.getName() : null;
+		return vehiculeBusiness.update(id, vehicule, principalName);
 	}
 
 	@DeleteMapping("/{id}")
@@ -176,60 +127,27 @@ public class VehiculeController {
 			@ApiResponse(responseCode = "403", description = "Permissions insuffisantes")
 	})
 	public ResponseEntity<Void> delete(@PathVariable Long id, Principal principal) {
-		if (principal == null) {
-			throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Connexion requise.");
-		}
-		AppUser user = userRepository.findByEmail(principal.getName())
-				.orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Utilisateur introuvable."));
-		Vehicule existing = vehiculeService.findById(id);
-		if (!"ADMIN".equalsIgnoreCase(user.getRole()) && !user.getEmail().equalsIgnoreCase(existing.getCreatedBy())) {
-			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Seul le créateur ou un administrateur peut supprimer ce véhicule.");
-		}
-		vehiculeService.delete(id);
+		String principalName = principal != null ? principal.getName() : null;
+		vehiculeBusiness.delete(id, principalName);
 		return ResponseEntity.noContent().build();
 	}
 
 	@GetMapping("/brands")
 	@Operation(summary = "Lister toutes les marques uniques présentes dans le catalogue")
 	public ResponseEntity<List<String>> getCatalogBrands() {
-		List<String> list = vehiculeService.findAll().stream()
-				.map(Vehicule::getBrand)
-				.filter(b -> b != null && !b.isBlank())
-				.distinct()
-				.sorted()
-				.toList();
-		return ResponseEntity.ok(list);
+		return ResponseEntity.ok(vehiculeBusiness.getCatalogBrands());
 	}
 
 	@GetMapping("/models")
 	@Operation(summary = "Lister tous les modèles pour une marque présente dans le catalogue")
 	public ResponseEntity<List<String>> getCatalogModels(@RequestParam String brand) {
-		List<String> list = vehiculeService.findAll().stream()
-				.filter(v -> brand.equalsIgnoreCase(v.getBrand()))
-				.map(v -> {
-					if (v.getGeneration() != null && !v.getGeneration().isBlank()) {
-						return v.getModel() + " (" + v.getGeneration() + ")";
-					}
-					return v.getModel();
-				})
-				.filter(m -> m != null && !m.isBlank())
-				.distinct()
-				.sorted()
-				.toList();
-		return ResponseEntity.ok(list);
+		return ResponseEntity.ok(vehiculeBusiness.getCatalogModels(brand));
 	}
 
 	@GetMapping("/versions")
 	@Operation(summary = "Lister toutes les versions pour un couple marque et modèle dans le catalogue")
 	public ResponseEntity<List<Map<String, String>>> getCatalogVersions(@RequestParam String brand, @RequestParam String model) {
-		String cleanModel = model.split("\\(")[0].trim();
-		List<Map<String, String>> list = vehiculeService.findAll().stream()
-				.filter(v -> brand.equalsIgnoreCase(v.getBrand()) && cleanModel.equalsIgnoreCase(v.getModel()))
-				.map(v -> Map.of("version", v.getVersion()))
-				.distinct()
-				.sorted((a, b) -> a.get("version").compareTo(b.get("version")))
-				.toList();
-		return ResponseEntity.ok(list);
+		return ResponseEntity.ok(vehiculeBusiness.getCatalogVersions(brand, model));
 	}
 
 	@ExceptionHandler(IllegalArgumentException.class)

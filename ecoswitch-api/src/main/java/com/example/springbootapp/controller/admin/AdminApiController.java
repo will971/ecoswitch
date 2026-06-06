@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.example.springbootapp.monitoring.UsageMonitor;
 import com.example.springbootapp.service.JvmUsageService;
 import com.example.springbootapp.service.LogFileService;
+import com.example.springbootapp.business.admin.AdminApiBusiness;
 
 import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
@@ -43,29 +44,18 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 public class AdminApiController {
 
 	private static final int DEFAULT_LINES = 300;
-	private static final int MAX_LINES = 2_000;
 
-	private final LogFileService logFileService;
-	private final UsageMonitor usageMonitor;
-	private final JvmUsageService jvmUsageService;
-	private final LoggingSystem loggingSystem;
+	private final AdminApiBusiness adminApiBusiness;
 
-	public AdminApiController(
-			LogFileService logFileService,
-			UsageMonitor usageMonitor,
-			JvmUsageService jvmUsageService,
-			LoggingSystem loggingSystem) {
-		this.logFileService = logFileService;
-		this.usageMonitor = usageMonitor;
-		this.jvmUsageService = jvmUsageService;
-		this.loggingSystem = loggingSystem;
+	public AdminApiController(AdminApiBusiness adminApiBusiness) {
+		this.adminApiBusiness = adminApiBusiness;
 	}
 
 	@GetMapping("/log-files")
 	@Operation(summary = "Lister les fichiers de log")
 	@ApiResponse(responseCode = "200", description = "Liste des fichiers de log")
 	public List<LogFileService.LogFileInfo> logFiles() throws IOException {
-		return logFileService.listLogFiles();
+		return adminApiBusiness.listLogFiles();
 	}
 
 	@GetMapping("/log-files/{fileName:.+}")
@@ -79,22 +69,21 @@ public class AdminApiController {
 			@Parameter(description = "Nombre max de lignes retournees") @RequestParam(defaultValue = ""
 					+ DEFAULT_LINES) int lines)
 			throws IOException {
-		int safeLines = Math.min(Math.max(1, lines), MAX_LINES);
-		return Map.of("fileName", fileName, "content", logFileService.readTail(fileName, safeLines));
+		return Map.of("fileName", fileName, "content", adminApiBusiness.readLogFileTail(fileName, lines));
 	}
 
 	@GetMapping("/usage")
 	@Operation(summary = "Afficher l'usage des services et DAO instrumentes")
 	@ApiResponse(responseCode = "200", description = "Statistiques d'utilisation")
 	public List<UsageMonitor.UsageSnapshot> usage() {
-		return usageMonitor.getSnapshots();
+		return adminApiBusiness.getUsageSnapshots();
 	}
 
 	@GetMapping("/jvm-usage")
 	@Operation(summary = "Afficher l'etat JVM (memoire, threads, CPU, uptime)")
 	@ApiResponse(responseCode = "200", description = "Metriques JVM")
 	public JvmUsageService.JvmUsageSnapshot jvmUsage() {
-		return jvmUsageService.snapshot();
+		return adminApiBusiness.getJvmUsageSnapshot();
 	}
 
 	@GetMapping("/log-files/{fileName:.+}/download")
@@ -104,10 +93,7 @@ public class AdminApiController {
 			@ApiResponse(responseCode = "400", description = "Fichier introuvable")
 	})
 	public ResponseEntity<Resource> downloadLogFile(@PathVariable String fileName) {
-		Resource resource = logFileService.asResource(fileName);
-		if (!resource.exists() || !resource.isReadable()) {
-			throw new IllegalArgumentException("Log file not found.");
-		}
+		Resource resource = adminApiBusiness.getLogFileAsResource(fileName);
 		String safeFileName = fileName.replace("\"", "");
 		return ResponseEntity.ok()
 				.contentType(MediaType.TEXT_PLAIN)
@@ -119,7 +105,7 @@ public class AdminApiController {
 	@Operation(summary = "Lire le niveau de log d'un logger")
 	@ApiResponse(responseCode = "200", description = "Niveau de log courant")
 	public Map<String, String> logLevel(@RequestParam(defaultValue = "ROOT") String logger) {
-		LoggerConfiguration loggerConfig = loggingSystem.getLoggerConfiguration(logger);
+		LoggerConfiguration loggerConfig = adminApiBusiness.getLoggerConfiguration(logger);
 		if (loggerConfig == null) {
 			return Map.of("logger", logger, "configuredLevel", "N/A", "effectiveLevel", "UNKNOWN");
 		}
@@ -147,7 +133,7 @@ public class AdminApiController {
 			throw new IllegalArgumentException("Log level is required.");
 		}
 		LogLevel level = LogLevel.valueOf(request.level().toUpperCase());
-		loggingSystem.setLogLevel(logger, level);
+		adminApiBusiness.setLogLevel(logger, level);
 		return ResponseEntity.ok(logLevel(logger));
 	}
 

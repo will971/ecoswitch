@@ -13,11 +13,16 @@ import org.springframework.http.ResponseEntity;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import com.example.springbootapp.service.ImmatriculationService;
+import com.example.springbootapp.business.vehicule.ImmatriculationBusiness;
+
 class ImmatriculationControllerTest {
 
 	private final ObjectMapper objectMapper = new ObjectMapper();
 	private final ResourceLoader resourceLoader = new DefaultResourceLoader();
-	private final ImmatriculationController immatriculationController = new ImmatriculationController(objectMapper, resourceLoader);
+	private final ImmatriculationService immatriculationService = new ImmatriculationService(objectMapper, resourceLoader);
+	private final ImmatriculationBusiness immatriculationBusiness = new ImmatriculationBusiness(immatriculationService);
+	private final ImmatriculationController immatriculationController = new ImmatriculationController(immatriculationBusiness);
 
 	@Test
 	void shouldReturnBadRequestWhenPlaqueIsMissing() {

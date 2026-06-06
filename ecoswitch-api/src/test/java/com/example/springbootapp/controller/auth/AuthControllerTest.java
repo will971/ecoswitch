@@ -13,14 +13,16 @@ import org.springframework.http.ResponseEntity;
 
 import com.example.springbootapp.service.JwtService;
 import com.example.springbootapp.service.UserService;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.example.springbootapp.service.GoogleAuthService;
+import com.example.springbootapp.business.auth.AuthBusiness;
 
 class AuthControllerTest {
 
-	private final ObjectMapper objectMapper = new ObjectMapper();
 	private final JwtService jwtService = mock(JwtService.class);
 	private final UserService userService = mock(UserService.class);
-	private final AuthController authController = new AuthController(objectMapper, jwtService, userService);
+	private final GoogleAuthService googleAuthService = mock(GoogleAuthService.class);
+	private final AuthBusiness authBusiness = new AuthBusiness(userService, jwtService, googleAuthService);
+	private final AuthController authController = new AuthController(authBusiness);
 
 	@Test
 	void shouldReturnBadRequestWhenCredentialIsMissing() {

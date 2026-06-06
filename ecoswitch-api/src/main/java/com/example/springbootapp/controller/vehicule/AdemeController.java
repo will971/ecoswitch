@@ -1,7 +1,7 @@
 package com.example.springbootapp.controller.vehicule;
 
-import com.example.springbootapp.service.AdemeService;
 import com.example.springbootapp.service.AdemeService.AdemeVehicle;
+import com.example.springbootapp.business.vehicule.AdemeBusiness;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
@@ -18,28 +18,28 @@ import java.util.Map;
 @Tag(name = "ADEME", description = "Recherche de vehicules par marque, modele et version via le dump ADEME")
 public class AdemeController {
 
-	private final AdemeService ademeService;
+	private final AdemeBusiness ademeBusiness;
 
-	public AdemeController(AdemeService ademeService) {
-		this.ademeService = ademeService;
+	public AdemeController(AdemeBusiness ademeBusiness) {
+		this.ademeBusiness = ademeBusiness;
 	}
 
 	@GetMapping("/brands")
 	@Operation(summary = "Lister toutes les marques uniques de véhicules")
 	public ResponseEntity<List<String>> getBrands() {
-		return ResponseEntity.ok(ademeService.getBrands());
+		return ResponseEntity.ok(ademeBusiness.getBrands());
 	}
 
 	@GetMapping("/models")
 	@Operation(summary = "Lister tous les modèles pour une marque")
 	public ResponseEntity<List<String>> getModels(@RequestParam String brand) {
-		return ResponseEntity.ok(ademeService.getModels(brand));
+		return ResponseEntity.ok(ademeBusiness.getModels(brand));
 	}
 
 	@GetMapping("/versions")
 	@Operation(summary = "Lister toutes les versions pour un couple marque et modèle")
 	public ResponseEntity<List<AdemeVehicle>> getVersions(@RequestParam String brand, @RequestParam String model) {
-		return ResponseEntity.ok(ademeService.getVersions(brand, model));
+		return ResponseEntity.ok(ademeBusiness.getVersions(brand, model));
 	}
 
 	@GetMapping("/vehicle")
@@ -48,7 +48,7 @@ public class AdemeController {
 			@RequestParam String brand,
 			@RequestParam String model,
 			@RequestParam String version) {
-		return ademeService.getVehicle(brand, model, version)
+		return ademeBusiness.getVehicle(brand, model, version)
 				.map(v -> ResponseEntity.ok(Map.of(
 						"name", v.getFullName(),
 						"fuelType", v.fuelType().name(),
