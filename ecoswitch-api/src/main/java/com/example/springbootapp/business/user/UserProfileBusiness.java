@@ -30,7 +30,7 @@ public class UserProfileBusiness {
         if (existingProfiles.isEmpty() || profileInput.isDefault()) {
             profile.setDefault(true);
             if (profileInput.isDefault()) {
-                clearOtherDefaults(existingProfiles);
+                clearOtherDefaults(existingProfiles, null);
             }
         } else {
             profile.setDefault(false);
@@ -51,7 +51,7 @@ public class UserProfileBusiness {
 
         if (profileInput.isDefault() && !profile.isDefault()) {
             profile.setDefault(true);
-            clearOtherDefaults(existingProfiles);
+            clearOtherDefaults(existingProfiles, profile.getId());
         } else if (!profileInput.isDefault() && profile.isDefault()) {
             profile.setDefault(false);
         }
@@ -81,9 +81,9 @@ public class UserProfileBusiness {
         return true;
     }
 
-    private void clearOtherDefaults(List<UserVehicleProfile> profiles) {
+    private void clearOtherDefaults(List<UserVehicleProfile> profiles, Long excludeId) {
         for (UserVehicleProfile p : profiles) {
-            if (p.isDefault()) {
+            if (p.isDefault() && (excludeId == null || !p.getId().equals(excludeId))) {
                 p.setDefault(false);
                 profileService.save(p);
             }

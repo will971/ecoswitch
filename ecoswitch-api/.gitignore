@@ -37,4 +37,4 @@ out/
 .vscode/
 logs/
 logs/application.log
-data/
+/data/

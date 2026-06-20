@@ -1,0 +1,36 @@
+{
+  "brandNormalizations": {
+    "b.m.w.": "BMW",
+    "bmw": "BMW",
+    "citroen": "Citroën",
+    "mg": "MG"
+  },
+  "modelRules": {
+    "BMW": {
+      "Serie 1": {
+        "replacement": "Série 1 (F40)"
+      },
+      "Serie 2": {
+        "replacement": "Série 2 (F44/U06)"
+      },
+      "Serie 3": {
+        "replacement": "Série 3 (G20)"
+      },
+      "Serie 4": {
+        "replacement": "Série 4 (G22)"
+      },
+      "Serie 5": {
+        "replacement": "Série 5 (G30)"
+      },
+      "Serie X": {
+        "versionContains": {
+          "X1": "Série X (X1 - U11)",
+          "X2": "Série X (X2 - F39)",
+          "X3": "Série X (X3 - G01)",
+          "X4": "Série X (X4 - G02)"
+        },
+        "replacement": "Série X (2022+)"
+      }
+    }
+  }
+}

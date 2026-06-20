@@ -7,7 +7,12 @@
     "dev": "vite --host",
     "build": "vite build",
     "preview": "vite preview",
-    "clean": "rm -rf dist node_modules/.vite"
+    "clean": "rm -rf dist node_modules/.vite",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "coverage:clean": "rm -rf .nyc_output coverage playwright-report",
+    "coverage:report": "nyc report",
+    "test:e2e:coverage": "npm run coverage:clean && npm run test:e2e && npm run coverage:report"
   },
   "dependencies": {
     "@lucide/vue": "^1.17.0",
@@ -15,7 +20,30 @@
     "vue": "^3.5.34"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.0",
     "@vitejs/plugin-vue": "^6.0.6",
-    "vite": "^8.0.12"
+    "nyc": "^18.0.0",
+    "vite": "^8.0.12",
+    "vite-plugin-istanbul": "^9.0.1"
+  },
+  "nyc": {
+    "all": true,
+    "extension": [
+      ".js",
+      ".vue"
+    ],
+    "include": [
+      "src/**/*.{js,vue}"
+    ],
+    "exclude": [
+      "src/main.js",
+      "src/assets/**"
+    ],
+    "reporter": [
+      "text",
+      "html"
+    ],
+    "temp-dir": "./.nyc_output",
+    "report-dir": "./coverage"
   }
 }

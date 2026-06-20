@@ -131,7 +131,7 @@ public class VehiculeSeedLoader implements ApplicationRunner {
 			return reader.lines()
 				.map(String::trim)
 				.filter(line -> !line.isBlank() && !line.startsWith("#"))
-				.filter(line -> !line.toLowerCase().startsWith("name,"))
+				.filter(line -> !line.toLowerCase().startsWith("name, brand,") && !line.toLowerCase().startsWith("name,"))
 				.map(this::parseCsvLine)
 				.collect(Collectors.toList());
 		}
@@ -139,24 +139,32 @@ public class VehiculeSeedLoader implements ApplicationRunner {
 
 	private VehiculeSeedItem parseCsvLine(String line) {
 		String[] parts = line.split(",", -1);
-		if (parts.length != 8) {
+		if (parts.length != 12) {
 			throw new IllegalArgumentException("Ligne CSV invalide: " + line);
 		}
 		return new VehiculeSeedItem(
 			parts[0].trim(),
-			Double.parseDouble(parts[1].trim()),
-			FuelType.valueOf(parts[2].trim().toUpperCase()),
-			Double.parseDouble(parts[3].trim()),
-			Integer.parseInt(parts[4].trim()),
+			parts[1].trim(),
+			parts[2].trim(),
+			parts[3].trim(),
+			parts[4].trim(),
 			Double.parseDouble(parts[5].trim()),
-			Double.parseDouble(parts[6].trim()),
-			Double.parseDouble(parts[7].trim())
+			FuelType.valueOf(parts[6].trim().toUpperCase()),
+			Double.parseDouble(parts[7].trim()),
+			Integer.parseInt(parts[8].trim()),
+			Double.parseDouble(parts[9].trim()),
+			Double.parseDouble(parts[10].trim()),
+			Double.parseDouble(parts[11].trim())
 		);
 	}
 
 	private Vehicule toVehicule(VehiculeSeedItem item) {
 		Vehicule vehicule = new Vehicule();
 		vehicule.setName(item.name());
+		vehicule.setBrand(item.brand());
+		vehicule.setModel(item.model());
+		vehicule.setGeneration(item.generation().isEmpty() ? null : item.generation());
+		vehicule.setVersion(item.version());
 		vehicule.setPurchasePrice(item.purchasePrice());
 		vehicule.setFuelType(item.fuelType());
 		vehicule.setConsumption(item.consumption());
@@ -164,62 +172,15 @@ public class VehiculeSeedLoader implements ApplicationRunner {
 		vehicule.setInsuranceCost(item.insuranceCost());
 		vehicule.setMaintenanceCost(item.maintenanceCost());
 		vehicule.setResaleValue(item.resaleValue());
-
-		// Parse brand, model, generation, version from full name
-		int firstSpace = item.name().indexOf(' ');
-		if (firstSpace == -1) {
-			vehicule.setBrand(item.name());
-			vehicule.setModel("Autre");
-			vehicule.setVersion("Standard");
-		} else {
-			String brand = item.name().substring(0, firstSpace);
-			if (brand.equalsIgnoreCase("b.m.w.")) brand = "BMW";
-			else brand = brand.substring(0, 1).toUpperCase() + brand.substring(1).toLowerCase();
-			vehicule.setBrand(brand);
-
-			String remaining = item.name().substring(firstSpace + 1);
-			if (brand.equalsIgnoreCase("BMW")) {
-				if (remaining.contains("F20")) {
-					vehicule.setModel("Série 1");
-					vehicule.setGeneration("F20");
-					vehicule.setVersion(remaining.replace("F20", "").replaceAll(" +", " ").trim());
-				} else if (remaining.contains("E46")) {
-					vehicule.setModel("Série 3");
-					vehicule.setGeneration("E46");
-					vehicule.setVersion(remaining.replace("E46", "").replaceAll(" +", " ").trim());
-				} else if (remaining.contains("F30")) {
-					vehicule.setModel("Série 3");
-					vehicule.setGeneration("F30");
-					vehicule.setVersion(remaining.replace("F30", "").replaceAll(" +", " ").trim());
-				} else if (remaining.contains("E36")) {
-					vehicule.setModel("Série 3");
-					vehicule.setGeneration("E36");
-					vehicule.setVersion(remaining.replace("E36", "").replaceAll(" +", " ").trim());
-				} else if (remaining.contains("E81") || remaining.contains("E87")) {
-					vehicule.setModel("Série 1");
-					vehicule.setGeneration("E81/E87");
-					vehicule.setVersion(remaining.replace("E81", "").replace("E87", "").replaceAll(" +", " ").trim());
-				} else {
-					vehicule.setModel("Autres Modèles");
-					vehicule.setVersion(remaining);
-				}
-			} else {
-				// Fallback generic split
-				int nextSpace = remaining.indexOf(' ');
-				if (nextSpace != -1) {
-					vehicule.setModel(remaining.substring(0, nextSpace));
-					vehicule.setVersion(remaining.substring(nextSpace + 1).trim());
-				} else {
-					vehicule.setModel(remaining);
-					vehicule.setVersion("Standard");
-				}
-			}
-		}
 		return vehicule;
 	}
 
 	public record VehiculeSeedItem(
 		String name,
+		String brand,
+		String model,
+		String generation,
+		String version,
 		double purchasePrice,
 		FuelType fuelType,
 		double consumption,

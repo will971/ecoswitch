@@ -1,0 +1,69 @@
+{
+  "EZ999ZZ": {
+    "name": "BMW 114i 1.6 102cv (2013)",
+    "fuelType": "PETROL",
+    "consumption": 6.5,
+    "annualMileage": 12000,
+    "insuranceCost": 650.0,
+    "maintenanceCost": 500.0,
+    "resaleValue": 4500.0
+  },
+  "GG555EL": {
+    "name": "Tesla Model 3 Grande Autonomie (2021)",
+    "fuelType": "ELECTRIC",
+    "consumption": 14.7,
+    "annualMileage": 15000,
+    "insuranceCost": 700.0,
+    "maintenanceCost": 200.0,
+    "purchasePrice": 37800.0,
+    "resaleValue": 22000.0
+  },
+  "AB123CD": {
+    "name": "Peugeot 208 II 1.2 PureTech 100 (2020)",
+    "fuelType": "PETROL",
+    "consumption": 5.2,
+    "annualMileage": 15000,
+    "insuranceCost": 550.0,
+    "maintenanceCost": 380.0,
+    "purchasePrice": 17900.0,
+    "resaleValue": 11000.0
+  },
+  "FR199XC": {
+    "name": "Renault Clio V E-Tech 140 (2021)",
+    "fuelType": "HYBRID",
+    "consumption": 4.3,
+    "annualMileage": 15000,
+    "insuranceCost": 500.0,
+    "maintenanceCost": 300.0,
+    "purchasePrice": 21500.0,
+    "resaleValue": 14500.0
+  },
+  "AA987BB": {
+    "name": "Peugeot 3008 II 1.5 BlueHDi 130 (2019)",
+    "fuelType": "DIESEL",
+    "consumption": 4.9,
+    "annualMileage": 18000,
+    "insuranceCost": 650.0,
+    "maintenanceCost": 450.0,
+    "resaleValue": 16500.0
+  },
+  "DK120FR": {
+    "name": "Renault Zoe R135 (2020)",
+    "fuelType": "ELECTRIC",
+    "consumption": 17.2,
+    "annualMileage": 12000,
+    "insuranceCost": 480.0,
+    "maintenanceCost": 150.0,
+    "purchasePrice": 19800.0,
+    "resaleValue": 9800.0
+  },
+  "DA015CM": {
+    "name": "BMW 114i 1.6 102cv (2013)",
+    "fuelType": "PETROL",
+    "consumption": 6.5,
+    "annualMileage": 12000,
+    "insuranceCost": 650.0,
+    "maintenanceCost": 500.0,
+    "resaleValue": 4500.0
+  }
+}
