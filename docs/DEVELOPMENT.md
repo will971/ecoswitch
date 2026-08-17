@@ -9,7 +9,7 @@ Ce guide décrit les étapes nécessaires pour installer, exécuter, tester et c
 Avant de commencer, assurez-vous d'avoir installé les outils suivants sur votre système :
 
 *   **Docker Desktop** (ou Docker Engine + Docker Compose).
-*   **Java 24** (nécessaire pour exécuter l'API en local sans Docker).
+*   **Java 26** (nécessaire pour exécuter l'API en local sans Docker).
 *   **Node.js 22+** et **npm** (nécessaires pour exécuter l'IHM en local sans Docker).
 
 ---
@@ -96,15 +96,30 @@ Au démarrage du backend, l'application initialise sa base de données à l'aide
 
 ---
 
-## 6. Lancement des Tests
+## 6. Lancement des Tests & Couverture de Code
 
-Le backend intègre des suites de tests unitaires et d'intégration Spring Boot pour valider la logique des calculs et des contrôleurs.
+### A. Backend API (JUnit 5 & JaCoCo)
+Le backend intègre des suites de tests unitaires et d'intégration Spring Boot pour valider la logique des calculs, des entités et des contrôleurs de sécurité.
+La couverture de code est générée à l'aide de **JaCoCo**.
 
-Pour exécuter les tests depuis la racine du projet :
+Pour exécuter les tests et générer le rapport de couverture depuis la racine du projet :
 ```bash
-make test-api
+cd ecoswitch-api && ./gradlew test jacocoTestReport
 ```
-*(Équivalent à `cd ecoswitch-api && ./gradlew test`)*
+*   **Rapport de tests** : `ecoswitch-api/build/reports/tests/test/index.html`
+*   **Rapport de couverture de code** : `ecoswitch-api/build/reports/jacoco/test/html/index.html`
 
-Les rapports de test JUnit sont générés dans le dossier :
-`ecoswitch-api/build/reports/tests/test/index.html`.
+### B. Frontend IHM (Playwright & Istanbul)
+Le frontend utilise **Playwright** pour ses tests End-to-End (E2E) simulés sur différents viewports (Ordinateur, Tablette, Mobile) et **Istanbul** pour mesurer la couverture de code induite par ces tests.
+
+Pour exécuter les tests E2E avec la génération du rapport de couverture (nécessite que l'API tourne en tâche de fond sur le port 8080) :
+1.  **Démarrer l'API** (si hors Docker) :
+    ```bash
+    cd ecoswitch-api && ./gradlew bootRun
+    ```
+2.  **Lancer les tests et générer la couverture** :
+    ```bash
+    cd ecoswitch-ihm && npm run test:e2e:coverage
+    ```
+*   **Rapport HTML Playwright** : `ecoswitch-ihm/playwright-report/index.html`
+*   **Rapport de couverture de code** : `ecoswitch-ihm/coverage/index.html`

@@ -39,7 +39,7 @@ graph TD
 
 ## 2. Backend Spring Boot
 
-Le backend est développé avec **Spring Boot 4.0.6** et s'exécute sur une machine virtuelle **Java 24**.
+Le backend est développé avec **Spring Boot 4.1.0** et s'exécute sur une machine virtuelle **Java 26**.
 
 ### A. Persistance & Base de Données
 Le stockage utilise une base de données **H2 en mémoire**.

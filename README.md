@@ -3,7 +3,7 @@
 EcoSwitch est un outil d'aide à la décision financière et écologique permettant de comparer le coût de détention de différents véhicules et d'identifier le seuil de rentabilité lors du passage au véhicule électrique ou hybride.
 
 Ce dépôt est un monorepo contenant :
-*   **ecoswitch-api** : Le serveur backend REST (Spring Boot / Java 24 / H2).
+*   **ecoswitch-api** : Le serveur backend REST (Spring Boot 4.1.0 / Java 26 / H2).
 *   **ecoswitch-ihm** : L'interface utilisateur Web monopage (Vue 3 / Vite).
 
 ---
