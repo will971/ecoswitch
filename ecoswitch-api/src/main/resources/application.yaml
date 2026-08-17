@@ -17,15 +17,18 @@ logging:
 app:
   admin:
     log-directory: logs
-    username: admin
-    password: admin
+    username: ${APP_ADMIN_USERNAME:admin}
+    password: ${APP_ADMIN_PASSWORD:admin}
   seed:
     vehicles-file: classpath:data/vehicules-seed.csv
     vehicles-url: https://raw.githubusercontent.com/williamsmodeste/antigravity-auto-db/main/vehicles.json
   security:
     google:
-      client-id: 1047781504975-placeholderclientid.apps.googleusercontent.com
+      client-id: ${GOOGLE_CLIENT_ID:}
     jwt:
       # Clé HMAC-SHA256 encodée en Base64 (256 bits minimum)
-      secret: RWNvU3dpdGNoU2VjcmV0S2V5MjAyNlByZW1pdW1BcHBKd3RTZWNVcmVUb2tlbg==
+      secret: ${JWT_SECRET:RWNvU3dpdGNoU2VjcmV0S2V5MjAyNlByZW1pdW1BcHBKd3RTZWNVcmVUb2tlbg==}
       expiration-days: 7
+  gemini:
+    api-key: ${GEMINI_API_KEY:}
+    model: ${GEMINI_MODEL:gemini-flash-lite-latest}

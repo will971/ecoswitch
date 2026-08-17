@@ -1,9 +1,29 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { ArrowLeft, DollarSign, TrendingUp, CheckCircle2, AlertCircle, FileSpreadsheet, Save, X, Share2, PiggyBank, Scale, Sparkles, Fuel, CreditCard } from '@lucide/vue'
+import {
+  ArrowLeft,
+  DollarSign,
+  TrendingUp,
+  CheckCircle2,
+  AlertCircle,
+  FileSpreadsheet,
+  Save,
+  X,
+  Share2,
+  PiggyBank,
+  Scale,
+  Sparkles,
+  Fuel,
+  CreditCard,
+  ChevronDown,
+  ChevronUp,
+  Layers,
+  Check
+} from '@lucide/vue'
 import { apiSaveSimulation } from '../../utils/api.js'
 
-// Import des sous-composants dans le même dossier
+// Import des sous-composants
+import MobilityInsightCard from './MobilityInsightCard.vue'
 import ArbitrageCard from './ArbitrageCard.vue'
 import AdvisorRecommendations from './AdvisorRecommendations.vue'
 import ProjectionsTable from './ProjectionsTable.vue'
@@ -39,6 +59,18 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  homeChargingRatio: {
+    type: Number,
+    default: 0.85
+  },
+  taxIncome: {
+    type: Number,
+    default: null
+  },
+  scrapVehicle: {
+    type: Boolean,
+    default: false
+  },
   currentUser: {
     type: Object,
     default: null
@@ -50,16 +82,18 @@ const emit = defineEmits(['back', 'load-alternative'])
 const showShareModal = ref(false)
 const showSaveModal = ref(false)
 const saveNote = ref('')
+const showDetailedTables = ref(false)
+const saveSuccessToast = ref(false)
 
-// Calculs du budget mensuel détaillé
-const currentMonthlyUsage = computed(() => props.result.currentAnnualCost / 12.0)
-const targetMonthlyUsage = computed(() => props.result.targetAnnualCost / 12.0)
+// Calculs du budget mensuel
+const currentMonthlyUsage = computed(() => (props.result?.currentAnnualCost || 0) / 12.0)
+const targetMonthlyUsage = computed(() => (props.result?.targetAnnualCost || 0) / 12.0)
 const monthlyUsageSavings = computed(() => currentMonthlyUsage.value - targetMonthlyUsage.value)
 
-const currentMonthlyFinancing = computed(() => 0.0) // véhicule actuel supposé payé
+const currentMonthlyFinancing = computed(() => 0.0)
 const targetMonthlyFinancing = computed(() => {
-  if (props.isLeasing) {
-    return props.result.targetMonthlyTotalCost - targetMonthlyUsage.value
+  if (props.isLeasing && props.result?.targetMonthlyTotalCost !== undefined) {
+    return Math.max(0, props.result.targetMonthlyTotalCost - targetMonthlyUsage.value)
   }
   return 0.0
 })
@@ -93,7 +127,7 @@ const getYearlyForecast = () => {
 }
 
 const formatCurrency = (val) => {
-  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(val)
+  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val || 0)
 }
 
 const exportToCSV = () => {
@@ -101,7 +135,7 @@ const exportToCSV = () => {
   
   const yearly = getYearlyForecast()
   let csvContent = "data:text/csv;charset=utf-8,"
-    + "Annee,Cout Actuel Cumule (avec reparations) (EUR),Cout Cible Cumule (EUR),Bilan Net Cumule (EUR),Etat Rentabilite\n"
+    + "Annee,Cout Actuel Cumule (EUR),Cout Cible Cumule (EUR),Bilan Net Cumule (EUR),Etat Rentabilite\n"
 
   yearly.forEach(row => {
     csvContent += `${row.year},${row.currentCost.toFixed(2)},${row.targetCost.toFixed(2)},${row.difference.toFixed(2)},${row.isProfitable ? 'Rentable' : 'Deficit'}\n`
@@ -112,7 +146,7 @@ const exportToCSV = () => {
   link.setAttribute("href", encodedUri)
   const currentName = props.currentVehicle.name.replace(/\s+/g, '_')
   const targetName = props.targetVehicle.name.replace(/\s+/g, '_')
-  link.setAttribute("download", `Simulation_Rentabilite_${currentName}_vs_${targetName}.csv`)
+  link.setAttribute("download", `Bilan_EcoSwitch_${currentName}_vs_${targetName}.csv`)
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
@@ -120,7 +154,7 @@ const exportToCSV = () => {
 
 const triggerSave = () => {
   if (!props.currentUser) {
-    alert("Veuillez d'abord vous connecter pour sauvegarder vos simulations.")
+    alert("Veuillez vous connecter à votre Espace Client pour enregistrer vos simulations.")
     return
   }
   showSaveModal.value = true
@@ -137,13 +171,16 @@ const confirmSave = async () => {
     result:            { ...props.result },
     note:              saveNote.value
   }
-  const simName = `${props.currentVehicle.name} vs ${props.targetVehicle.name}`
+  const simName = `${props.currentVehicle.name} ➔ ${props.targetVehicle.name}`
 
   try {
     await apiSaveSimulation(simName, simData)
     showSaveModal.value = false
     saveNote.value = ''
-    alert('Simulation enregistrée avec succès dans votre espace !')
+    saveSuccessToast.value = true
+    setTimeout(() => {
+      saveSuccessToast.value = false
+    }, 4000)
   } catch (err) {
     if (err.message === 'SESSION_EXPIRED') {
       alert('Votre session a expiré. Veuillez vous reconnecter.')
@@ -162,203 +199,216 @@ const handleLoadAlternative = (rec) => {
 </script>
 
 <template>
-  <div class="apple-results-dashboard">
+  <div class="results-dashboard animation-fadeIn">
     
-    <!-- Header / Actions de type Apple Toolbar -->
-    <div class="apple-toolbar mb-5">
-      <button class="apple-btn-back" @click="emit('back')">
+    <!-- Barre d'outils Apple Style -->
+    <div class="results-toolbar mb-4">
+      <button class="btn-back" @click="emit('back')">
         <ArrowLeft size="16" />
         <span>Modifier la saisie</span>
       </button>
-      <div class="apple-toolbar-actions">
-        <button class="apple-btn-secondary" @click="showShareModal = true" title="Partager">
+
+      <div class="toolbar-actions flex items-center gap-2">
+        <button class="btn btn-secondary btn-small" @click="showShareModal = true" title="Partager">
           <Share2 size="14" />
-          <span>Partager</span>
+          <span class="hide-on-xs">Partager</span>
         </button>
-        <button class="apple-btn-secondary" @click="exportToCSV" title="Exporter">
+        <button class="btn btn-secondary btn-small" @click="exportToCSV" title="Exporter CSV">
           <FileSpreadsheet size="14" />
-          <span>Exporter</span>
+          <span class="hide-on-xs">Exporter CSV</span>
         </button>
-        <button class="apple-btn-primary" @click="triggerSave" title="Enregistrer">
+        <button class="btn btn-primary btn-small" @click="triggerSave" title="Enregistrer">
           <Save size="14" />
           <span>Enregistrer</span>
         </button>
       </div>
     </div>
 
-    <!-- Bannière Diagnostic iOS Style -->
-    <div class="apple-alert-card mb-5" :class="result.breakEvenYear ? 'alert-success' : 'alert-warning'">
-      <div class="alert-icon-wrapper">
-        <CheckCircle2 v-if="result.breakEvenYear" size="24" class="text-teal" />
-        <AlertCircle v-else size="24" class="text-rose" />
+    <!-- Notification Toast Sauvegarde Réussie -->
+    <div v-if="saveSuccessToast" class="toast-success p-3 rounded-xl mb-4 flex items-center gap-2 border-glass bg-card animation-fadeIn">
+      <CheckCircle2 size="18" class="text-teal" />
+      <span class="text-xs font-semibold text-main">Simulation enregistrée avec succès dans votre Espace Client !</span>
+    </div>
+
+    <!-- Bannière Diagnostic Hero Apple Style -->
+    <div class="hero-diagnostic-card mb-4" :class="result.breakEvenYear ? 'roi-profitable' : 'roi-neutral'">
+      <div class="diagnostic-icon-wrapper flex-center">
+        <CheckCircle2 v-if="result.breakEvenYear" size="26" class="text-teal" />
+        <AlertCircle v-else size="26" class="text-amber" />
       </div>
-      <div class="alert-content">
-        <h4 class="alert-title">
-          {{ result.breakEvenYear ? 'Changement rentable' : 'Investissement à long terme' }}
-        </h4>
-        <p class="alert-description">
+
+      <div class="diagnostic-content flex-1">
+        <div class="flex items-center gap-2 mb-1">
+          <span class="badge badge-small" :class="result.breakEvenYear ? 'badge-teal' : 'badge-amber'">
+            {{ result.breakEvenYear ? 'Rentable' : 'Long terme' }}
+          </span>
+          <span class="text-xxs font-bold uppercase text-dimmed">
+            {{ currentVehicle.name }} ➔ {{ targetVehicle.name }}
+          </span>
+        </div>
+        
+        <h3 class="diagnostic-title text-main font-heading m-0">
           {{ result.breakEvenYear 
-            ? `L'économie réalisée sur les coûts d'usage (énergie, assurance et entretien) amortit l'investissement de transition en ${result.breakEvenYear} ans.`
-            : `Le coût cumulé du nouveau véhicule (incluant son coût d'acquisition ou loyers) reste supérieur à votre véhicule actuel sur votre horizon de ${maxYears} ans.`
+            ? `Changement de véhicule amorti en ${result.breakEvenYear} an${result.breakEvenYear > 1 ? 's' : ''}`
+            : `Investissement amorti au-delà de votre horizon de ${maxYears} ans`
+          }}
+        </h3>
+        <p class="diagnostic-description text-xs text-muted mt-1 m-0">
+          {{ result.breakEvenYear 
+            ? `Vos économies d'énergie et d'entretien (${formatCurrency(result.annualSavings)}/an) compensent votre investissement initial.`
+            : `Le surcoût d'acquisition (${formatCurrency(result.switchInvestment)}) nécessite plus de ${maxYears} ans pour être amorti par les économies d'énergie.`
           }}
         </p>
       </div>
-      <div class="alert-badge" v-if="result.breakEvenYear">
-        <span class="badge-label">Point Mort</span>
-        <span class="badge-value text-teal">{{ result.breakEvenYear }} {{ result.breakEvenYear > 1 ? 'ans' : 'an' }}</span>
-      </div>
-      <div class="alert-badge" v-else>
-        <span class="badge-label">Horizon</span>
-        <span class="badge-value text-rose">> {{ maxYears }} ans</span>
+
+      <div class="diagnostic-stat shrink-0 text-right">
+        <div class="stat-label text-xxs uppercase font-bold text-dimmed">Point Mort</div>
+        <div class="stat-value font-heading" :class="result.breakEvenYear ? 'text-teal' : 'text-amber'">
+          {{ result.breakEvenYear ? `${result.breakEvenYear} ans` : `> ${maxYears} ans` }}
+        </div>
       </div>
     </div>
 
-    <!-- Section titre de section minimaliste -->
-    <div class="section-title-wrapper mb-4">
-      <h3 class="apple-section-title">Analyse Financière Mensuelle</h3>
-      <p class="apple-section-subtitle">Comparaison de l'impact de la transition sur votre budget mensuel courant.</p>
-    </div>
-
-    <!-- Bento Grid : Partie Budget Mensuel (3 cartes) -->
-    <div class="apple-bento-grid mb-5">
-      
-      <!-- Carte Budget Actuel -->
-      <div class="apple-bento-card">
-        <span class="card-tag">Budget Mensuel Actuel</span>
-        <h5 class="card-vehicle-title">{{ currentVehicle.name }}</h5>
-        <div class="card-primary-value text-rose">{{ formatCurrency(currentMonthlyTotal) }}<span class="value-period">/mois</span></div>
-        
-        <div class="card-details-divider"></div>
-        
-        <div class="card-detail-row">
-          <div class="detail-label flex items-center gap-1.5">
-            <Fuel size="14" class="text-rose" />
-            <span>Usage & Énergie</span>
-          </div>
-          <span class="detail-value font-semibold">{{ formatCurrency(currentMonthlyUsage) }}</span>
-        </div>
-        <div class="card-detail-row">
-          <div class="detail-label flex items-center gap-1.5">
-            <CreditCard size="14" class="text-rose" />
-            <span>Financement / Loyer</span>
-          </div>
-          <span class="detail-value font-semibold">{{ formatCurrency(currentMonthlyFinancing) }}</span>
-        </div>
+    <!-- Bento Grid : Analyse Financière Mensuelle (Reste à vivre) -->
+    <div class="mb-4">
+      <div class="mb-2.5">
+        <h4 class="text-sm font-bold text-main m-0">Impact sur votre Budget Mensuel</h4>
+        <p class="text-xxs text-muted m-0">Dépenses mensuelles comparées d'usage et de financement</p>
       </div>
 
-      <!-- Carte Budget Nouveau -->
-      <div class="apple-bento-card">
-        <span class="card-tag">Budget Mensuel Nouveau</span>
-        <h5 class="card-vehicle-title">{{ targetVehicle.name }}</h5>
-        <div class="card-primary-value text-cyan">{{ formatCurrency(targetMonthlyTotal) }}<span class="value-period">/mois</span></div>
-        
-        <div class="card-details-divider"></div>
-        
-        <div class="card-detail-row">
-          <div class="detail-label flex items-center gap-1.5">
-            <Fuel size="14" class="text-teal" />
-            <span>Usage & Électricité</span>
+      <div class="bento-grid">
+        <!-- Budget Actuel -->
+        <div class="bento-card">
+          <span class="badge badge-amber badge-small mb-2">Actuel</span>
+          <div class="text-xs font-bold text-main truncate">{{ currentVehicle.name }}</div>
+          <div class="metric-value font-heading text-rose mt-1">{{ formatCurrency(currentMonthlyTotal) }}<span class="metric-unit">/mois</span></div>
+          
+          <div class="card-divider my-2.5"></div>
+          
+          <div class="detail-line flex-between text-xs py-0.5">
+            <span class="text-dimmed">Carburant + Entretien</span>
+            <span class="font-bold text-main">{{ formatCurrency(currentMonthlyUsage) }}</span>
           </div>
-          <span class="detail-value font-semibold">{{ formatCurrency(targetMonthlyUsage) }}</span>
-        </div>
-        <div class="card-detail-row">
-          <div class="detail-label flex items-center gap-1.5">
-            <CreditCard size="14" class="text-cyan" />
-            <span>Financement / Loyer</span>
+          <div class="detail-line flex-between text-xs py-0.5">
+            <span class="text-dimmed">Loyer / Financement</span>
+            <span class="font-bold text-main">{{ formatCurrency(currentMonthlyFinancing) }}</span>
           </div>
-          <span class="detail-value font-semibold">{{ formatCurrency(targetMonthlyFinancing) }}</span>
         </div>
-      </div>
 
-      <!-- Carte Bilan Mensuel (Impact direct) -->
-      <div class="apple-bento-card card-highlighted" :class="netMonthlySavings > 0 ? 'highlight-success' : 'highlight-warning'">
-        <span class="card-tag">Impact Direct Trésorerie</span>
-        <h5 class="card-vehicle-title">{{ netMonthlySavings > 0 ? 'Gain mensuel' : 'Surcoût mensuel' }}</h5>
-        <div class="card-primary-value font-bold" :class="netMonthlySavings > 0 ? 'text-teal' : 'text-rose'">
-          {{ netMonthlySavings > 0 ? '+' : '' }}{{ formatCurrency(netMonthlySavings) }}<span class="value-period">/mois</span>
+        <!-- Budget Nouveau -->
+        <div class="bento-card">
+          <span class="badge badge-cyan badge-small mb-2">Nouveau</span>
+          <div class="text-xs font-bold text-main truncate">{{ targetVehicle.name }}</div>
+          <div class="metric-value font-heading text-cyan mt-1">{{ formatCurrency(targetMonthlyTotal) }}<span class="metric-unit">/mois</span></div>
+          
+          <div class="card-divider my-2.5"></div>
+          
+          <div class="detail-line flex-between text-xs py-0.5">
+            <span class="text-dimmed">Énergie + Entretien</span>
+            <span class="font-bold text-main">{{ formatCurrency(targetMonthlyUsage) }}</span>
+          </div>
+          <div class="detail-line flex-between text-xs py-0.5">
+            <span class="text-dimmed">Loyer / Financement</span>
+            <span class="font-bold text-main">{{ formatCurrency(targetMonthlyFinancing) }}</span>
+          </div>
         </div>
-        
-        <div class="card-details-divider"></div>
-        
-        <div class="verdict-bubble">
-          <Sparkles size="14" class="text-teal shrink-0 mt-0.5" />
-          <p class="verdict-description">
+
+        <!-- Impact Direct Trésorerie -->
+        <div class="bento-card">
+          <span class="badge badge-small mb-2" :class="netMonthlySavings > 0 ? 'badge-teal' : 'badge-rose'">
+            {{ netMonthlySavings > 0 ? 'Reste à vivre' : 'Surcoût mensuel' }}
+          </span>
+          <div class="text-xs font-bold text-main">Gain net en poche</div>
+          <div class="metric-value font-heading mt-1" :class="netMonthlySavings > 0 ? 'text-teal' : 'text-rose'">
+            {{ netMonthlySavings > 0 ? '+' : '' }}{{ formatCurrency(netMonthlySavings) }}<span class="metric-unit">/mois</span>
+          </div>
+          
+          <div class="card-divider my-2.5"></div>
+          
+          <p class="text-xxs text-muted m-0" style="line-height: 1.4;">
             <span v-if="!isLeasing">
-              Achat comptant : vous réduisez vos coûts énergétiques mensuels de <strong>{{ formatCurrency(monthlyUsageSavings) }} / mois</strong>.
+              Achat comptant : réduction immédiate des dépenses d'énergie de <strong>{{ formatCurrency(monthlyUsageSavings) }} / mois</strong>.
             </span>
             <span v-else>
-              <span v-if="netMonthlySavings > 0">
-                L'économie d'énergie de <strong>{{ formatCurrency(monthlyUsageSavings) }} / mois</strong> compense entièrement le loyer de leasing.
-              </span>
-              <span v-else>
-                Le loyer de leasing de <strong>{{ formatCurrency(targetMonthlyFinancing) }} / mois</strong> surpasse vos économies d'énergie mensuelles.
-              </span>
+              {{ netMonthlySavings > 0 
+                ? `L'économie d'énergie mensuelle de ${formatCurrency(monthlyUsageSavings)} absorbe entièrement le loyer.` 
+                : `Le loyer de ${formatCurrency(targetMonthlyFinancing)} / mois dépasse les économies de carburant.`
+              }}
             </span>
           </p>
         </div>
       </div>
-
     </div>
 
-    <!-- Section titre de section long terme -->
-    <div class="section-title-wrapper mb-4">
-      <h3 class="apple-section-title">Synthèse Financière à long terme</h3>
-      <p class="apple-section-subtitle">Bilan projeté et retour sur investissement sur l'horizon de {{ maxYears }} ans.</p>
+    <!-- Carte Diagnostic Mobilité Personnalisé (IA Gemini) -->
+    <MobilityInsightCard
+      :result="result"
+      :currentVehicle="currentVehicle"
+      :targetVehicle="targetVehicle"
+      :fuelPrices="fuelPrices"
+      :isLeasing="isLeasing"
+      :homeChargingRatio="homeChargingRatio"
+      :taxIncome="taxIncome"
+      :scrapVehicle="scrapVehicle"
+    />
+
+    <!-- Bilan Carbone & Climat -->
+    <CarbonFootprintCard :result="result" class="mb-4" />
+
+    <!-- Recommandations d'Alternatives Intelligentes -->
+    <AdvisorRecommendations
+      v-if="result.recommendations && result.recommendations.length > 0"
+      :recommendations="result.recommendations"
+      class="mb-4"
+      @load-alternative="handleLoadAlternative"
+    />
+
+    <!-- Accordéon Détails Techniques & Amortissement 10 ans -->
+    <div class="detailed-toggle-bar p-3.5 rounded-xl border-glass mb-4 flex-between items-center bg-card">
+      <div class="flex items-center gap-2">
+        <Layers size="16" class="text-teal" />
+        <span class="text-xs font-bold text-main">Projections financières détaillées (10 ans)</span>
+      </div>
+      <button
+        type="button"
+        class="btn btn-secondary btn-small py-1 px-3 text-xs font-semibold flex items-center gap-1.5"
+        @click="showDetailedTables = !showDetailedTables"
+      >
+        <span>{{ showDetailedTables ? 'Masquer' : 'Afficher le tableau' }}</span>
+        <component :is="showDetailedTables ? ChevronUp : ChevronDown" size="13" />
+      </button>
     </div>
 
-    <!-- Bento Grid : Partie Long Terme (3 cartes) -->
-    <div class="apple-bento-grid mb-5">
-      
-      <!-- Carte Économie Annuelle -->
-      <div class="apple-bento-card">
-        <span class="card-tag">Lissé à l'année</span>
-        <h5 class="card-vehicle-title">Économie Annuelle Moyenne</h5>
-        <div class="card-primary-value" :class="result.annualSavings > 0 ? 'text-teal' : 'text-rose'">
-          {{ formatCurrency(result.annualSavings) }}<span class="value-period">/an</span>
+    <!-- Volet Dépliable : Long Terme -->
+    <div v-if="showDetailedTables" class="collapsible-projections animation-fadeIn flex flex-column gap-4 mb-4">
+      <div class="bento-grid">
+        <div class="bento-card">
+          <span class="badge badge-teal badge-small mb-1.5">Moyenne annuelle</span>
+          <div class="text-xs font-bold text-main">Économie Annuelle</div>
+          <div class="metric-value font-heading text-teal mt-1">{{ formatCurrency(result.annualSavings) }}<span class="metric-unit">/an</span></div>
         </div>
-        <div class="card-details-divider"></div>
-        <p class="card-bottom-caption text-xs text-muted">Économie moyenne d'usage calculée sur l'ensemble de la période.</p>
-      </div>
 
-      <!-- Carte Investissement Transition -->
-      <div class="apple-bento-card">
-        <span class="card-tag">Investissement Initial</span>
-        <h5 class="card-vehicle-title">Coût Net de Transition</h5>
-        <div class="card-primary-value text-rose">{{ formatCurrency(result.switchInvestment) }}</div>
-        <div class="card-details-divider"></div>
-        <p class="card-bottom-caption text-xs text-muted" v-if="result.totalSubsidies > 0">
-          Aides d'État déduites (bonus et conversion) : -{{ formatCurrency(result.totalSubsidies) }}
-        </p>
-        <p class="card-bottom-caption text-xs text-muted" v-else>
-          Aucune aide d'État applicable estimée pour ce véhicule.
-        </p>
-      </div>
-
-      <!-- Carte Bilan cumulé -->
-      <div class="apple-bento-card">
-        <span class="card-tag">Horizon à {{ maxYears }} ans</span>
-        <h5 class="card-vehicle-title">Bilan Cumulé Final</h5>
-        <div class="card-primary-value" :class="result.totalCostDeltaAtHorizon <= 0 ? 'text-teal' : 'text-rose'">
-          {{ result.totalCostDeltaAtHorizon <= 0 ? '+' : '' }}{{ formatCurrency(-result.totalCostDeltaAtHorizon) }}
+        <div class="bento-card">
+          <span class="badge badge-rose badge-small mb-1.5">Effort initial</span>
+          <div class="text-xs font-bold text-main">Coût Net d'Acquisition</div>
+          <div class="metric-value font-heading text-rose mt-1">{{ formatCurrency(result.switchInvestment) }}</div>
+          <p class="text-xxs text-dimmed mt-1 m-0" v-if="result.totalSubsidies > 0">
+            Aides déduites : -{{ formatCurrency(result.totalSubsidies) }}
+          </p>
         </div>
-        <div class="card-details-divider"></div>
-        <p class="card-bottom-caption text-xs text-muted">
-          {{ result.totalCostDeltaAtHorizon <= 0 
-            ? 'Gain financier net accumulé sur votre budget global.' 
-            : 'Coût net cumulé de la transition sur cette période.' 
-          }}
-        </p>
+
+        <div class="bento-card">
+          <span class="badge badge-small mb-1.5" :class="result.totalCostDeltaAtHorizon <= 0 ? 'badge-teal' : 'badge-amber'">
+            Horizon {{ maxYears }} ans
+          </span>
+          <div class="text-xs font-bold text-main">Bilan Cumulé Global</div>
+          <div class="metric-value font-heading mt-1" :class="result.totalCostDeltaAtHorizon <= 0 ? 'text-teal' : 'text-amber'">
+            {{ result.totalCostDeltaAtHorizon <= 0 ? '+' : '' }}{{ formatCurrency(-result.totalCostDeltaAtHorizon) }}
+          </div>
+        </div>
       </div>
 
-    </div>
-
-    <!-- Éléments larges du bas (Projections, CarbonFootprint, Alternatives) -->
-    <div class="apple-wide-sections flex flex-column gap-5">
-      
-      <!-- Bilan Écologique CO2 -->
-      <CarbonFootprintCard :result="result" />
-
-      <!-- Arbitrage Financier (Si frais de réparation) -->
+      <!-- Arbitrage Garagiste (si frais de réparations) -->
       <ArbitrageCard
         v-if="immediateRepairCost > 0"
         :result="result"
@@ -366,43 +416,35 @@ const handleLoadAlternative = (rec) => {
         :currentVehicle="currentVehicle"
       />
 
-      <!-- Recommandations Intelligentes -->
-      <AdvisorRecommendations
-        v-if="result.recommendations && result.recommendations.length > 0"
-        :recommendations="result.recommendations"
-        @load-alternative="handleLoadAlternative"
-      />
-
-      <!-- Tableau des Projections -->
-      <div class="apple-bento-large-card p-4">
-        <h4 class="font-heading text-sm text-gradient-teal mb-4">Tableau de Projection Annuelle Cumulative</h4>
+      <!-- Tableau Annuel -->
+      <div class="card-glass p-4">
+        <h4 class="text-sm text-main font-bold mb-3">Projection Annuelle Cumulative</h4>
         <ProjectionsTable :yearlyForecast="getYearlyForecast()" />
       </div>
-
     </div>
 
-    <!-- Modal d'enregistrement des simulations -->
+    <!-- Modal d'enregistrement -->
     <div v-if="showSaveModal" class="auth-modal-overlay flex-center">
-      <div class="card-glass glow-teal auth-modal-card p-4 relative max-w-md w-100">
-        <button class="absolute top-4 right-4 text-dimmed hover-text-main" @click="showSaveModal = false">
-          <X size="20" />
+      <div class="card-glass auth-modal-card p-4 relative max-w-md w-100 animation-fadeIn">
+        <button class="icon-btn-close absolute top-4 right-4" @click="showSaveModal = false">
+          ✕
         </button>
-        <h3 class="text-gradient mb-3 font-heading">Enregistrer la Simulation</h3>
-        <p class="text-xs text-muted mb-4">Ajoutez une note pour retrouver facilement cette simulation dans votre espace.</p>
+        <h3 class="text-main font-heading mb-1 text-md font-bold">Enregistrer cette Simulation</h3>
+        <p class="text-xs text-muted mb-4">Ajoutez un titre pour retrouver cette simulation dans votre Espace Client.</p>
         
         <div class="form-group mb-4">
-          <label class="form-label">Note / Mémo descriptif</label>
-          <input v-model="saveNote" type="text" class="form-control" placeholder="ex: Projet Tesla été 2026, km augmenté" required />
+          <label class="form-label text-xxs">Titre / Note du projet</label>
+          <input v-model="saveNote" type="text" class="form-control text-xs" placeholder="ex: Transition Toyota Yaris 2026" required />
         </div>
 
-        <div class="flex-between gap-3">
-          <button class="btn btn-secondary w-50" @click="showSaveModal = false">Annuler</button>
-          <button class="btn btn-primary w-50" @click="confirmSave">Enregistrer</button>
+        <div class="flex-between gap-2">
+          <button class="btn btn-secondary w-50 text-xs" @click="showSaveModal = false">Annuler</button>
+          <button class="btn btn-primary w-50 text-xs font-bold" @click="confirmSave">Enregistrer</button>
         </div>
       </div>
     </div>
 
-    <!-- Modal de Partage Social -->
+    <!-- Modal Partage -->
     <ShareModal
       :show="showShareModal"
       :currentVehicle="currentVehicle"
@@ -414,303 +456,105 @@ const handleLoadAlternative = (rec) => {
 </template>
 
 <style scoped>
-.apple-results-dashboard {
-  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  padding: 1rem 0;
-}
-
-/* ── Apple Style Toolbar ── */
-.apple-toolbar {
+.results-toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 16px;
 }
-.apple-btn-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
+
+.btn-back {
   background: transparent;
   border: none;
-  font-family: var(--font-heading);
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: hsl(var(--accent-teal));
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent-blue);
   cursor: pointer;
-  padding: 6px 12px;
+  padding: 6px 8px;
   border-radius: 8px;
-  transition: background-color 0.2s ease;
-}
-.apple-btn-back:hover {
-  background: hsla(var(--accent-teal) / 0.08);
-}
-.apple-toolbar-actions {
   display: flex;
-  gap: 8px;
-}
-.apple-btn-secondary {
-  display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: hsl(var(--bg-deep) / 0.4);
-  border: 1px solid hsl(var(--border-glass));
-  border-radius: 20px;
-  padding: 8px 16px;
-  font-family: var(--font-heading);
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: hsl(var(--text-main));
-  cursor: pointer;
-  transition: all 0.2s ease;
+  transition: opacity 0.15s ease;
 }
-.apple-btn-secondary:hover {
-  background: hsl(var(--bg-deep) / 0.8);
-  border-color: hsl(var(--accent-cyan) / 0.4);
-}
-.apple-btn-primary {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: linear-gradient(135deg, hsl(var(--accent-teal)) 0%, hsl(var(--accent-cyan)) 100%);
-  border: none;
-  border-radius: 20px;
-  padding: 8px 16px;
-  font-family: var(--font-heading);
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: hsl(var(--bg-deep));
-  cursor: pointer;
-  box-shadow: 0 4px 12px hsla(var(--accent-cyan) / 0.15);
-  transition: all 0.2s ease;
-}
-.apple-btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px hsla(var(--accent-cyan) / 0.25);
+.btn-back:hover {
+  opacity: 0.75;
 }
 
-/* ── iOS Style Notification Card ── */
-.apple-alert-card {
+.hero-diagnostic-card {
   display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  background: hsl(var(--bg-glass));
-  border: 1px solid hsl(var(--border-glass));
-  border-radius: 20px;
+  align-items: center;
+  gap: 18px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-xl);
   padding: 20px 24px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.03);
+  box-shadow: var(--shadow-card);
 }
-.alert-icon-wrapper {
-  margin-top: 2px;
-  flex-shrink: 0;
+.roi-profitable {
+  border-left: 4px solid var(--accent-teal);
 }
-.alert-content {
-  flex: 1;
-}
-.alert-title {
-  font-family: var(--font-heading);
-  font-size: 1rem;
-  font-weight: 700;
-  margin: 0 0 4px 0;
-  color: hsl(var(--text-main));
-}
-.alert-description {
-  font-size: 0.825rem;
-  line-height: 1.5;
-  color: hsl(var(--text-muted));
-  margin: 0;
-}
-.alert-badge {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: center;
-  flex-shrink: 0;
-  padding-left: 16px;
-  border-left: 1px solid hsl(var(--border-glass));
-}
-.badge-label {
-  font-size: 0.65rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: hsl(var(--text-dimmed));
-  font-weight: 600;
-}
-.badge-value {
-  font-family: var(--font-heading);
-  font-size: 1.4rem;
-  font-weight: 800;
-  margin-top: 2px;
+.roi-neutral {
+  border-left: 4px solid var(--accent-amber);
 }
 
-/* ── Section Titles ── */
-.section-title-wrapper {
-  border-left: 3px solid hsl(var(--accent-teal));
-  padding-left: 12px;
+.diagnostic-icon-wrapper {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--accent-teal-soft);
+  flex-shrink: 0;
 }
-.apple-section-title {
-  font-family: var(--font-heading);
+.roi-neutral .diagnostic-icon-wrapper {
+  background: var(--accent-amber-soft);
+}
+
+.diagnostic-title {
   font-size: 1.15rem;
-  font-weight: 700;
-  margin: 0;
-  color: hsl(var(--text-main));
-}
-.apple-section-subtitle {
-  font-size: 0.8rem;
-  color: hsl(var(--text-muted));
-  margin: 4px 0 0 0;
-}
-
-/* ── Bento Grid Layout ── */
-.apple-bento-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
-}
-@media (max-width: 992px) {
-  .apple-bento-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-@media (max-width: 680px) {
-  .apple-bento-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.apple-bento-card {
-  background: hsl(var(--bg-glass));
-  border: 1px solid hsl(var(--border-glass));
-  border-radius: 22px;
-  padding: 24px;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.02);
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
-  display: flex;
-  flex-direction: column;
-}
-.apple-bento-card:hover {
-  transform: translateY(-2px);
-  border-color: hsl(var(--border-glass-focus));
-}
-
-.card-tag {
-  font-size: 0.65rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: hsl(var(--text-dimmed));
-  margin-bottom: 6px;
-}
-.card-vehicle-title {
-  font-family: var(--font-heading);
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: hsl(var(--text-main));
-  margin: 0 0 12px 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.card-primary-value {
-  font-family: var(--font-heading);
-  font-size: 2.1rem;
   font-weight: 800;
-  letter-spacing: -0.03em;
-  margin-bottom: auto;
+  letter-spacing: -0.02em;
 }
-.value-period {
-  font-size: 0.85rem;
-  font-weight: 400;
-  letter-spacing: normal;
-  color: hsl(var(--text-muted));
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.metric-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.metric-unit {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-dimmed);
   margin-left: 2px;
 }
 
-.card-details-divider {
+.card-divider {
   height: 1px;
-  background: hsl(var(--border-glass));
-  margin: 18px 0;
-  width: 100%;
+  background: var(--border-subtle);
 }
 
-.card-detail-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-.card-detail-row:last-child {
-  margin-bottom: 0;
-}
-.detail-label {
-  font-size: 0.775rem;
-  color: hsl(var(--text-muted));
-}
-.detail-value {
-  font-size: 0.825rem;
-  color: hsl(var(--text-main));
+.toast-success {
+  background: var(--accent-teal-soft);
+  border-color: rgba(16, 124, 65, 0.25);
 }
 
-/* Delta / Highlight card styling */
-.highlight-success {
-  background: hsla(var(--accent-teal) / 0.04);
-  border-color: hsla(var(--accent-teal) / 0.25);
-}
-.highlight-warning {
-  background: hsla(var(--accent-rose) / 0.04);
-  border-color: hsla(var(--accent-rose) / 0.25);
-}
-
-.verdict-bubble {
-  display: flex;
-  gap: 10px;
-  background: hsl(var(--bg-deep) / 0.3);
-  border-radius: 12px;
-  padding: 12px;
-  margin-top: auto;
-}
-.verdict-description {
-  font-size: 0.75rem;
-  line-height: 1.4;
-  color: hsl(var(--text-muted));
-  margin: 0;
-}
-
-/* ── Wide Sections (Bottom) ── */
-.apple-wide-sections {
-  margin-top: 20px;
-}
-.apple-bento-large-card {
-  background: hsl(var(--bg-glass));
-  border: 1px solid hsl(var(--border-glass));
-  border-radius: 22px;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.02);
-}
-
-/* Modal overlays */
-.auth-modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  z-index: 1000;
-}
-.auth-modal-card {
-  z-index: 1001;
-  background: hsl(var(--bg-deep) / 0.95);
-  border-radius: 20px;
-}
-
-.text-teal { color: hsl(var(--accent-teal)) !important; }
-.text-rose { color: hsl(var(--accent-rose)) !important; }
-.text-cyan { color: hsl(var(--accent-cyan)) !important; }
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+@media (max-width: 768px) {
+  .hero-diagnostic-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .diagnostic-stat {
+    text-align: left;
+  }
+  .hide-on-xs {
+    display: none;
+  }
 }
 </style>

@@ -8,7 +8,19 @@ const BASE_URL = '/api/v1'
 
 /** Récupère le token JWT stocké après connexion */
 function getToken() {
-  return localStorage.getItem('saas_token')
+  try {
+    const t = localStorage.getItem('saas_token')
+    if (!t || t === 'undefined' || t === 'null' || typeof t !== 'string') {
+      return null
+    }
+    const clean = t.trim()
+    if (!clean || clean.length < 10 || clean.includes('\n') || clean.includes('\r')) {
+      return null
+    }
+    return clean
+  } catch (e) {
+    return null
+  }
 }
 
 /**
@@ -18,12 +30,18 @@ function getToken() {
  * @returns {Promise<Response>}
  */
 async function apiFetch(path, options = {}) {
-  const token = getToken()
+  const isPublicAuthRoute = path.startsWith('/auth/login') ||
+                            path.startsWith('/auth/register') ||
+                            path.startsWith('/auth/google-login')
+
+  const token = isPublicAuthRoute ? null : getToken()
+
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     ...(options.headers || {})
   }
+
   return fetch(`${BASE_URL}${path}`, { ...options, headers })
 }
 
@@ -57,6 +75,14 @@ export async function apiGoogleLogin(credential) {
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || "Échec de la validation Google.")
   return data // { token, name, email, plan }
+}
+
+export async function apiGetMe() {
+  const res = await apiFetch('/auth/me')
+  if (res.status === 401) throw new Error('SESSION_EXPIRED')
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || "Erreur récupération profil.")
+  return data
 }
 
 // ── Simulations ───────────────────────────────────────────────────────────
@@ -127,4 +153,16 @@ export async function apiDeleteUserVehicleProfile(id) {
   if (res.status === 401) throw new Error('SESSION_EXPIRED')
   if (res.status === 404) throw new Error('Profil introuvable.')
   if (!res.ok) throw new Error('Impossible de supprimer le profil véhicule.')
+}
+
+// ── IA Advisor (Gemini) ───────────────────────────────────────────────────
+
+export async function apiGetAiAdvisorSummary(simulationPayload) {
+  const res = await apiFetch('/comparisons/ai-advisor', {
+    method: 'POST',
+    body: JSON.stringify(simulationPayload)
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || "Impossible de générer l'analyse IA.")
+  return data
 }

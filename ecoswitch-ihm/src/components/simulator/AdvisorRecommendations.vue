@@ -81,8 +81,8 @@ const scrollCarousel = (direction) => {
 .recommendations-container {
   background: hsl(var(--bg-glass));
   border: 1px solid hsl(var(--border-glass));
-  border-radius: 22px;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.02);
+  border-radius: 20px;
+  box-shadow: var(--shadow-card);
 }
 
 .rec-header {
@@ -116,34 +116,33 @@ const scrollCarousel = (direction) => {
   border-radius: 2px;
 }
 .rec-carousel::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--accent-teal) / 0.8);
+  background: hsl(var(--accent-teal));
 }
 
 /* ── Square card ── */
 .rec-card {
-  flex: 0 0 156px;
-  width: 156px;
-  height: 168px;
+  flex: 0 0 170px;
+  width: 170px;
+  min-height: 180px;
   scroll-snap-align: start;
 
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  padding: 14px;
-  background: hsl(var(--bg-deep) / 0.25);
+  padding: 16px 12px;
+  background: hsl(var(--bg-card));
   border: 1px solid hsl(var(--border-glass));
-  border-radius: 18px;
+  border-radius: 16px;
   cursor: pointer;
   outline: none;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.2s ease;
 }
 
 .rec-card:hover,
 .rec-card:focus-visible {
-  border-color: hsl(var(--border-glass-focus));
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
-  background: hsl(var(--bg-deep) / 0.6);
+  border-color: hsl(var(--accent-teal));
+  box-shadow: var(--shadow-hover);
   transform: translateY(-2px);
 }
 
@@ -153,13 +152,13 @@ const scrollCarousel = (direction) => {
 
 /* Small Catalogue badge */
 .rec-badge {
-  font-size: 0.6rem;
+  font-size: 0.65rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  background: hsla(var(--accent-teal) / 0.12);
+  background: hsla(var(--accent-teal) / 0.15);
   color: hsl(var(--accent-teal));
-  padding: 2px 8px;
+  padding: 3px 10px;
   border-radius: 20px;
   text-align: center;
 }
@@ -167,8 +166,8 @@ const scrollCarousel = (direction) => {
 /* Vehicle name */
 .rec-vehicle-name {
   font-family: var(--font-sans);
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.8rem;
+  font-weight: 700;
   color: hsl(var(--text-main));
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -193,53 +192,51 @@ const scrollCarousel = (direction) => {
   align-items: center;
 }
 .rec-savings-label {
-  font-size: 0.58rem;
+  font-size: 0.68rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: hsl(var(--text-dimmed));
-  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: hsl(var(--text-muted));
+  font-weight: 700;
 }
 .rec-savings-value {
-  font-family: var(--font-heading);
-  font-size: 0.875rem;
+  font-family: var(--font-sans);
+  font-size: 1.05rem;
   font-weight: 800;
-  line-height: 1.2;
+  margin-top: 2px;
 }
 
-/* Purchase row at the bottom */
+/* Purchase price bottom row */
 .rec-purchase-row {
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 2px;
   width: 100%;
 }
 .rec-purchase-label {
-  font-size: 0.58rem;
+  font-size: 0.65rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: hsl(var(--text-dimmed));
+  color: hsl(var(--text-muted));
   font-weight: 600;
 }
 .rec-purchase-value {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: hsl(var(--text-muted));
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: hsl(var(--text-main));
 }
 
-/* ── Desktop carousel nav buttons ── */
+/* ── Navigation arrows ── */
 .carousel-nav-btns {
   display: flex;
   gap: 4px;
 }
 .carousel-nav-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: hsl(var(--bg-card));
+  border: 1px solid hsl(var(--border-glass));
+  color: hsl(var(--text-muted));
+  border-radius: 8px;
   width: 28px;
   height: 28px;
-  border-radius: 8px;
-  border: 1px solid hsl(var(--border-glass));
-  background: hsl(var(--bg-card));
   color: hsl(var(--text-muted));
   cursor: pointer;
   transition: all 0.2s ease;

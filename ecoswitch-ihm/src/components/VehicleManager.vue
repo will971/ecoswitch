@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { Plus, Edit2, Trash2, Shield, Settings, Eye, HelpCircle, Save, X, Sparkles, Check, Info } from '@lucide/vue'
+import { Plus, Edit2, Trash2, Shield, Settings, Eye, HelpCircle, Save, X, Sparkles, Check, Info, ArrowRight, Car, Fuel } from '@lucide/vue'
 
 const props = defineProps({
   currentUser: {
@@ -22,7 +22,7 @@ const successMsg = ref(null)
 
 // Pagination & Filtres
 const page = ref(0)
-const size = ref(6) // 6 véhicules par page
+const size = ref(6)
 const totalPages = ref(1)
 
 // ADEME Filter states
@@ -40,6 +40,10 @@ const activeVehicleId = ref(null)
 
 const form = ref({
   name: '',
+  brand: '',
+  model: '',
+  generation: '',
+  version: '',
   purchasePrice: 15000,
   fuelType: 'PETROL',
   consumption: 6.2,
@@ -59,7 +63,6 @@ const getHeaders = () => {
   }
 }
 
-// Catalog Service fetchers (conditioned strictly on available catalog inventory)
 const fetchBrands = async () => {
   try {
     const res = await fetch('/api/v1/vehicules/brands')
@@ -67,7 +70,7 @@ const fetchBrands = async () => {
       brands.value = await res.json()
     }
   } catch (err) {
-    console.error('Erreur de chargement des marques:', err)
+    console.error('Erreur chargement marques:', err)
   }
 }
 
@@ -89,7 +92,7 @@ const fetchModels = async () => {
       models.value = await res.json()
     }
   } catch (err) {
-    console.error('Erreur de chargement des modèles:', err)
+    console.error('Erreur chargement modèles:', err)
   }
   page.value = 0
   fetchVehicles()
@@ -111,7 +114,7 @@ const fetchVersions = async () => {
       versions.value = await res.json()
     }
   } catch (err) {
-    console.error('Erreur de chargement des versions:', err)
+    console.error('Erreur chargement versions:', err)
   }
   page.value = 0
   fetchVehicles()
@@ -131,7 +134,6 @@ const fetchVehicles = async () => {
       params.append('model', selectedModel.value)
     }
     if (selectedVersion.value) {
-      // If version is selected, match exactly using its clean version string
       params.append('version', selectedVersion.value.version)
     }
     const response = await fetch(`/api/v1/vehicules?${params.toString()}`, {
@@ -310,7 +312,7 @@ const getFuelLabel = (type) => {
 }
 
 const formatCurrency = (val) => {
-  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(val)
+  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val || 0)
 }
 
 const goToVehicle = (url) => {
@@ -320,36 +322,28 @@ const goToVehicle = (url) => {
 }
 
 const getFuelPrice = (fuelType) => {
-  if (!props.userProfile) return 1.5 // Fallback generic
+  if (!props.userProfile) return 1.5
   switch (fuelType) {
-    case 'PETROL': return props.userProfile.petrolPrice
-    case 'DIESEL': return props.userProfile.dieselPrice
-    case 'ELECTRIC': return props.userProfile.electricPrice
-    case 'HYBRID': return props.userProfile.petrolPrice // Approximation pour hybride
+    case 'PETROL': return props.userProfile.petrolPrice || 1.88
+    case 'DIESEL': return props.userProfile.dieselPrice || 1.74
+    case 'ELECTRIC': return props.userProfile.electricPrice || 0.25
+    case 'HYBRID': return props.userProfile.petrolPrice || 1.88
     default: return 1.5
   }
 }
 
 const calculateSavings = (vehicle) => {
   if (!props.userProfile) return null
-  
   const myProfile = props.userProfile
-  
-  // Coût du profil actuel
   const myFuelCost = (myProfile.consumption * getFuelPrice(myProfile.fuelType) * myProfile.annualMileage) / 100
   const myTotalCost = myFuelCost + myProfile.insuranceCost + myProfile.maintenanceCost
   
-  // Coût du véhicule cible (on utilise le kilométrage annuel de l'utilisateur pour la simulation)
   const targetFuelCost = (vehicle.consumption * getFuelPrice(vehicle.fuelType) * myProfile.annualMileage) / 100
   const targetTotalCost = targetFuelCost + vehicle.insuranceCost + vehicle.maintenanceCost
-  
-  const savings = myTotalCost - targetTotalCost
-  return savings
+  return myTotalCost - targetTotalCost
 }
 
 const openSimulatorForVehicle = (vehicle) => {
-  // Déclencher un event global ou juste envoyer à App.vue avec event emit pour ouvrir le simulateur
-  // On sauvegarde le targetVehicle temporairement dans le localStorage ou un store pour que DirectSimulator le récupère
   localStorage.setItem('eco_target_vehicle_id', vehicle.id)
   emit('open-simulator')
 }
@@ -361,51 +355,49 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="vehicle-manager-container">
-    <div class="header-section flex-between mb-5">
+  <div class="vehicle-manager-container animation-fadeIn">
+    <div class="header-section flex-between items-center mb-4">
       <div>
-        <h2 class="text-gradient mb-2">Catalogue des Véhicules</h2>
-        <p class="text-muted">Gérez la base de données des véhicules disponibles pour vos comparaisons et analyses.</p>
+        <h2 class="text-main font-heading text-xl font-bold mb-1">Catalogue des Véhicules</h2>
+        <p class="text-muted text-xs m-0">Consultez la base de données certifiée et simulez l'impact financier en un clic.</p>
       </div>
-      <button v-if="!formOpen && currentUser" class="btn btn-primary" @click="openAddForm">
-        <Plus size="18" /> Ajouter un véhicule
+      <button v-if="!formOpen && currentUser" class="btn btn-primary btn-small flex items-center gap-1.5" @click="openAddForm">
+        <Plus size="16" /> <span>Ajouter un véhicule</span>
       </button>
-      <div v-else-if="!formOpen" class="text-xs text-rose flex-center bg-warning-glass border-rose px-3 py-2 rounded">
-        <Info size="14" class="mr-1" /> Connectez-vous pour ajouter un véhicule.
-      </div>
     </div>
 
     <!-- Notifications et erreurs -->
-    <div v-if="successMsg" class="alert-banner bg-success-glass border-teal text-teal p-3 rounded mb-4 flex-between">
-      <div class="flex-center">
-        <Check size="18" class="mr-2" /> {{ successMsg }}
-      </div>
+    <div v-if="successMsg" class="alert-banner p-3 rounded-xl mb-4 flex items-center gap-2 border-glass bg-card">
+      <Check size="16" class="text-teal" />
+      <span class="text-xs font-semibold text-teal">{{ successMsg }}</span>
     </div>
-    <div v-if="error" class="alert-banner bg-warning-glass border-rose text-rose p-3 rounded mb-4 flex-between">
-      <div class="flex-center">
-        <Info size="18" class="mr-2" /> {{ error }}
-      </div>
+    <div v-if="error" class="alert-banner p-3 rounded-xl mb-4 flex items-center gap-2 border-glass bg-card">
+      <Info size="16" class="text-rose" />
+      <span class="text-xs font-semibold text-rose">{{ error }}</span>
     </div>
 
-    <!-- Filtres et Recherche Cascading (Marque -> Modèle -> Version) -->
-    <div v-if="!formOpen" class="filters-bar card-glass p-3 mb-4 flex flex-column gap-3">
-      <div class="text-xxs text-cyan uppercase font-semibold">⚡ Rechercher par critères</div>
+    <!-- Filtres Cascading (Marque -> Modèle -> Version) -->
+    <div v-if="!formOpen" class="filters-bar card-glass p-3.5 mb-4 flex flex-column gap-2.5">
+      <div class="flex items-center gap-1.5 text-xxs text-dimmed uppercase font-bold">
+        <Sparkles size="13" class="text-teal" />
+        <span>Filtres de recherche rapides</span>
+      </div>
       <div class="grid-3-fields w-100">
         <div class="form-group mb-0">
           <select v-model="selectedBrand" class="form-control form-select text-xs" @change="onBrandChange">
-            <option value="">Marque</option>
+            <option value="">Toutes les marques</option>
             <option v-for="b in brands" :key="b" :value="b">{{ b }}</option>
           </select>
         </div>
         <div class="form-group mb-0">
           <select v-model="selectedModel" :disabled="!selectedBrand" class="form-control form-select text-xs" @change="onModelChange">
-            <option value="">Modèle</option>
+            <option value="">Tous les modèles</option>
             <option v-for="m in models" :key="m" :value="m">{{ m }}</option>
           </select>
         </div>
         <div class="form-group mb-0">
           <select v-model="selectedVersion" :disabled="!selectedModel" class="form-control form-select text-xs" @change="onVersionChange">
-            <option :value="null">Version (Tout afficher)</option>
+            <option :value="null">Toutes les versions</option>
             <option v-for="v in versions" :key="v.version" :value="v">{{ v.version }}</option>
           </select>
         </div>
@@ -413,35 +405,37 @@ onMounted(() => {
     </div>
 
     <!-- Formulaire d'Ajout/Édition -->
-    <section v-if="formOpen" class="card-glass glow-teal mb-5">
-      <h3 class="text-gradient mb-4 flex-between">
-        <span>{{ editMode ? 'Modifier le véhicule' : 'Nouveau Véhicule' }}</span>
-        <button class="btn btn-secondary btn-small flex-center" @click="formOpen = false">
-          <X size="16" /> Fermer
+    <section v-if="formOpen" class="card-glass mb-4">
+      <div class="flex-between items-center mb-4 pb-2 border-b border-glass">
+        <h3 class="text-main font-heading text-md font-bold m-0">
+          {{ editMode ? 'Modifier la fiche véhicule' : 'Ajouter un nouveau véhicule' }}
+        </h3>
+        <button class="icon-btn-close" @click="formOpen = false">
+          <X size="18" />
         </button>
-      </h3>
+      </div>
 
       <div class="grid-cols-2">
         <div>
           <div class="form-group">
-            <label class="form-label">Marque</label>
-            <input v-model="form.brand" type="text" class="form-control" placeholder="ex: Peugeot" @input="form.name = `${form.brand} ${form.model} ${form.generation} ${form.version}`.replace(/\s+/g, ' ').trim()" required />
+            <label class="form-label text-xxs">Marque</label>
+            <input v-model="form.brand" type="text" class="form-control text-xs" placeholder="ex: Peugeot" @input="form.name = `${form.brand} ${form.model} ${form.generation} ${form.version}`.replace(/\s+/g, ' ').trim()" required />
           </div>
           <div class="form-group">
-            <label class="form-label">Modèle</label>
-            <input v-model="form.model" type="text" class="form-control" placeholder="ex: 308" @input="form.name = `${form.brand} ${form.model} ${form.generation} ${form.version}`.replace(/\s+/g, ' ').trim()" required />
+            <label class="form-label text-xxs">Modèle</label>
+            <input v-model="form.model" type="text" class="form-control text-xs" placeholder="ex: 308" @input="form.name = `${form.brand} ${form.model} ${form.generation} ${form.version}`.replace(/\s+/g, ' ').trim()" required />
           </div>
           <div class="form-group">
-            <label class="form-label">Génération (Code Génération)</label>
-            <input v-model="form.generation" type="text" class="form-control" placeholder="ex: III (optionnel)" @input="form.name = `${form.brand} ${form.model} ${form.generation} ${form.version}`.replace(/\s+/g, ' ').trim()" />
+            <label class="form-label text-xxs">Génération</label>
+            <input v-model="form.generation" type="text" class="form-control text-xs" placeholder="ex: III" @input="form.name = `${form.brand} ${form.model} ${form.generation} ${form.version}`.replace(/\s+/g, ' ').trim()" />
           </div>
           <div class="form-group">
-            <label class="form-label">Version / Finition</label>
-            <input v-model="form.version" type="text" class="form-control" placeholder="ex: BlueHDi 130 EAT8" @input="form.name = `${form.brand} ${form.model} ${form.generation} ${form.version}`.replace(/\s+/g, ' ').trim()" required />
+            <label class="form-label text-xxs">Version / Finition</label>
+            <input v-model="form.version" type="text" class="form-control text-xs" placeholder="ex: BlueHDi 130 EAT8" @input="form.name = `${form.brand} ${form.model} ${form.generation} ${form.version}`.replace(/\s+/g, ' ').trim()" required />
           </div>
           <div class="form-group">
-            <label class="form-label">Type d'énergie</label>
-            <select v-model="form.fuelType" class="form-control form-select">
+            <label class="form-label text-xxs">Type d'énergie</label>
+            <select v-model="form.fuelType" class="form-control form-select text-xs">
               <option value="PETROL">Essence</option>
               <option value="DIESEL">Diesel</option>
               <option value="HYBRID">Hybride</option>
@@ -449,152 +443,130 @@ onMounted(() => {
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label">Consommation (L/100km ou kWh/100km)</label>
-            <input v-model.number="form.consumption" type="number" step="0.1" class="form-control" required />
+            <label class="form-label text-xxs">Consommation (L ou kWh/100km)</label>
+            <input v-model.number="form.consumption" type="number" step="0.1" class="form-control text-xs" required />
           </div>
           <div class="form-group">
-            <label class="form-label">Prix d'achat ou de référence (€)</label>
-            <input v-model.number="form.purchasePrice" type="number" class="form-control" required />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Lien vers le véhicule (URL de redirection)</label>
-            <input v-model="form.url" type="url" class="form-control" placeholder="https://example.com/vehicule" />
+            <label class="form-label text-xxs">Prix d'achat (€)</label>
+            <input v-model.number="form.purchasePrice" type="number" class="form-control text-xs" required />
           </div>
         </div>
 
         <div>
           <div class="form-group">
-            <label class="form-label">Kilométrage annuel moyen (km/an)</label>
-            <input v-model.number="form.annualMileage" type="number" class="form-control" required />
+            <label class="form-label text-xxs">Kilométrage annuel moyen (km/an)</label>
+            <input v-model.number="form.annualMileage" type="number" class="form-control text-xs" required />
           </div>
           <div class="form-group">
-            <label class="form-label">Assurance annuelle (€/an)</label>
-            <input v-model.number="form.insuranceCost" type="number" class="form-control" required />
+            <label class="form-label text-xxs">Assurance annuelle (€/an)</label>
+            <input v-model.number="form.insuranceCost" type="number" class="form-control text-xs" required />
           </div>
           <div class="form-group">
-            <label class="form-label">Entretien annuel moyen (€/an)</label>
-            <input v-model.number="form.maintenanceCost" type="number" class="form-control" required />
+            <label class="form-label text-xxs">Entretien annuel moyen (€/an)</label>
+            <input v-model.number="form.maintenanceCost" type="number" class="form-control text-xs" required />
           </div>
           <div class="form-group">
-            <label class="form-label">Valeur résiduelle/de revente estimée (€)</label>
-            <input v-model.number="form.resaleValue" type="number" class="form-control" required />
+            <label class="form-label text-xxs">Valeur de revente estimée (€)</label>
+            <input v-model.number="form.resaleValue" type="number" class="form-control text-xs" required />
           </div>
           <div class="form-group">
-            <label class="form-label">Visibilité</label>
-            <select v-model="form.visibility" class="form-control form-select">
-              <option value="PUBLIC">Publique (visible de tous)</option>
-              <option value="PRIVATE">Privée (visible uniquement par vous et les administrateurs)</option>
+            <label class="form-label text-xxs">Visibilité</label>
+            <select v-model="form.visibility" class="form-control form-select text-xs">
+              <option value="PUBLIC">Publique (partagée au catalogue)</option>
+              <option value="PRIVATE">Privée (visible uniquement par vous)</option>
             </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label text-xxs">Lien externe (Fiche constructeur)</label>
+            <input v-model="form.url" type="url" class="form-control text-xs" placeholder="https://..." />
           </div>
         </div>
       </div>
 
-      <div class="flex-end gap-3 mt-4">
-        <button class="btn btn-secondary" @click="formOpen = false">Annuler</button>
-        <button :disabled="loading" class="btn btn-primary" @click="saveVehicle">
-          <Save size="18" /> {{ editMode ? 'Mettre à jour' : 'Créer le véhicule' }}
+      <div class="flex justify-end gap-2 mt-4 pt-3 border-t border-glass">
+        <button class="btn btn-secondary text-xs" @click="formOpen = false">Annuler</button>
+        <button :disabled="loading" class="btn btn-primary text-xs font-bold" @click="saveVehicle">
+          <Save size="15" /> <span>{{ editMode ? 'Mettre à jour' : 'Créer le véhicule' }}</span>
         </button>
       </div>
     </section>
 
-    <!-- Liste des Véhicules sous forme de cartes premium -->
-    <div v-if="loading && vehicles.length === 0" class="flex-center py-5">
-      <Sparkles class="spinner text-teal" size="32" />
-      <span class="ml-2 text-dimmed">Chargement des véhicules...</span>
+    <!-- Liste des Véhicules en cartes Bento -->
+    <div v-if="loading && vehicles.length === 0" class="flex-center py-5 text-muted text-xs">
+      <Sparkles class="spinner text-teal mr-2" size="20" /> Chargement des modèles...
     </div>
 
-    <div v-else-if="vehicles.length === 0" class="flex-center flex-column py-5 text-dimmed text-center border-glass rounded p-5 bg-card">
-      <HelpCircle size="48" class="text-dimmed opacity-40 mb-3" />
-      <h4>Aucun véhicule enregistré</h4>
-      <p class="max-w-sm mt-1">Le catalogue est actuellement vide. Cliquez sur "Ajouter un véhicule" en haut à droite pour insérer votre premier modèle.</p>
+    <div v-else-if="vehicles.length === 0" class="flex-center flex-column py-5 text-center card-glass">
+      <HelpCircle size="40" class="text-dimmed opacity-40 mb-2" />
+      <h4 class="text-main font-heading text-sm font-bold m-0">Aucun véhicule trouvé</h4>
+      <p class="text-xs text-muted max-w-sm mt-1 m-0">Modifiez vos critères de recherche ou ajoutez un modèle.</p>
     </div>
 
     <div v-else class="vehicles-grid">
-      <div v-for="vehicle in vehicles" 
-           :key="vehicle.id" 
-           @click="goToVehicle(vehicle.url)"
-           :class="['card-glass', 'card-glass-hover', 'flex', 'flex-column', 'justify-between', 'relative', 'overflow-hidden', vehicle.url ? 'cursor-pointer' : '']">
-        
-        <!-- Dégradé lumineux en arrière plan de carte -->
-        <div class="glow-accent-overlay" :class="'overlay-' + vehicle.fuelType.toLowerCase()"></div>
-
-        <div class="card-header-top mb-3 flex-between">
-          <div class="flex gap-1 items-center">
-            <span class="badge" :class="getFuelBadgeClass(vehicle.fuelType)">
+      <div
+        v-for="vehicle in vehicles" 
+        :key="vehicle.id" 
+        class="vehicle-card card-glass p-4 flex flex-column justify-between relative"
+      >
+        <div>
+          <div class="card-header-top mb-2.5 flex-between items-center">
+            <span class="badge badge-small" :class="getFuelBadgeClass(vehicle.fuelType)">
               {{ getFuelLabel(vehicle.fuelType) }}
             </span>
-            <span v-if="currentUser && vehicle.visibility" class="badge" :class="vehicle.visibility === 'PRIVATE' ? 'badge-rose' : 'badge-teal'">
-              {{ vehicle.visibility === 'PRIVATE' ? 'Privé' : 'Public' }}
+            <div v-if="currentUser && (currentUser.role === 'ADMIN' || currentUser.email === vehicle.createdBy)" class="actions flex gap-1.5">
+              <button class="icon-btn" @click.stop="openEditForm(vehicle)" title="Modifier">
+                <Edit2 size="13" />
+              </button>
+              <button class="icon-btn hover-rose" @click.stop="deleteVehicle(vehicle.id)" title="Supprimer">
+                <Trash2 size="13" />
+              </button>
+            </div>
+          </div>
+
+          <h3 class="vehicle-title text-main font-bold text-sm mb-2">
+            {{ vehicle.name }}
+          </h3>
+
+          <!-- Gain estimé si profil garage renseigné -->
+          <div v-if="userProfile" class="savings-chip mb-3 py-1.5 px-2.5 rounded-lg text-center" :class="calculateSavings(vehicle) > 0 ? 'bg-teal-soft' : 'bg-rose-soft'">
+            <span class="text-xxs uppercase font-bold text-dimmed">Gain estimé : </span>
+            <span class="text-xs font-bold" :class="calculateSavings(vehicle) > 0 ? 'text-teal' : 'text-rose'">
+              {{ calculateSavings(vehicle) > 0 ? '+' : '' }}{{ formatCurrency(calculateSavings(vehicle)) }} / an
             </span>
           </div>
-          <div v-if="currentUser && (currentUser.role === 'ADMIN' || currentUser.email === vehicle.createdBy)" class="actions flex gap-2">
-            <button class="icon-btn btn-secondary-edit" @click.stop="openEditForm(vehicle)" title="Modifier">
-              <Edit2 size="14" />
-            </button>
-            <button class="icon-btn btn-danger-delete" @click.stop="deleteVehicle(vehicle.id)" title="Supprimer">
-              <Trash2 size="14" />
-            </button>
+
+          <!-- Caractéristiques -->
+          <div class="specs-list py-2 border-t border-glass text-xs flex flex-column gap-1">
+            <div class="flex-between">
+              <span class="text-dimmed">Consommation :</span>
+              <span class="font-semibold text-main">{{ vehicle.consumption }} {{ vehicle.fuelType === 'ELECTRIC' ? 'kWh' : 'L' }}/100km</span>
+            </div>
+            <div class="flex-between">
+              <span class="text-dimmed">Prix d'achat :</span>
+              <span class="font-bold text-cyan">{{ formatCurrency(vehicle.purchasePrice) }}</span>
+            </div>
+            <div class="flex-between">
+              <span class="text-dimmed">Assurance :</span>
+              <span class="font-semibold text-main">{{ formatCurrency(vehicle.insuranceCost) }}/an</span>
+            </div>
+            <div class="flex-between">
+              <span class="text-dimmed">Entretien :</span>
+              <span class="font-semibold text-main">{{ formatCurrency(vehicle.maintenanceCost) }}/an</span>
+            </div>
           </div>
         </div>
 
-        <h3 class="vehicle-title text-gradient text-md mb-3 flex items-center gap-1">
-          {{ vehicle.name }}
-          <svg v-if="vehicle.url" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-cyan"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-        </h3>
-
-        <!-- Calcul rapide des économies (si profil présent) -->
-        <div v-if="userProfile" class="savings-badge mb-3 text-center py-2 px-3 rounded" :class="calculateSavings(vehicle) > 0 ? 'bg-success-glass border-teal' : 'bg-warning-glass border-rose'">
-          <div class="text-xs text-dimmed uppercase mb-1">Bilan Économique</div>
-          <div class="font-bold font-heading text-lg" :class="calculateSavings(vehicle) > 0 ? 'text-teal' : 'text-rose'">
-            {{ calculateSavings(vehicle) > 0 ? '+' : '' }}{{ formatCurrency(calculateSavings(vehicle)) }} / an
-          </div>
-        </div>
-        <div v-else-if="currentUser" class="savings-badge mb-3 text-center py-2 px-3 rounded bg-deep-glass border-glass text-xs text-dimmed">
-          Complétez votre profil pour voir vos économies.
-        </div>
-
-        <!-- Fiche technique -->
-        <div class="specifications-sheet py-2 border-t border-glass text-xs">
-          <div class="flex-between py-1">
-            <span class="text-dimmed">Consommation :</span>
-            <span class="font-semibold">{{ vehicle.consumption }} {{ vehicle.fuelType === 'ELECTRIC' ? 'kWh' : 'L' }}/100km</span>
-          </div>
-          <div class="flex-between py-1">
-            <span class="text-dimmed">Prix d'achat :</span>
-            <span class="font-semibold text-cyan">{{ formatCurrency(vehicle.purchasePrice) }}</span>
-          </div>
-          <div class="flex-between py-1">
-            <span class="text-dimmed">Usage annuel :</span>
-            <span class="font-semibold">{{ vehicle.annualMileage }} km/an</span>
-          </div>
-          <div class="flex-between py-1">
-            <span class="text-dimmed">Assurance :</span>
-            <span class="font-semibold">{{ formatCurrency(vehicle.insuranceCost) }}/an</span>
-          </div>
-          <div class="flex-between py-1">
-            <span class="text-dimmed">Entretien :</span>
-            <span class="font-semibold">{{ formatCurrency(vehicle.maintenanceCost) }}/an</span>
-          </div>
-          <div class="flex-between py-1">
-            <span class="text-dimmed">Valeur revente :</span>
-            <span class="font-semibold text-amber">{{ formatCurrency(vehicle.resaleValue) }}</span>
-          </div>
-          <div v-if="currentUser && currentUser.role === 'ADMIN' && vehicle.createdBy" class="flex-between py-1 border-t border-glass text-cyan mt-1">
-            <span class="text-dimmed">Ajouté par :</span>
-            <span class="font-semibold">{{ vehicle.createdBy }}</span>
-          </div>
-        </div>
-        
-        <div class="mt-3 pt-3 border-t border-glass">
-          <button class="btn btn-secondary w-100 flex-center gap-1 glow-teal" @click.stop="openSimulatorForVehicle(vehicle)">
-            <Sparkles size="16" class="text-teal" /> Simuler l'achat
+        <div class="mt-3 pt-2.5 border-t border-glass">
+          <button class="btn btn-secondary w-100 btn-small flex items-center justify-center gap-1.5" @click="openSimulatorForVehicle(vehicle)">
+            <Sparkles size="14" class="text-teal" />
+            <span>Simuler ce véhicule</span>
           </button>
         </div>
       </div>
     </div>
 
     <!-- Pagination -->
-    <div v-if="!formOpen && totalPages > 1" class="pagination-controls flex-center gap-3 mt-5">
+    <div v-if="!formOpen && totalPages > 1" class="pagination-controls flex-center gap-3 mt-4">
       <button 
         class="btn btn-secondary btn-small" 
         :disabled="page === 0" 
@@ -602,7 +574,7 @@ onMounted(() => {
       >
         Précédent
       </button>
-      <span class="text-xs text-dimmed">Page {{ page + 1 }} sur {{ totalPages }}</span>
+      <span class="text-xs text-dimmed font-semibold">Page {{ page + 1 }} sur {{ totalPages }}</span>
       <button 
         class="btn btn-secondary btn-small" 
         :disabled="page + 1 >= totalPages" 
@@ -617,101 +589,46 @@ onMounted(() => {
 <style scoped>
 .vehicles-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 16px;
 }
-.flex-end {
-  display: flex;
-  justify-content: flex-end;
+
+.vehicle-card {
+  transition: all 0.2s ease;
 }
-.gap-3 {
-  gap: 12px;
+.vehicle-card:hover {
+  border-color: hsl(var(--accent-teal) / 0.45);
+  transform: translateY(-2px);
 }
-.gap-2 {
-  gap: 8px;
-}
+
 .icon-btn {
+  background: hsl(var(--bg-card-subtle));
+  border: 1px solid hsl(var(--border-glass));
+  color: hsl(var(--text-dimmed));
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  border: 1px solid hsl(var(--border-glass));
-  background: rgba(255, 255, 255, 0.02);
-  color: hsl(var(--text-muted));
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 }
-.btn-secondary-edit:hover {
-  border-color: hsl(var(--accent-cyan));
-  color: hsl(var(--accent-cyan));
-  background: rgba(8, 145, 178, 0.1);
+.icon-btn:hover {
+  color: hsl(var(--text-main));
+  border-color: hsl(var(--text-dimmed));
 }
-.btn-danger-delete:hover {
-  border-color: hsl(var(--accent-rose));
+.icon-btn.hover-rose:hover {
   color: hsl(var(--accent-rose));
-  background: rgba(225, 29, 72, 0.1);
-}
-.vehicle-title {
-  font-size: 1.1rem;
-  line-height: 1.3;
-}
-.card-header-top {
-  position: relative;
-  z-index: 2;
-}
-.specifications-sheet {
-  position: relative;
-  z-index: 2;
+  border-color: hsl(var(--accent-rose));
 }
 
-/* Glow overlays for premium visuals */
-.glow-accent-overlay {
-  position: absolute;
-  top: -60px;
-  right: -60px;
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  filter: blur(40px);
-  opacity: 0.15;
-  pointer-events: none;
-  z-index: 1;
-  transition: all 0.3s ease;
+.bg-teal-soft {
+  background: hsla(var(--accent-teal) / 0.1);
+  border: 1px solid hsla(var(--accent-teal) / 0.25);
 }
-
-.card-glass:hover .glow-accent-overlay {
-  opacity: 0.3;
-  width: 140px;
-  height: 140px;
+.bg-rose-soft {
+  background: hsla(var(--accent-rose) / 0.1);
+  border: 1px solid hsla(var(--accent-rose) / 0.25);
 }
-
-.overlay-electric { background-color: hsl(var(--accent-teal)); }
-.overlay-hybrid { background-color: hsl(var(--accent-cyan)); }
-.overlay-diesel { background-color: hsl(var(--accent-blue)); }
-.overlay-petrol { background-color: hsl(var(--accent-amber)); }
-
-.bg-success-glass { background: rgba(16, 185, 129, 0.08); }
-.bg-warning-glass { background: rgba(225, 29, 72, 0.08); }
-.border-teal { border: 1px solid rgba(16, 185, 129, 0.3); }
-.border-rose { border: 1px solid rgba(225, 29, 72, 0.3); }
-.text-teal { color: hsl(var(--accent-teal)); }
-.text-rose { color: hsl(var(--accent-rose)); }
-.text-cyan { color: hsl(var(--accent-cyan)); }
-.text-amber { color: hsl(var(--accent-amber)); }
-.text-dimmed { color: hsl(var(--text-dimmed)); }
-.text-xs { font-size: 0.75rem; }
-.text-sm { font-size: 0.875rem; }
-.text-md { font-size: 1.05rem; }
-.font-semibold { font-weight: 600; }
-.border-t { border-top: 1px solid; }
-.py-1 { padding-top: 4px; padding-bottom: 4px; }
-.py-2 { padding-top: 8px; padding-bottom: 8px; }
-.mr-2 { margin-right: 0.5rem; }
-.relative { position: relative; }
-.overflow-hidden { overflow: hidden; }
-.p-5 { padding: 3rem; }
-.bg-card { background: hsl(var(--bg-glass)); }
-.cursor-pointer { cursor: pointer; }
 </style>

@@ -1,0 +1,1224 @@
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+import {
+  Zap,
+  Home,
+  Building2,
+  ParkingCircle,
+  ArrowRight,
+  ArrowLeft,
+  Sparkles,
+  Search,
+  Check,
+  Layers,
+  HelpCircle,
+  ChevronDown,
+  ChevronUp,
+  Calculator,
+  Car,
+  Fuel,
+  CreditCard,
+  ShieldCheck
+} from '@lucide/vue'
+
+const props = defineProps({
+  currentVehicle: {
+    type: Object,
+    required: true
+  },
+  targetVehicle: {
+    type: Object,
+    required: true
+  },
+  fuelPrices: {
+    type: Object,
+    required: true
+  },
+  homeChargingRatio: {
+    type: Number,
+    default: 0.85
+  },
+  taxIncome: {
+    type: Number,
+    default: 20000
+  },
+  scrapVehicle: {
+    type: Boolean,
+    default: false
+  },
+  isLeasing: {
+    type: Boolean,
+    default: false
+  },
+  customLeasingMonthlyPrice: {
+    type: Number,
+    default: null
+  },
+  catalogVehicles: {
+    type: Array,
+    default: () => []
+  },
+  loading: {
+    type: Boolean,
+    default: false
+  }
+})
+
+const emit = defineEmits([
+  'update:currentVehicle',
+  'update:targetVehicle',
+  'update:homeChargingRatio',
+  'update:taxIncome',
+  'update:scrapVehicle',
+  'update:isLeasing',
+  'update:customLeasingMonthlyPrice',
+  'submit',
+  'switch-to-expert'
+])
+
+// Étape active (1: Actuel, 2: Logement & Aides, 3: Cible & Budget)
+const currentStep = ref(1)
+
+// Modèles courants du parc français (pour l'étape 1)
+const popularCurrentCars = [
+  {
+    name: 'Peugeot 208 II PureTech 100',
+    brand: 'Peugeot',
+    fuelType: 'PETROL',
+    consumption: 5.3,
+    insuranceCost: 580,
+    maintenanceCost: 440,
+    resaleValue: 9800,
+    tag: 'Essence'
+  },
+  {
+    name: 'Renault Clio V TCe 90',
+    brand: 'Renault',
+    fuelType: 'PETROL',
+    consumption: 5.2,
+    insuranceCost: 560,
+    maintenanceCost: 420,
+    resaleValue: 9500,
+    tag: 'Essence'
+  },
+  {
+    name: 'Citroën C3 III PureTech 110',
+    brand: 'Citroën',
+    fuelType: 'PETROL',
+    consumption: 5.5,
+    insuranceCost: 550,
+    maintenanceCost: 430,
+    resaleValue: 9000,
+    tag: 'Essence'
+  },
+  {
+    name: 'Dacia Sandero Stepway TCe',
+    brand: 'Dacia',
+    fuelType: 'PETROL',
+    consumption: 5.8,
+    insuranceCost: 490,
+    maintenanceCost: 380,
+    resaleValue: 8200,
+    tag: 'Essence'
+  },
+  {
+    name: 'Peugeot 308 III BlueHDi 130',
+    brand: 'Peugeot',
+    fuelType: 'DIESEL',
+    consumption: 4.5,
+    insuranceCost: 740,
+    maintenanceCost: 580,
+    resaleValue: 14000,
+    tag: 'Diesel'
+  },
+  {
+    name: 'Volkswagen Golf VIII 2.0 TDI',
+    brand: 'Volkswagen',
+    fuelType: 'DIESEL',
+    consumption: 4.1,
+    insuranceCost: 780,
+    maintenanceCost: 620,
+    resaleValue: 15000,
+    tag: 'Diesel'
+  },
+  {
+    name: 'Toyota Yaris IV Hybrid',
+    brand: 'Toyota',
+    fuelType: 'HYBRID',
+    consumption: 3.8,
+    insuranceCost: 560,
+    maintenanceCost: 360,
+    resaleValue: 12500,
+    tag: 'Hybride'
+  },
+  {
+    name: 'Peugeot 206 / 207 HDi (Ancien)',
+    brand: 'Peugeot',
+    fuelType: 'DIESEL',
+    consumption: 4.8,
+    insuranceCost: 450,
+    maintenanceCost: 500,
+    resaleValue: 2000,
+    tag: 'Vieux Diesel'
+  }
+]
+
+// Modèles cibles recommandés pour l'étape 3
+const popularTargetCars = [
+  {
+    name: 'Tesla Model 3 Highland (2024)',
+    brand: 'Tesla',
+    fuelType: 'ELECTRIC',
+    consumption: 14.4,
+    purchasePrice: 41490,
+    insuranceCost: 900,
+    maintenanceCost: 250,
+    badge: 'Best-Seller Élec'
+  },
+  {
+    name: 'Renault Megane E-Tech EV60',
+    brand: 'Renault',
+    fuelType: 'ELECTRIC',
+    consumption: 16.1,
+    purchasePrice: 38000,
+    insuranceCost: 780,
+    maintenanceCost: 260,
+    badge: 'Made in France'
+  },
+  {
+    name: 'Peugeot e-208 GT',
+    brand: 'Peugeot',
+    fuelType: 'ELECTRIC',
+    consumption: 15.4,
+    purchasePrice: 34800,
+    insuranceCost: 720,
+    maintenanceCost: 240,
+    badge: 'Citadine Élec'
+  },
+  {
+    name: 'MG 4 EV Luxury',
+    brand: 'MG',
+    fuelType: 'ELECTRIC',
+    consumption: 16.0,
+    purchasePrice: 32990,
+    insuranceCost: 760,
+    maintenanceCost: 240,
+    badge: 'Rapport Qualité/Prix'
+  },
+  {
+    name: 'Dacia Spring Extreme',
+    brand: 'Dacia',
+    fuelType: 'ELECTRIC',
+    consumption: 13.9,
+    purchasePrice: 18900,
+    insuranceCost: 450,
+    maintenanceCost: 180,
+    badge: 'Ultra Abordable'
+  },
+  {
+    name: 'Toyota Yaris IV Hybrid (2020)',
+    brand: 'Toyota',
+    fuelType: 'HYBRID',
+    consumption: 3.8,
+    purchasePrice: 23950,
+    insuranceCost: 560,
+    maintenanceCost: 360,
+    badge: 'Hybride sans prise'
+  },
+  {
+    name: 'Renault Clio V E-Tech Hybrid',
+    brand: 'Renault',
+    fuelType: 'HYBRID',
+    consumption: 4.2,
+    purchasePrice: 22400,
+    insuranceCost: 590,
+    maintenanceCost: 380,
+    badge: 'Hybride Polyvalente'
+  },
+  {
+    name: 'Tesla Model Y RWD (2023)',
+    brand: 'Tesla',
+    fuelType: 'ELECTRIC',
+    consumption: 15.7,
+    purchasePrice: 44990,
+    insuranceCost: 950,
+    maintenanceCost: 280,
+    badge: 'SUV Familial'
+  }
+]
+
+// Profils de recharge pour l'étape 2
+const chargingProfiles = [
+  {
+    id: 'house',
+    title: 'Maison individuelle (Prise / Borne)',
+    desc: 'Recharge économique la nuit à domicile (~85%)',
+    ratio: 0.85,
+    icon: Home
+  },
+  {
+    id: 'mixed',
+    title: 'Copropriété / Parking partagé',
+    desc: 'Recharge mixte (domicile + travail / ville ~60%)',
+    ratio: 0.6,
+    icon: Building2
+  },
+  {
+    id: 'public',
+    title: 'Stationnement en voirie',
+    desc: 'Recharge sur bornes publiques et réseau rapide d’autoroute',
+    ratio: 0.15,
+    icon: ParkingCircle
+  }
+]
+
+// Recherche dynamique catalogue
+const searchCurrentQuery = ref('')
+const searchTargetQuery = ref('')
+const showCurrentCustom = ref(false)
+const showTargetCustom = ref(false)
+
+const selectedChargingProfile = ref('house')
+const selectedIncomeTier = ref('standard')
+const showCustomIncome = ref(false)
+const showTaxHelp = ref(false)
+
+onMounted(() => {
+  if (!props.currentVehicle.annualMileage) {
+    props.currentVehicle.annualMileage = 15000
+    props.targetVehicle.annualMileage = 15000
+  }
+  if (props.currentVehicle.resaleValue === null || props.currentVehicle.resaleValue === undefined) {
+    props.currentVehicle.resaleValue = 8000
+  }
+  if (props.taxIncome && props.taxIncome <= 15400) {
+    selectedIncomeTier.value = 'modest'
+  }
+})
+
+const selectCurrentCar = (car) => {
+  props.currentVehicle.name = car.name
+  props.currentVehicle.fuelType = car.fuelType
+  props.currentVehicle.consumption = car.consumption
+  props.currentVehicle.insuranceCost = car.insuranceCost
+  props.currentVehicle.maintenanceCost = car.maintenanceCost
+  props.currentVehicle.resaleValue = car.resaleValue
+  showCurrentCustom.value = false
+}
+
+const selectTargetCar = (car) => {
+  props.targetVehicle.name = car.name
+  props.targetVehicle.fuelType = car.fuelType
+  props.targetVehicle.consumption = car.consumption
+  props.targetVehicle.purchasePrice = car.purchasePrice
+  props.targetVehicle.insuranceCost = car.insuranceCost
+  props.targetVehicle.maintenanceCost = car.maintenanceCost
+  props.targetVehicle.annualMileage = props.currentVehicle.annualMileage || 15000
+  showTargetCustom.value = false
+}
+
+const currentSearchResults = computed(() => {
+  if (!searchCurrentQuery.value || searchCurrentQuery.value.trim().length < 2) return []
+  const q = searchCurrentQuery.value.toLowerCase()
+  return props.catalogVehicles.filter(v => v.name && v.name.toLowerCase().includes(q)).slice(0, 5)
+})
+
+const targetSearchResults = computed(() => {
+  if (!searchTargetQuery.value || searchTargetQuery.value.trim().length < 2) return []
+  const q = searchTargetQuery.value.toLowerCase()
+  return props.catalogVehicles.filter(v => v.name && v.name.toLowerCase().includes(q)).slice(0, 5)
+})
+
+const applyChargingProfile = (prof) => {
+  selectedChargingProfile.value = prof.id
+  emit('update:homeChargingRatio', prof.ratio)
+}
+
+const applyIncomeTier = (tier) => {
+  selectedIncomeTier.value = tier
+  if (tier === 'modest') {
+    emit('update:taxIncome', 14000)
+  } else {
+    emit('update:taxIncome', 25000)
+  }
+}
+
+const onCustomIncomeInput = (val) => {
+  const num = Number(val)
+  emit('update:taxIncome', num)
+  if (num > 0 && num <= 15400) {
+    selectedIncomeTier.value = 'modest'
+  } else {
+    selectedIncomeTier.value = 'standard'
+  }
+}
+
+const setMileagePreset = (km) => {
+  props.currentVehicle.annualMileage = km
+  props.targetVehicle.annualMileage = km
+}
+
+const canGoToStep2 = computed(() => {
+  return !!(props.currentVehicle.name &&
+    props.currentVehicle.fuelType &&
+    props.currentVehicle.consumption > 0 &&
+    props.currentVehicle.annualMileage > 0)
+})
+
+const canSubmit = computed(() => {
+  return canGoToStep2.value &&
+    !!(props.targetVehicle.name &&
+    props.targetVehicle.fuelType &&
+    props.targetVehicle.consumption > 0 &&
+    props.targetVehicle.purchasePrice > 0)
+})
+
+const nextStep = () => {
+  if (currentStep.value === 1 && canGoToStep2.value) {
+    currentStep.value = 2
+  } else if (currentStep.value === 2) {
+    currentStep.value = 3
+  }
+}
+
+const prevStep = () => {
+  if (currentStep.value > 1) {
+    currentStep.value--
+  }
+}
+
+const formatCurrency = (val) => {
+  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val || 0)
+}
+
+const formatFuelBadge = (fuelType) => {
+  switch (fuelType) {
+    case 'ELECTRIC': return 'Électrique'
+    case 'HYBRID': return 'Hybride'
+    case 'DIESEL': return 'Diesel'
+    default: return 'Essence'
+  }
+}
+</script>
+
+<template>
+  <div class="express-wizard card-glass p-5">
+    
+    <!-- Stepper Supérieur Apple Style -->
+    <div class="wizard-header mb-5">
+      <div class="flex-between items-center mb-4">
+        <div class="flex items-center gap-2.5">
+          <div class="wizard-icon-badge">
+            <Zap size="18" class="text-teal" />
+          </div>
+          <div>
+            <h3 class="wizard-title text-main m-0">Diagnostic Mobilité Express</h3>
+            <p class="text-xs text-muted m-0">3 étapes simples pour évaluer votre rentabilité</p>
+          </div>
+        </div>
+
+        <button type="button" class="btn-text-expert" @click="emit('switch-to-expert')">
+          <Layers size="14" />
+          <span>Passer en Mode Expert</span>
+        </button>
+      </div>
+
+      <!-- Stepper Track -->
+      <div class="stepper-track">
+        <div
+          class="stepper-step"
+          :class="{ active: currentStep === 1, done: currentStep > 1 }"
+          @click="currentStep = 1"
+        >
+          <div class="step-num">{{ currentStep > 1 ? '✓' : '1' }}</div>
+          <span class="step-text">Véhicule Actuel</span>
+        </div>
+        <div class="stepper-line" :class="{ filled: currentStep > 1 }"></div>
+        <div
+          class="stepper-step"
+          :class="{ active: currentStep === 2, done: currentStep > 2, disabled: !canGoToStep2 }"
+          @click="canGoToStep2 && (currentStep = 2)"
+        >
+          <div class="step-num">{{ currentStep > 2 ? '✓' : '2' }}</div>
+          <span class="step-text">Logement & Aides</span>
+        </div>
+        <div class="stepper-line" :class="{ filled: currentStep > 2 }"></div>
+        <div
+          class="stepper-step"
+          :class="{ active: currentStep === 3, disabled: !canGoToStep2 }"
+          @click="canGoToStep2 && (currentStep = 3)"
+        >
+          <div class="step-num">3</div>
+          <span class="step-text">Nouveau Véhicule</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ÉTAPE 1 : VÉHICULE ACTUEL -->
+    <div v-if="currentStep === 1" class="wizard-step-body animation-fadeIn">
+      <div class="step-intro mb-3.5">
+        <h4 class="step-title font-heading text-main">
+          1. Quel véhicule conduisez-vous actuellement ?
+        </h4>
+        <p class="step-subtitle text-muted text-xs">
+          Sélectionnez votre modèle ou recherchez-le dans le catalogue officiel ADEME.
+        </p>
+      </div>
+
+      <!-- Grille des voitures actuelles populaires -->
+      <div class="cars-grid mb-4">
+        <div
+          v-for="car in popularCurrentCars"
+          :key="car.name"
+          class="car-card"
+          :class="{ selected: currentVehicle.name === car.name }"
+          @click="selectCurrentCar(car)"
+        >
+          <div class="car-card-top flex-between mb-1.5">
+            <span class="badge badge-small" :class="car.fuelType === 'DIESEL' ? 'badge-amber' : car.fuelType === 'HYBRID' ? 'badge-cyan' : 'badge-teal'">
+              {{ car.tag }}
+            </span>
+            <div v-if="currentVehicle.name === car.name" class="check-circle flex-center">
+              <Check size="12" />
+            </div>
+          </div>
+          <div class="car-card-name text-main">{{ car.name }}</div>
+          <div class="car-card-meta text-xxs text-dimmed mt-1">
+            {{ car.consumption }} L/100km &middot; Reprise ~{{ formatCurrency(car.resaleValue) }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Option de recherche personnalisée / ADEME -->
+      <div class="custom-search-container p-3 rounded-xl border-glass mb-4 bg-card-subtle">
+        <button
+          type="button"
+          class="btn-toggle-custom flex-between w-100"
+          @click="showCurrentCustom = !showCurrentCustom"
+        >
+          <span class="flex items-center gap-2 text-xs font-semibold text-main">
+            <Search size="14" class="text-teal" />
+            <span>Mon modèle n'est pas dans la liste (Recherche catalogue ADEME)</span>
+          </span>
+          <span class="text-xs text-teal font-semibold">{{ showCurrentCustom ? 'Masquer ▲' : 'Rechercher ▼' }}</span>
+        </button>
+
+        <div v-if="showCurrentCustom" class="custom-search-inputs mt-3 pt-3 border-t border-glass">
+          <div class="form-group relative mb-3">
+            <label class="form-label text-xxs">Rechercher par marque ou modèle</label>
+            <input
+              v-model="searchCurrentQuery"
+              type="text"
+              class="form-control text-xs"
+              placeholder="ex: C4, Clio, Yaris, 308..."
+            />
+            <div v-if="currentSearchResults.length > 0" class="search-dropdown card-glass">
+              <div
+                v-for="v in currentSearchResults"
+                :key="v.id"
+                class="dropdown-item"
+                @click="selectCurrentCar(v)"
+              >
+                <span class="font-bold text-xs text-main">{{ v.name }}</span>
+                <span class="text-xxs text-muted">
+                  {{ formatFuelBadge(v.fuelType) }} &middot; {{ v.consumption }} {{ v.fuelType === 'ELECTRIC' ? 'kWh' : 'L' }}/100km
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid-3-fields">
+            <div class="form-group mb-0">
+              <label class="form-label text-xxs">Nom du modèle</label>
+              <input v-model="currentVehicle.name" type="text" class="form-control text-xs" placeholder="ex: Renault Megane" />
+            </div>
+            <div class="form-group mb-0">
+              <label class="form-label text-xxs">Carburant</label>
+              <select v-model="currentVehicle.fuelType" class="form-control form-select text-xs">
+                <option value="PETROL">Essence</option>
+                <option value="DIESEL">Diesel</option>
+                <option value="HYBRID">Hybride</option>
+                <option value="ELECTRIC">Électrique</option>
+              </select>
+            </div>
+            <div class="form-group mb-0">
+              <label class="form-label text-xxs">Consommation (L/100km)</label>
+              <input v-model.number="currentVehicle.consumption" type="number" step="0.1" class="form-control text-xs" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Kilométrage & Valeur de reprise -->
+      <div class="usage-params p-4 rounded-xl border-glass mb-4 bg-card-subtle">
+        <div class="form-group mb-4">
+          <div class="flex-between items-center mb-2">
+            <label class="form-label text-xs font-bold m-0">Votre kilométrage annuel estimé</label>
+            <span class="badge badge-teal font-bold text-sm">{{ Number(currentVehicle.annualMileage || 0).toLocaleString('fr-FR') }} km / an</span>
+          </div>
+          
+          <!-- Presets de km rapides -->
+          <div class="mileage-presets flex gap-2 mb-3">
+            <button
+              type="button"
+              class="btn-preset"
+              :class="{ active: currentVehicle.annualMileage === 8000 }"
+              @click="setMileagePreset(8000)"
+            >
+              8 000 km <span class="preset-desc">(Urbain)</span>
+            </button>
+            <button
+              type="button"
+              class="btn-preset"
+              :class="{ active: currentVehicle.annualMileage === 15000 }"
+              @click="setMileagePreset(15000)"
+            >
+              15 000 km <span class="preset-desc">(Moyenne FR)</span>
+            </button>
+            <button
+              type="button"
+              class="btn-preset"
+              :class="{ active: currentVehicle.annualMileage === 25000 }"
+              @click="setMileagePreset(25000)"
+            >
+              25 000 km <span class="preset-desc">(Gros rouleur)</span>
+            </button>
+          </div>
+
+          <input
+            v-model.number="currentVehicle.annualMileage"
+            type="range"
+            min="3000"
+            max="40000"
+            step="1000"
+            class="w-100 accent-teal cursor-pointer"
+            @input="targetVehicle.annualMileage = currentVehicle.annualMileage"
+          />
+        </div>
+
+        <div class="grid-2-fields">
+          <div class="form-group mb-0">
+            <label class="form-label text-xs">Estimation de valeur de reprise actuelle (€)</label>
+            <input
+              v-model.number="currentVehicle.resaleValue"
+              type="number"
+              class="form-control text-xs"
+              placeholder="ex: 8000"
+            />
+            <p class="text-xxs text-dimmed mt-1 m-0">Sera déduite du coût net d'acquisition du nouveau modèle.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bouton Suivant Étape 1 -->
+      <div class="wizard-actions flex justify-end">
+        <button
+          type="button"
+          class="btn btn-primary px-5 py-2.5 font-bold flex items-center gap-2"
+          :disabled="!canGoToStep2"
+          @click="nextStep"
+        >
+          <span>Continuer vers le logement & les aides</span>
+          <ArrowRight size="16" />
+        </button>
+      </div>
+    </div>
+
+    <!-- ÉTAPE 2 : LOGEMENT & AIDES D'ÉTAT -->
+    <div v-else-if="currentStep === 2" class="wizard-step-body animation-fadeIn">
+      <div class="step-intro mb-3.5">
+        <h4 class="step-title font-heading text-main">
+          2. Votre logement et vos aides de l'État
+        </h4>
+        <p class="step-subtitle text-muted text-xs">
+          Ces critères définissent le coût réel de recharge et le montant des subventions publiques applicables.
+        </p>
+      </div>
+
+      <!-- Cartes de profil de recharge -->
+      <div class="form-group mb-4">
+        <label class="form-label text-xs font-bold uppercase text-dimmed mb-2.5 block">
+          🔌 Où stationnez-vous votre véhicule la nuit ?
+        </label>
+        <div class="charging-profiles-grid">
+          <div
+            v-for="prof in chargingProfiles"
+            :key="prof.id"
+            class="charging-card"
+            :class="{ selected: selectedChargingProfile === prof.id }"
+            @click="applyChargingProfile(prof)"
+          >
+            <div class="charging-icon-wrapper">
+              <component :is="prof.icon" size="22" class="text-teal" />
+            </div>
+            <div class="charging-card-content">
+              <h5 class="charging-title text-main font-bold text-xs">{{ prof.title }}</h5>
+              <p class="charging-desc text-xxs text-muted m-0">{{ prof.desc }}</p>
+            </div>
+            <div class="charging-check flex-center" v-if="selectedChargingProfile === prof.id">
+              <Check size="14" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tranches de revenus et subventions -->
+      <div class="subsidies-section p-4 rounded-xl border-glass mb-4 bg-card-subtle">
+        <label class="form-label text-xs font-bold uppercase text-dimmed mb-2.5 block">
+          🏛️ Éligibilité au Bonus Écologique de l'État
+        </label>
+
+        <div class="grid-2-fields gap-3 mb-3">
+          <div
+            class="income-tier-card p-3 rounded-xl border-glass cursor-pointer"
+            :class="{ selected: selectedIncomeTier === 'standard' && !showCustomIncome }"
+            @click="applyIncomeTier('standard'); showCustomIncome = false"
+          >
+            <div class="flex-between items-center mb-1">
+              <span class="font-bold text-xs text-main">Revenu fiscal standard</span>
+              <span class="badge badge-teal badge-small">Bonus 4 000 €</span>
+            </div>
+            <p class="text-xxs text-muted m-0">RFR supérieur à 15 400 € par part fiscale</p>
+          </div>
+
+          <div
+            class="income-tier-card p-3 rounded-xl border-glass cursor-pointer"
+            :class="{ selected: selectedIncomeTier === 'modest' && !showCustomIncome }"
+            @click="applyIncomeTier('modest'); showCustomIncome = false"
+          >
+            <div class="flex-between items-center mb-1">
+              <span class="font-bold text-xs text-main">Revenu fiscal modeste</span>
+              <span class="badge badge-cyan badge-small">Bonus Majoré 7 000 €</span>
+            </div>
+            <p class="text-xxs text-muted m-0">RFR ≤ 15 400 € par part fiscale</p>
+          </div>
+        </div>
+
+        <!-- Options complémentaires : Saisie exacte et Guide des parts -->
+        <div class="flex-between items-center flex-wrap gap-2 mb-3 pt-2 border-t border-glass text-xs">
+          <button
+            type="button"
+            class="btn-text-link flex items-center gap-1.5 text-xxs font-bold text-teal cursor-pointer"
+            @click="showCustomIncome = !showCustomIncome"
+          >
+            <Calculator size="13" />
+            <span>{{ showCustomIncome ? 'Masquer la saisie exacte' : 'Saisir mon RFR exact (€)' }}</span>
+            <component :is="showCustomIncome ? ChevronUp : ChevronDown" size="12" />
+          </button>
+
+          <button
+            type="button"
+            class="btn-text-link flex items-center gap-1.5 text-xxs font-bold text-cyan cursor-pointer"
+            @click="showTaxHelp = !showTaxHelp"
+          >
+            <HelpCircle size="13" />
+            <span>{{ showTaxHelp ? 'Masquer le guide des parts' : 'Comment calculer mes parts fiscales ?' }}</span>
+            <component :is="showTaxHelp ? ChevronUp : ChevronDown" size="12" />
+          </button>
+        </div>
+
+        <!-- Formulaire de saisie du montant exact de RFR -->
+        <div v-if="showCustomIncome" class="custom-income-input p-3 rounded-xl bg-card border-glass mb-3 animation-fadeIn">
+          <label class="form-label text-xxs text-dimmed uppercase">Votre Revenu Fiscal de Référence par part (RFR en €)</label>
+          <div class="flex gap-2 items-center mt-1">
+            <input
+              :value="taxIncome"
+              type="number"
+              class="form-control text-xs"
+              placeholder="ex: 14200"
+              @input="onCustomIncomeInput($event.target.value)"
+            />
+            <span class="badge badge-small shrink-0" :class="taxIncome <= 15400 ? 'badge-cyan' : 'badge-teal'">
+              {{ taxIncome <= 15400 ? 'Bonus 7 000 €' : 'Bonus 4 000 €' }}
+            </span>
+          </div>
+          <p class="text-xxs text-muted mt-1.5 m-0">
+            Ligne "Revenu fiscal de référence" sur votre avis d'impôt sur les revenus.
+          </p>
+        </div>
+
+        <!-- Guide interactif du calcul des parts fiscales -->
+        <div v-if="showTaxHelp" class="tax-help-guide p-3 rounded-xl bg-card border-glass mb-3 animation-fadeIn">
+          <h6 class="text-xs font-bold text-cyan mb-2">
+            Repères selon la composition de votre foyer (Plafond 15 400 € / part) :
+          </h6>
+          <div class="tax-examples-grid mb-2">
+            <div class="tax-example-pill">
+              <span class="example-role">👤 Célibataire (1 part)</span>
+              <span class="example-val">Revenu total &le; <strong>15 400 €</strong></span>
+            </div>
+            <div class="tax-example-pill">
+              <span class="example-role">👫 Couple (2 parts)</span>
+              <span class="example-val">Revenu total &le; <strong>30 800 €</strong></span>
+            </div>
+            <div class="tax-example-pill">
+              <span class="example-role">👨‍👩‍👧 Couple + 1 enfant (2.5 parts)</span>
+              <span class="example-val">Revenu total &le; <strong>38 500 €</strong></span>
+            </div>
+            <div class="tax-example-pill">
+              <span class="example-role">👨‍👩‍👧‍👦 Couple + 2 enfants (3 parts)</span>
+              <span class="example-val">Revenu total &le; <strong>46 200 €</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Case prime à la conversion -->
+        <div class="scrap-box p-3 rounded-xl border-glass flex items-center gap-3 bg-card">
+          <input
+            :checked="scrapVehicle"
+            type="checkbox"
+            id="scrapCheckExpress"
+            class="cursor-pointer"
+            @change="emit('update:scrapVehicle', $event.target.checked)"
+          />
+          <label for="scrapCheckExpress" class="cursor-pointer text-xs text-main m-0">
+            <strong>Mise à la casse d'un vieux véhicule thermique</strong> (Prime à la conversion de +1 500 € à +3 000 €)
+          </label>
+        </div>
+      </div>
+
+      <!-- Boutons Navigation Étape 2 -->
+      <div class="wizard-actions flex-between">
+        <button type="button" class="btn btn-secondary px-4 py-2 text-xs flex items-center gap-2" @click="prevStep">
+          <ArrowLeft size="14" />
+          <span>Retour</span>
+        </button>
+        <button type="button" class="btn btn-primary px-5 py-2.5 font-bold flex items-center gap-2" @click="nextStep">
+          <span>Choisir mon nouveau véhicule</span>
+          <ArrowRight size="16" />
+        </button>
+      </div>
+    </div>
+
+    <!-- ÉTAPE 3 : NOUVEAU VÉHICULE & FINANCEMENT -->
+    <div v-if="currentStep === 3" class="wizard-step-body animation-fadeIn">
+      <div class="step-intro mb-3.5">
+        <h4 class="step-title font-heading text-main">
+          3. Quel nouveau véhicule souhaitez-vous comparer ?
+        </h4>
+        <p class="step-subtitle text-muted text-xs">
+          Choisissez un modèle populaire ou recherchez un modèle précis dans le catalogue.
+        </p>
+      </div>
+
+      <!-- Grille des voitures cibles populaires -->
+      <div class="cars-grid mb-4">
+        <div
+          v-for="car in popularTargetCars"
+          :key="car.name"
+          class="car-card"
+          :class="{ selected: targetVehicle.name === car.name }"
+          @click="selectTargetCar(car)"
+        >
+          <div class="car-card-top flex-between mb-1.5">
+            <span class="badge badge-small" :class="car.fuelType === 'ELECTRIC' ? 'badge-teal' : 'badge-cyan'">
+              {{ car.badge }}
+            </span>
+            <div v-if="targetVehicle.name === car.name" class="check-circle flex-center">
+              <Check size="12" />
+            </div>
+          </div>
+          <div class="car-card-name text-main">{{ car.name }}</div>
+          <div class="car-card-meta text-xxs text-dimmed mt-1">
+            {{ formatCurrency(car.purchasePrice) }} &middot; {{ car.consumption }} {{ car.fuelType === 'ELECTRIC' ? 'kWh' : 'L' }}/100km
+          </div>
+        </div>
+      </div>
+
+      <!-- Option de recherche personnalisée cible -->
+      <div class="custom-search-container p-3 rounded-xl border-glass mb-4 bg-card-subtle">
+        <button
+          type="button"
+          class="btn-toggle-custom flex-between w-100"
+          @click="showTargetCustom = !showTargetCustom"
+        >
+          <span class="flex items-center gap-2 text-xs font-semibold text-main">
+            <Search size="14" class="text-teal" />
+            <span>Rechercher un autre véhicule dans le catalogue complet</span>
+          </span>
+          <span class="text-xs text-teal font-semibold">{{ showTargetCustom ? 'Masquer ▲' : 'Rechercher ▼' }}</span>
+        </button>
+
+        <div v-if="showTargetCustom" class="custom-search-inputs mt-3 pt-3 border-t border-glass">
+          <div class="form-group relative mb-3">
+            <label class="form-label text-xxs">Nom du modèle</label>
+            <input
+              v-model="searchTargetQuery"
+              type="text"
+              class="form-control text-xs"
+              placeholder="ex: e-2008, Ioniq 5, Fiat 500e..."
+            />
+            <div v-if="targetSearchResults.length > 0" class="search-dropdown card-glass">
+              <div
+                v-for="v in targetSearchResults"
+                :key="v.id"
+                class="dropdown-item"
+                @click="selectTargetCar(v)"
+              >
+                <span class="font-bold text-xs text-main">{{ v.name }}</span>
+                <span class="text-xxs text-muted">
+                  {{ formatCurrency(v.purchasePrice) }} &middot; {{ v.consumption }} {{ v.fuelType === 'ELECTRIC' ? 'kWh' : 'L' }}/100km
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid-3-fields">
+            <div class="form-group mb-0">
+              <label class="form-label text-xxs">Nom complet</label>
+              <input v-model="targetVehicle.name" type="text" class="form-control text-xs" />
+            </div>
+            <div class="form-group mb-0">
+              <label class="form-label text-xxs">Prix d'achat (€)</label>
+              <input v-model.number="targetVehicle.purchasePrice" type="number" class="form-control text-xs" />
+            </div>
+            <div class="form-group mb-0">
+              <label class="form-label text-xxs">Consommation</label>
+              <input v-model.number="targetVehicle.consumption" type="number" step="0.1" class="form-control text-xs" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mode de financement -->
+      <div class="financing-box p-4 rounded-xl border-glass mb-4 bg-card-subtle">
+        <label class="form-label text-xs font-bold uppercase text-dimmed mb-2.5 block">
+          💳 Mode d'acquisition du véhicule cible
+        </label>
+        
+        <div class="segmented-control w-100 mb-3">
+          <button
+            type="button"
+            class="segmented-item flex-1"
+            :class="{ active: !isLeasing }"
+            @click="emit('update:isLeasing', false)"
+          >
+            Achat Comptant / Crédit classique
+          </button>
+          <button
+            type="button"
+            class="segmented-item flex-1"
+            :class="{ active: isLeasing }"
+            @click="emit('update:isLeasing', true)"
+          >
+            Leasing (LOA / LLD)
+          </button>
+        </div>
+
+        <div v-if="isLeasing" class="form-group mb-0">
+          <label class="form-label text-xs">Loyer mensuel cible souhaité (€/mois)</label>
+          <input
+            :value="customLeasingMonthlyPrice"
+            type="number"
+            class="form-control text-xs"
+            placeholder="ex: 290 (laisser vide pour calcul automatique selon le prix)"
+            @input="emit('update:customLeasingMonthlyPrice', $event.target.value ? Number($event.target.value) : null)"
+          />
+        </div>
+      </div>
+
+      <!-- Boutons Finaux -->
+      <div class="wizard-actions flex-between items-center">
+        <button type="button" class="btn btn-secondary px-4 py-2 text-xs flex items-center gap-2" @click="prevStep">
+          <ArrowLeft size="14" />
+          <span>Retour</span>
+        </button>
+        <button
+          type="button"
+          class="btn btn-primary px-6 py-3 font-bold text-sm flex items-center gap-2"
+          :disabled="!canSubmit || loading"
+          @click="emit('submit')"
+        >
+          <span v-if="loading" class="spinner mr-1"></span>
+          <Sparkles v-else size="17" />
+          <span>Calculer mon Bilan Mobilité</span>
+          <ArrowRight size="16" />
+        </button>
+      </div>
+    </div>
+
+  </div>
+</template>
+
+<style scoped>
+.wizard-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.wizard-icon-badge {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--accent-teal-soft);
+  border: 1px solid rgba(16, 124, 65, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-text-expert {
+  background: transparent;
+  border: 1px solid var(--border-glass);
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+.btn-text-expert:hover {
+  border-color: var(--border-hover);
+  color: var(--text-main);
+  background: var(--bg-card-subtle);
+}
+
+/* Stepper Track */
+.stepper-track {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  margin-top: 1rem;
+  padding: 0 0.5rem;
+}
+
+.stepper-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  z-index: 2;
+}
+.stepper-step.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.step-num {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--bg-card-subtle);
+  border: 1.5px solid var(--border-glass);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--text-dimmed);
+  transition: all 0.15s ease;
+}
+.stepper-step.active .step-num {
+  background: var(--accent-teal);
+  border-color: var(--accent-teal);
+  color: #fff;
+}
+.stepper-step.done .step-num {
+  background: var(--accent-teal-soft);
+  border-color: var(--accent-teal);
+  color: var(--accent-teal);
+}
+
+.step-text {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-dimmed);
+}
+.stepper-step.active .step-text {
+  color: var(--text-main);
+}
+
+.stepper-line {
+  flex: 1;
+  height: 2px;
+  background: var(--border-glass);
+  margin: 0 10px;
+}
+.stepper-line.filled {
+  background: var(--accent-teal);
+}
+
+/* Cars Grid */
+.cars-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+@media (max-width: 992px) {
+  .cars-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 540px) {
+  .cars-grid { grid-template-columns: 1fr; }
+}
+
+.car-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+.car-card:hover {
+  border-color: var(--border-hover);
+  transform: translateY(-2px);
+}
+.car-card.selected {
+  border-color: var(--accent-teal);
+  background: var(--accent-teal-soft);
+}
+
+.car-card-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.check-circle {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent-teal);
+  color: #fff;
+}
+
+/* Charging Profiles */
+.charging-profiles-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+@media (max-width: 768px) {
+  .charging-profiles-grid { grid-template-columns: 1fr; }
+}
+
+.charging-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.charging-card:hover {
+  border-color: var(--border-hover);
+}
+.charging-card.selected {
+  border-color: var(--accent-teal);
+  background: var(--accent-teal-soft);
+}
+
+.charging-icon-wrapper {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--accent-teal-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.charging-check {
+  margin-left: auto;
+  color: var(--accent-teal);
+}
+
+/* Income cards */
+.income-tier-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  transition: all 0.15s ease;
+}
+.income-tier-card:hover {
+  border-color: var(--border-hover);
+}
+.income-tier-card.selected {
+  border-color: var(--accent-teal);
+  background: var(--accent-teal-soft);
+}
+
+.tax-examples-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+@media (max-width: 600px) {
+  .tax-examples-grid { grid-template-columns: 1fr; }
+}
+.tax-example-pill {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  background: var(--bg-card-subtle);
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-glass);
+}
+
+/* Mileage Presets */
+.btn-preset {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-preset:hover {
+  color: var(--text-main);
+  border-color: var(--border-hover);
+}
+.btn-preset.active {
+  background: var(--accent-teal-soft);
+  border-color: var(--accent-teal);
+  color: var(--accent-teal);
+}
+
+.btn-toggle-custom {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-text-link {
+  background: transparent;
+  border: none;
+  text-decoration: underline;
+}
+
+.search-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  max-height: 180px;
+  overflow-y: auto;
+  border-radius: 12px;
+  margin-top: 4px;
+}
+.dropdown-item {
+  padding: 8px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+.dropdown-item:hover {
+  background: var(--accent-teal-soft);
+}
+</style>

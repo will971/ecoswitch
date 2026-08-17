@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import { Copy, X, Check, Share2 } from '@lucide/vue'
+import { Copy, X, Check, Share2, MessageCircle, Send } from '@lucide/vue'
 
 const props = defineProps({
   show: {
@@ -26,28 +26,28 @@ const emit = defineEmits(['close'])
 const copied = ref(false)
 
 const formatCurrency = (val) => {
-  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val)
+  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val || 0)
 }
 
 const getReportText = () => {
-  const isElectric = props.targetVehicle.fuelType === 'ELECTRIC'
-  const energyWord = isElectric ? 'électrique' : 'plus propre'
-  let text = `⚡ Bilan de ma transition EcoSwitch : ${props.currentVehicle.name} ➡️ ${props.targetVehicle.name}\n\n`
+  let text = `⚡ Bilan de transition EcoSwitch : ${props.currentVehicle.name} ➡️ ${props.targetVehicle.name}\n\n`
   
   if (props.result.breakEvenYear) {
-    text += `✅ Changement rentable en ${props.result.breakEvenYear} ans !\n`
+    text += `✅ Changement amorti en ${props.result.breakEvenYear} an${props.result.breakEvenYear > 1 ? 's' : ''} !\n`
   } else {
-    text += `ℹ️ Transition orientée long terme.\n`
+    text += `ℹ️ Transition à horizon long terme.\n`
   }
   
   text += `💰 Économie d'énergie : ${formatCurrency(props.result.annualSavings)}/an\n`
-  text += `🌍 Émissions CO₂ évitées : ${(props.result.annualCO2Savings).toFixed(0)} kg CO₂/an (soit env. ${(props.result.annualCO2Savings / 25).toFixed(0)} arbres plantés !)\n\n`
-  
-  if (props.result.monthlySavings > 0) {
-    text += `📈 Gain mensuel en leasing : +${formatCurrency(props.result.monthlySavings)}/mois de reste à vivre !\n`
+  if (props.result.annualCO2Savings > 0) {
+    text += `🌍 Réduction carbone : ${(props.result.annualCO2Savings).toFixed(0)} kg CO₂/an (env. ${(props.result.annualCO2Savings / 25).toFixed(0)} arbres)\n`
   }
   
-  text += `Calculez votre rentabilité gratuitement sur EcoSwitch ! 🚗`
+  if (props.result.monthlySavings > 0) {
+    text += `📈 Reste à vivre mensuel : +${formatCurrency(props.result.monthlySavings)}/mois !\n`
+  }
+  
+  text += `\nSimulez gratuitement votre transition sur EcoSwitch !`
   return text
 }
 
@@ -76,42 +76,51 @@ const shareOnWhatsApp = () => {
 
 <template>
   <div v-if="show" class="auth-modal-overlay flex-center">
-    <div class="card-glass glow-teal auth-modal-card p-4 relative max-w-md w-100">
-      <!-- Bouton fermer -->
-      <button class="absolute top-4 right-4 text-dimmed hover-text-main" @click="emit('close')">
-        <X size="20" />
+    <div class="card-glass auth-modal-card p-4 relative max-w-md w-100 animation-fadeIn">
+      <button class="icon-btn-close absolute top-4 right-4" @click="emit('close')">
+        <X size="18" />
       </button>
 
-      <h3 class="text-gradient mb-3 flex items-center gap-2">
-        <Share2 size="22" class="text-teal" />
-        <span>Partager mon Bilan</span>
-      </h3>
-      <p class="text-xs text-muted mb-4">
-        Partagez vos résultats ou copiez le récapitulatif pour en discuter avec vos proches.
+      <div class="flex items-center gap-2 mb-2">
+        <div class="share-icon-badge flex-center">
+          <Share2 size="16" class="text-teal" />
+        </div>
+        <h3 class="text-main font-heading text-md font-bold m-0">Partager mon Bilan</h3>
+      </div>
+      <p class="text-xs text-muted mb-3">
+        Partagez votre calcul de rentabilité ou copiez le texte récapitulatif :
       </p>
 
       <!-- Aperçu du rapport -->
-      <div class="report-preview p-3 rounded border-glass bg-deep-glass text-xs text-left mb-4 select-all">
-        <pre>{{ getReportText() }}</pre>
+      <div class="report-preview p-3 rounded-xl border-glass bg-card-subtle text-xs text-left mb-3.5 select-all">
+        <pre class="m-0 font-mono text-xxs text-main" style="white-space: pre-wrap; font-family: var(--font-mono);">{{ getReportText() }}</pre>
       </div>
 
-      <!-- Actions -->
+      <!-- Actions de partage -->
       <div class="flex flex-column gap-2">
-        <!-- Copier -->
-        <button class="btn btn-secondary w-100 flex-center gap-2 py-2 text-xs font-semibold" @click="copyToClipboard">
-          <component :is="copied ? Check : Copy" size="16" :class="copied ? 'text-teal' : ''" />
-          <span>{{ copied ? 'Copié dans le presse-papier !' : 'Copier le récapitulatif' }}</span>
+        <button
+          class="btn btn-primary w-100 text-xs font-bold flex items-center justify-center gap-2"
+          @click="copyToClipboard"
+        >
+          <Check v-if="copied" size="14" />
+          <Copy v-else size="14" />
+          <span>{{ copied ? 'Copié dans le presse-papier !' : 'Copier le texte' }}</span>
         </button>
 
-        <div class="flex gap-2 mt-2">
-          <!-- Partager Twitter/X -->
-          <button class="btn btn-secondary w-50 flex-center gap-2 py-2 text-xs font-semibold" @click="shareOnTwitter">
-            <span>Partager sur X</span>
+        <div class="grid-2-fields gap-2">
+          <button
+            class="btn btn-secondary w-100 text-xs font-semibold flex items-center justify-center gap-1.5"
+            @click="shareOnWhatsApp"
+          >
+            <MessageCircle size="14" class="text-teal" />
+            <span>WhatsApp</span>
           </button>
-          
-          <!-- Partager WhatsApp -->
-          <button class="btn btn-secondary w-50 flex-center gap-2 py-2 text-xs font-semibold" @click="shareOnWhatsApp">
-            <span>Envoyer sur WhatsApp</span>
+          <button
+            class="btn btn-secondary w-100 text-xs font-semibold flex items-center justify-center gap-1.5"
+            @click="shareOnTwitter"
+          >
+            <Send size="14" class="text-cyan" />
+            <span>X / Twitter</span>
           </button>
         </div>
       </div>
@@ -120,41 +129,16 @@ const shareOnWhatsApp = () => {
 </template>
 
 <style scoped>
+.share-icon-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: hsla(var(--accent-teal) / 0.12);
+  border: 1px solid hsla(var(--accent-teal) / 0.25);
+}
+
 .report-preview {
-  font-family: inherit;
-  white-space: pre-wrap;
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  max-height: 180px;
+  max-height: 160px;
   overflow-y: auto;
-  line-height: 1.4;
-  color: hsl(var(--text-main));
 }
-pre {
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-.auth-modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  z-index: 1000;
-}
-.auth-modal-card {
-  z-index: 1001;
-  background: hsl(var(--bg-deep) / 0.9);
-}
-.absolute { position: absolute; }
-.top-4 { top: 1rem; }
-.right-4 { right: 1rem; }
-.w-100 { width: 100%; }
-.w-50 { width: 50%; }
-.gap-2 { gap: 8px; }
-.mt-2 { margin-top: 8px; }
 </style>

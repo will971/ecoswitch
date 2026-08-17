@@ -1,152 +1,202 @@
 <script setup>
 import { ref, watch, nextTick, onMounted } from 'vue'
-import { Car, BarChart3, Settings, HelpCircle, Activity, ExternalLink, ShieldCheck, User, LogOut, Lock, Mail, Key, CreditCard, Sparkles, Check, X, Sun, Moon, Menu } from '@lucide/vue'
+import {
+  Car,
+  BarChart3,
+  Settings,
+  Zap,
+  Activity,
+  ExternalLink,
+  ShieldCheck,
+  User,
+  LogOut,
+  Lock,
+  Mail,
+  Key,
+  CreditCard,
+  Sparkles,
+  Check,
+  Sun,
+  Moon,
+  Bookmark,
+  TrendingUp,
+  Fuel
+} from '@lucide/vue'
+
 import DirectSimulator from './components/DirectSimulator.vue'
-import VehicleManager from './components/VehicleManager.vue'
 import CatalogComparator from './components/CatalogComparator.vue'
+import VehicleManager from './components/VehicleManager.vue'
 import SavedSimulations from './components/SavedSimulations.vue'
 import UserProfileModal from './components/UserProfileModal.vue'
-import { apiRegister, apiLogin, apiGoogleLogin, apiGetUserVehicleProfiles } from './utils/api.js'
-import { useTheme } from './utils/theme.js'
+import { apiLogin, apiRegister, apiGoogleLogin, apiGetMe, apiGetUserVehicleProfiles } from './utils/api.js'
 
-const activeTab = ref('direct') // direct, compare, catalog, saved, pricing
-const currentUser = ref(null)
-const userProfiles = ref([]) // Liste des profils véhicules
-const activeUserProfile = ref(null) // Profil actif
-const showMobileMenu = ref(false)
+// Vue active
+const activeTab = ref('direct-sim')
 
-const { currentTheme, initTheme, toggleTheme } = useTheme()
+// Theme (Default Light Studio)
+const theme = ref(localStorage.getItem('eco_theme') || 'light')
 
-// Modale Auth
-const showAuthModal = ref(false)
-const isRegister = ref(false)
-const authEmail = ref('williams@saas.com')
-const authPassword = ref('password')
-const authName = ref('Williams Modeste')
-
-// Modale Profil
-const showProfileModal = ref(false)
-
-// Simulation chargée depuis l'historique
-const loadedSimulation = ref(null)
-
-const setTab = (tab) => {
-  activeTab.value = tab
+const applyTheme = (t) => {
+  theme.value = t
+  localStorage.setItem('eco_theme', t)
+  document.documentElement.setAttribute('data-theme', t)
 }
 
+const toggleTheme = () => {
+  applyTheme(theme.value === 'dark' ? 'light' : 'dark')
+}
+
+// État Authentification
+const currentUser = ref(null)
+const authModalOpen = ref(false)
+const authMode = ref('login') // 'login' | 'register'
+const authEmail = ref('')
+const authPassword = ref('')
 const authError = ref('')
 const authLoading = ref(false)
 
-/** Restaure la session depuis le localStorage si le token JWT est encore présent */
-const checkSession = () => {
-  const user  = localStorage.getItem('saas_user')
+// Garage & Profils utilisateur
+const userProfiles = ref([])
+const activeUserProfile = ref(null)
+const profileModalOpen = ref(false)
+
+// Données transmises au simulateur lors d'un rechargement
+const simulationToLoad = ref(null)
+
+const checkCurrentUser = async () => {
   const token = localStorage.getItem('saas_token')
-  if (user && token) {
-    currentUser.value = JSON.parse(user)
+  const savedUser = localStorage.getItem('saas_user')
+  if (!token || token === 'undefined' || token === 'null' || token.length < 10) {
+    handleLogout()
+    return
+  }
+
+  if (savedUser && savedUser !== 'undefined' && savedUser !== 'null') {
+    try {
+      currentUser.value = JSON.parse(savedUser)
+    } catch (e) {}
+  }
+
+  try {
+    const user = await apiGetMe()
+    currentUser.value = user
+    localStorage.setItem('saas_user', JSON.stringify(user))
+    await loadUserProfiles()
+  } catch (err) {
+    console.warn("Session expirée ou invalide :", err)
+    handleLogout()
   }
 }
 
-/** Persiste la session après auth réussie */
-const persistSession = async (userData) => {
-  const user = { name: userData.name, email: userData.email, plan: userData.plan, role: userData.role }
-  localStorage.setItem('saas_token', userData.token)
-  localStorage.setItem('saas_user', JSON.stringify(user))
-  currentUser.value = user
-  showAuthModal.value = false
-  authError.value = ''
-  
-  // Charger les profils véhicules
+const loadUserProfiles = async () => {
+  if (!currentUser.value) return
   try {
     const profiles = await apiGetUserVehicleProfiles()
     userProfiles.value = profiles
-    if (profiles.length > 0) {
-      activeUserProfile.value = profiles.find(p => p.default) || profiles[profiles.length - 1]
-    }
-  } catch (e) {
-    console.error("Erreur chargement profil véhicule", e)
-  }
-
-  if (activeTab.value === 'saved') activeTab.value = 'direct'
-}
-
-/** Déconnexion forcée (expiration de session) */
-const forceLogout = () => {
-  localStorage.removeItem('saas_user')
-  localStorage.removeItem('saas_token')
-  currentUser.value = null
-  if (activeTab.value === 'saved') activeTab.value = 'direct'
-  showAuthModal.value = true
-  authError.value = 'Votre session a expiré. Veuillez vous reconnecter.'
-}
-
-const openAuth = () => {
-  showAuthModal.value = true
-  authError.value = ''
-}
-
-const closeAuth = () => {
-  showAuthModal.value = false
-  authError.value = ''
-}
-
-const handleAuth = async () => {
-  authLoading.value = true
-  authError.value = ''
-  try {
-    let userData
-    if (isRegister.value) {
-      userData = await apiRegister(
-        authEmail.value.trim().toLowerCase(),
-        authPassword.value,
-        authName.value || 'Utilisateur'
-      )
+    if (profiles && profiles.length > 0) {
+      const defaultP = profiles.find(p => p.default) || profiles[0]
+      activeUserProfile.value = defaultP
     } else {
-      userData = await apiLogin(
-        authEmail.value.trim().toLowerCase(),
-        authPassword.value
-      )
+      activeUserProfile.value = null
     }
-    persistSession(userData)
   } catch (err) {
-    authError.value = err.message
+    console.error("Erreur chargement garage :", err)
+  }
+}
+
+const persistSession = (data) => {
+  if (!data?.token) return
+  localStorage.setItem('saas_token', data.token)
+  const user = {
+    email: data.email || authEmail.value,
+    name: data.name || (data.email ? data.email.split('@')[0] : 'Utilisateur'),
+    plan: data.plan || 'Pro',
+    role: data.role || 'USER'
+  }
+  localStorage.setItem('saas_user', JSON.stringify(user))
+  currentUser.value = user
+  authModalOpen.value = false
+  authEmail.value = ''
+  authPassword.value = ''
+}
+
+const handleLogin = async () => {
+  authError.value = ''
+  authLoading.value = true
+  try {
+    const data = await apiLogin(authEmail.value, authPassword.value)
+    persistSession(data)
+    await loadUserProfiles()
+  } catch (err) {
+    authError.value = err.message || 'Email ou mot de passe incorrect.'
   } finally {
     authLoading.value = false
   }
 }
 
+const handleRegister = async () => {
+  authError.value = ''
+  authLoading.value = true
+  try {
+    const name = authEmail.value.split('@')[0]
+    const data = await apiRegister(authEmail.value, authPassword.value, name)
+    persistSession(data)
+    await loadUserProfiles()
+  } catch (err) {
+    authError.value = err.message || "Erreur lors de l'inscription."
+  } finally {
+    authLoading.value = false
+  }
+}
+
+// ── Google SSO Integration (Identity Services) ──────────────────────────────
+const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
+
 const initGoogleSignIn = () => {
-  if (typeof google === 'undefined') return
-  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '1047781504975-placeholderclientid.apps.googleusercontent.com'
-  google.accounts.id.initialize({
-    client_id: clientId,
-    callback: handleGoogleCredentialResponse,
-    auto_select: false,
-    cancel_on_tap_outside: true
-  })
+  if (typeof google === 'undefined' || !google.accounts?.id) return
+  try {
+    google.accounts.id.initialize({
+      client_id: clientId,
+      callback: handleGoogleCredentialResponse,
+      auto_select: false,
+      cancel_on_tap_outside: true
+    })
+  } catch (e) {
+    console.warn("Initialisation Google Sign-In:", e)
+  }
 }
 
 const renderGoogleButton = () => {
-  if (typeof google === 'undefined') return
+  if (typeof google === 'undefined' || !google.accounts?.id) return
   const btnEl = document.getElementById('google-signin-btn')
   if (!btnEl) return
-  google.accounts.id.renderButton(
-    btnEl,
-    { 
-      theme: 'dark', 
-      size: 'large', 
-      width: 320,
-      text: 'continue_with',
-      shape: 'rectangular'
-    }
-  )
+  
+  btnEl.innerHTML = ''
+  try {
+    google.accounts.id.renderButton(
+      btnEl,
+      { 
+        theme: theme.value === 'dark' ? 'filled_black' : 'outline', 
+        size: 'large', 
+        width: 300,
+        text: 'continue_with',
+        shape: 'rectangular',
+        logo_alignment: 'left'
+      }
+    )
+  } catch (e) {
+    console.warn("Erreur renderButton Google:", e)
+  }
 }
 
 const handleGoogleCredentialResponse = async (response) => {
+  if (!response?.credential) return
   authLoading.value = true
   authError.value = ''
   try {
-    const userData = await apiGoogleLogin(response.credential)
-    persistSession(userData)
+    const data = await apiGoogleLogin(response.credential)
+    persistSession(data)
+    await loadUserProfiles()
   } catch (err) {
     console.error("Erreur d'authentification Google SSO", err)
     authError.value = `Google SSO : ${err.message}`
@@ -155,834 +205,567 @@ const handleGoogleCredentialResponse = async (response) => {
   }
 }
 
-watch(showAuthModal, (newVal) => {
+watch(authModalOpen, (newVal) => {
   if (newVal) {
     nextTick(() => {
-      renderGoogleButton()
+      initGoogleSignIn()
+      setTimeout(() => {
+        renderGoogleButton()
+      }, 50)
     })
   }
 })
 
-const logout = () => {
-  localStorage.removeItem('saas_user')
+const handleLogout = () => {
   localStorage.removeItem('saas_token')
+  localStorage.removeItem('saas_user')
   currentUser.value = null
-  if (activeTab.value === 'saved') {
-    activeTab.value = 'direct'
-  }
+  userProfiles.value = []
+  activeUserProfile.value = null
 }
 
-const handleLoadSimulation = (sim) => {
-  loadedSimulation.value = sim
-  activeTab.value = 'direct'
+const openLoginModal = () => {
+  authMode.value = 'login'
+  authError.value = ''
+  authModalOpen.value = true
 }
 
-const handleProfileSaved = async () => {
-  try {
-    const profiles = await apiGetUserVehicleProfiles()
-    userProfiles.value = profiles
-    if (profiles.length > 0) {
-      activeUserProfile.value = profiles.find(p => p.default) || profiles[profiles.length - 1]
-    } else {
-      activeUserProfile.value = null
-    }
-  } catch (e) {
-    console.error("Erreur rechargement profils", e)
-  }
+const handleLoadSimulation = (simData) => {
+  simulationToLoad.value = { ...simData, _loadTimestamp: Date.now() }
+  activeTab.value = 'direct-sim'
 }
 
-onMounted(async () => {
-  initTheme()
-  checkSession()
-  if (currentUser.value) {
-    try {
-      const profiles = await apiGetUserVehicleProfiles()
-      userProfiles.value = profiles
-      if (profiles.length > 0) {
-        activeUserProfile.value = profiles.find(p => p.default) || profiles[profiles.length - 1]
+onMounted(() => {
+  applyTheme(theme.value)
+  checkCurrentUser()
+
+  // Chargement propre du script Google Identity Services
+  if (!document.getElementById('google-gsi-script')) {
+    const script = document.createElement('script')
+    script.id = 'google-gsi-script'
+    script.src = 'https://accounts.google.com/gsi/client'
+    script.async = true
+    script.defer = true
+    script.onload = () => {
+      try {
+        initGoogleSignIn()
+        if (authModalOpen.value) {
+          renderGoogleButton()
+        }
+      } catch (e) {
+        console.warn('Google SSO non disponible:', e.message)
       }
-    } catch (e) {
-      console.error("Erreur chargement profil au montage", e)
     }
-  }
-
-  // Google Identity Services — certaines versions du parser Safari (JavaScriptCore)
-  // génèrent une SyntaxError interne au script GSI (via eval/new Function côté Google).
-  // On charge le script avec onerror pour éviter une erreur non interceptée dans la console.
-  const script = document.createElement('script')
-  script.src = 'https://accounts.google.com/gsi/client'
-  script.async = true
-  script.defer = true
-  script.onload = () => {
-    try {
-      initGoogleSignIn()
-    } catch (e) {
-      // Google SSO non disponible dans ce navigateur — l'auth email reste fonctionnelle
-      console.warn('Google SSO non disponible:', e.message)
+    script.onerror = () => {
+      console.warn('Google SSO : impossible de charger le script GSI')
     }
+    document.head.appendChild(script)
+  } else {
+    initGoogleSignIn()
   }
-  script.onerror = () => {
-    console.warn('Google SSO : impossible de charger le script (réseau ou navigateur incompatible)')
-  }
-  document.head.appendChild(script)
 })
 </script>
 
 <template>
-  <div class="app-shell min-h-screen">
-
-    <!-- Décor de fond : icônes flottantes thématiques -->
-    <div class="bg-decor" aria-hidden="true">
-
-      <!-- === VOITURES (10) === -->
-      <svg class="bg-icon bg-car" style="--x:3%;--y:8%;--s:5rem;--r:-12deg;--d:0s;--op:0.09" viewBox="0 0 24 24" fill="currentColor"><path d="M19 10l-1.5-3.5C17.2 5.8 16.5 5.3 15.7 5.3H8.3C7.5 5.3 6.8 5.8 6.5 6.5L5 10H3c-.6 0-1 .4-1 1v4c0 .6.4 1 1 1h1.1c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3h.2c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3H21c.6 0 1-.4 1-1v-4c0-.6-.4-1-1-1h-2z"/><circle cx="8" cy="16" r="2"/><circle cx="16" cy="16" r="2"/></svg>
-      <svg class="bg-icon bg-car" style="--x:85%;--y:5%;--s:4rem;--r:8deg;--d:3s;--op:0.08" viewBox="0 0 24 24" fill="currentColor"><path d="M19 10l-1.5-3.5C17.2 5.8 16.5 5.3 15.7 5.3H8.3C7.5 5.3 6.8 5.8 6.5 6.5L5 10H3c-.6 0-1 .4-1 1v4c0 .6.4 1 1 1h1.1c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3h.2c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3H21c.6 0 1-.4 1-1v-4c0-.6-.4-1-1-1h-2z"/><circle cx="8" cy="16" r="2"/><circle cx="16" cy="16" r="2"/></svg>
-      <svg class="bg-icon bg-car" style="--x:40%;--y:68%;--s:6rem;--r:5deg;--d:6s;--op:0.07" viewBox="0 0 24 24" fill="currentColor"><path d="M19 10l-1.5-3.5C17.2 5.8 16.5 5.3 15.7 5.3H8.3C7.5 5.3 6.8 5.8 6.5 6.5L5 10H3c-.6 0-1 .4-1 1v4c0 .6.4 1 1 1h1.1c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3h.2c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3H21c.6 0 1-.4 1-1v-4c0-.6-.4-1-1-1h-2z"/><circle cx="8" cy="16" r="2"/><circle cx="16" cy="16" r="2"/></svg>
-      <svg class="bg-icon bg-car" style="--x:68%;--y:50%;--s:3.5rem;--r:-18deg;--d:9s;--op:0.08" viewBox="0 0 24 24" fill="currentColor"><path d="M19 10l-1.5-3.5C17.2 5.8 16.5 5.3 15.7 5.3H8.3C7.5 5.3 6.8 5.8 6.5 6.5L5 10H3c-.6 0-1 .4-1 1v4c0 .6.4 1 1 1h1.1c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3h.2c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3H21c.6 0 1-.4 1-1v-4c0-.6-.4-1-1-1h-2z"/><circle cx="8" cy="16" r="2"/><circle cx="16" cy="16" r="2"/></svg>
-      <svg class="bg-icon bg-car" style="--x:18%;--y:82%;--s:4.5rem;--r:10deg;--d:1.5s;--op:0.085" viewBox="0 0 24 24" fill="currentColor"><path d="M19 10l-1.5-3.5C17.2 5.8 16.5 5.3 15.7 5.3H8.3C7.5 5.3 6.8 5.8 6.5 6.5L5 10H3c-.6 0-1 .4-1 1v4c0 .6.4 1 1 1h1.1c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3h.2c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3H21c.6 0 1-.4 1-1v-4c0-.6-.4-1-1-1h-2z"/><circle cx="8" cy="16" r="2"/><circle cx="16" cy="16" r="2"/></svg>
-      <svg class="bg-icon bg-car" style="--x:52%;--y:20%;--s:3rem;--r:-5deg;--d:4s;--op:0.07" viewBox="0 0 24 24" fill="currentColor"><path d="M19 10l-1.5-3.5C17.2 5.8 16.5 5.3 15.7 5.3H8.3C7.5 5.3 6.8 5.8 6.5 6.5L5 10H3c-.6 0-1 .4-1 1v4c0 .6.4 1 1 1h1.1c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3h.2c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3H21c.6 0 1-.4 1-1v-4c0-.6-.4-1-1-1h-2z"/><circle cx="8" cy="16" r="2"/><circle cx="16" cy="16" r="2"/></svg>
-      <svg class="bg-icon bg-car" style="--x:90%;--y:78%;--s:5.5rem;--r:15deg;--d:12s;--op:0.075" viewBox="0 0 24 24" fill="currentColor"><path d="M19 10l-1.5-3.5C17.2 5.8 16.5 5.3 15.7 5.3H8.3C7.5 5.3 6.8 5.8 6.5 6.5L5 10H3c-.6 0-1 .4-1 1v4c0 .6.4 1 1 1h1.1c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3h.2c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3H21c.6 0 1-.4 1-1v-4c0-.6-.4-1-1-1h-2z"/><circle cx="8" cy="16" r="2"/><circle cx="16" cy="16" r="2"/></svg>
-      <svg class="bg-icon bg-car" style="--x:25%;--y:35%;--s:3.8rem;--r:-22deg;--d:7s;--op:0.065" viewBox="0 0 24 24" fill="currentColor"><path d="M19 10l-1.5-3.5C17.2 5.8 16.5 5.3 15.7 5.3H8.3C7.5 5.3 6.8 5.8 6.5 6.5L5 10H3c-.6 0-1 .4-1 1v4c0 .6.4 1 1 1h1.1c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3h.2c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3H21c.6 0 1-.4 1-1v-4c0-.6-.4-1-1-1h-2z"/><circle cx="8" cy="16" r="2"/><circle cx="16" cy="16" r="2"/></svg>
-      <svg class="bg-icon bg-car" style="--x:75%;--y:88%;--s:4.2rem;--r:3deg;--d:10s;--op:0.08" viewBox="0 0 24 24" fill="currentColor"><path d="M19 10l-1.5-3.5C17.2 5.8 16.5 5.3 15.7 5.3H8.3C7.5 5.3 6.8 5.8 6.5 6.5L5 10H3c-.6 0-1 .4-1 1v4c0 .6.4 1 1 1h1.1c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3h.2c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3H21c.6 0 1-.4 1-1v-4c0-.6-.4-1-1-1h-2z"/><circle cx="8" cy="16" r="2"/><circle cx="16" cy="16" r="2"/></svg>
-      <svg class="bg-icon bg-car" style="--x:47%;--y:44%;--s:2.8rem;--r:-8deg;--d:15s;--op:0.06" viewBox="0 0 24 24" fill="currentColor"><path d="M19 10l-1.5-3.5C17.2 5.8 16.5 5.3 15.7 5.3H8.3C7.5 5.3 6.8 5.8 6.5 6.5L5 10H3c-.6 0-1 .4-1 1v4c0 .6.4 1 1 1h1.1c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3h.2c.4 1.7 2 3 3.9 3s3.5-1.3 3.9-3H21c.6 0 1-.4 1-1v-4c0-.6-.4-1-1-1h-2z"/><circle cx="8" cy="16" r="2"/><circle cx="16" cy="16" r="2"/></svg>
-
-      <!-- === RECYCLAGE (8) === -->
-      <svg class="bg-icon bg-recycle" style="--x:12%;--y:38%;--s:4.5rem;--r:0deg;--d:2s;--op:0.09" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.5 6H7l2.3 3.9-1.1 1.9L4 5.5 1 11l3.5.5L3 14h6.3L12 19l2.7-5H21l-1.5-3 3.5-.5-3-5.5-4.2 6.3-1.1-1.9L18.9 6H16.5L14 2h-2z"/></svg>
-      <svg class="bg-icon bg-recycle" style="--x:78%;--y:28%;--s:3.5rem;--r:30deg;--d:7s;--op:0.085" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.5 6H7l2.3 3.9-1.1 1.9L4 5.5 1 11l3.5.5L3 14h6.3L12 19l2.7-5H21l-1.5-3 3.5-.5-3-5.5-4.2 6.3-1.1-1.9L18.9 6H16.5L14 2h-2z"/></svg>
-      <svg class="bg-icon bg-recycle" style="--x:58%;--y:80%;--s:5rem;--r:-10deg;--d:4.5s;--op:0.08" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.5 6H7l2.3 3.9-1.1 1.9L4 5.5 1 11l3.5.5L3 14h6.3L12 19l2.7-5H21l-1.5-3 3.5-.5-3-5.5-4.2 6.3-1.1-1.9L18.9 6H16.5L14 2h-2z"/></svg>
-      <svg class="bg-icon bg-recycle" style="--x:33%;--y:18%;--s:3rem;--r:45deg;--d:11s;--op:0.075" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.5 6H7l2.3 3.9-1.1 1.9L4 5.5 1 11l3.5.5L3 14h6.3L12 19l2.7-5H21l-1.5-3 3.5-.5-3-5.5-4.2 6.3-1.1-1.9L18.9 6H16.5L14 2h-2z"/></svg>
-      <svg class="bg-icon bg-recycle" style="--x:62%;--y:12%;--s:4rem;--r:-20deg;--d:5s;--op:0.08" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.5 6H7l2.3 3.9-1.1 1.9L4 5.5 1 11l3.5.5L3 14h6.3L12 19l2.7-5H21l-1.5-3 3.5-.5-3-5.5-4.2 6.3-1.1-1.9L18.9 6H16.5L14 2h-2z"/></svg>
-      <svg class="bg-icon bg-recycle" style="--x:2%;--y:60%;--s:5.5rem;--r:15deg;--d:8s;--op:0.07" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.5 6H7l2.3 3.9-1.1 1.9L4 5.5 1 11l3.5.5L3 14h6.3L12 19l2.7-5H21l-1.5-3 3.5-.5-3-5.5-4.2 6.3-1.1-1.9L18.9 6H16.5L14 2h-2z"/></svg>
-      <svg class="bg-icon bg-recycle" style="--x:88%;--y:45%;--s:3.8rem;--r:-35deg;--d:13s;--op:0.085" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.5 6H7l2.3 3.9-1.1 1.9L4 5.5 1 11l3.5.5L3 14h6.3L12 19l2.7-5H21l-1.5-3 3.5-.5-3-5.5-4.2 6.3-1.1-1.9L18.9 6H16.5L14 2h-2z"/></svg>
-      <svg class="bg-icon bg-recycle" style="--x:44%;--y:92%;--s:4.5rem;--r:25deg;--d:16s;--op:0.07" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.5 6H7l2.3 3.9-1.1 1.9L4 5.5 1 11l3.5.5L3 14h6.3L12 19l2.7-5H21l-1.5-3 3.5-.5-3-5.5-4.2 6.3-1.1-1.9L18.9 6H16.5L14 2h-2z"/></svg>
-
-      <!-- === DEVISES (17) === -->
-      <span class="bg-icon bg-currency" style="--x:91%;--y:60%;--s:5.5rem;--r:-5deg;--d:0.5s;--op:0.1">€</span>
-      <span class="bg-icon bg-currency" style="--x:2%;--y:63%;--s:4.5rem;--r:12deg;--d:5s;--op:0.09">$</span>
-      <span class="bg-icon bg-currency" style="--x:49%;--y:3%;--s:3.5rem;--r:-8deg;--d:8s;--op:0.085">€</span>
-      <span class="bg-icon bg-currency" style="--x:27%;--y:52%;--s:5rem;--r:20deg;--d:3.5s;--op:0.08">$</span>
-      <span class="bg-icon bg-currency" style="--x:69%;--y:16%;--s:4rem;--r:-18deg;--d:10s;--op:0.09">€</span>
-      <span class="bg-icon bg-currency" style="--x:7%;--y:88%;--s:5rem;--r:5deg;--d:2.5s;--op:0.08">$</span>
-      <span class="bg-icon bg-currency" style="--x:54%;--y:42%;--s:3rem;--r:-25deg;--d:13s;--op:0.075">€</span>
-      <span class="bg-icon bg-currency" style="--x:81%;--y:90%;--s:4.5rem;--r:15deg;--d:7.5s;--op:0.085">$</span>
-      <span class="bg-icon bg-currency" style="--x:38%;--y:5%;--s:3.5rem;--r:-12deg;--d:6s;--op:0.08">$</span>
-      <span class="bg-icon bg-currency" style="--x:15%;--y:18%;--s:4rem;--r:22deg;--d:9s;--op:0.09">€</span>
-      <span class="bg-icon bg-currency" style="--x:72%;--y:72%;--s:3.8rem;--r:-8deg;--d:14s;--op:0.08">$</span>
-      <span class="bg-icon bg-currency" style="--x:30%;--y:95%;--s:4.5rem;--r:18deg;--d:1s;--op:0.075">€</span>
-      <span class="bg-icon bg-currency" style="--x:94%;--y:25%;--s:3.5rem;--r:-15deg;--d:11s;--op:0.085">$</span>
-      <span class="bg-icon bg-currency" style="--x:55%;--y:58%;--s:5rem;--r:30deg;--d:17s;--op:0.07">€</span>
-      <span class="bg-icon bg-currency" style="--x:20%;--y:65%;--s:3rem;--r:-20deg;--d:4s;--op:0.08">$</span>
-      <span class="bg-icon bg-currency" style="--x:83%;--y:12%;--s:4.8rem;--r:10deg;--d:18s;--op:0.075">€</span>
-      <span class="bg-icon bg-currency" style="--x:10%;--y:45%;--s:3.5rem;--r:-30deg;--d:20s;--op:0.085">$</span>
-    </div>
-
-    <!-- Sidebar Gauche (Navigation) -->
-    <aside class="sidebar-left">
-      <div class="brand flex gap-2">
-        <div class="logo-box flex-center">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M19 10L17.5 6.5C17.2 5.8 16.5 5.3 15.7 5.3H8.3C7.5 5.3 6.8 5.8 6.5 6.5L5 10H3C2.4 10 2 10.4 2 11V15C2 15.6 2.4 16 3 16H4.1C4.5 17.7 6.1 19 8 19C9.9 19 11.5 17.7 11.9 16H12.1C12.5 17.7 14.1 19 16 19C17.9 19 19.5 17.7 19.9 16H21C21.6 16 22 15.6 22 15V11C22 10.4 21.6 10 21 10H19Z" fill="url(#logo-grad-car)" />
-            <path d="M12.5 5C14.5 5 18 6.5 19 8.5" stroke="#10b981" stroke-width="1.5" stroke-linecap="round" />
-            <!-- Leaf tail representing transition to green -->
-            <path d="M21 10C21.5 9 22.5 6.5 20.5 4.5C18.5 2.5 16 3.5 15 4C16.5 5 16.5 7.5 16.5 8.5C16.5 9.5 17 10 17 10H21Z" fill="#10b981" />
-            <!-- Wheels -->
-            <circle cx="8" cy="16" r="2.5" fill="#0f172a" stroke="#10b981" stroke-width="1.5" />
-            <circle cx="16" cy="16" r="2.5" fill="#0f172a" stroke="#10b981" stroke-width="1.5" />
-            <defs>
-              <linearGradient id="logo-grad-car" x1="2" y1="5.3" x2="22" y2="19" gradientUnits="userSpaceOnUse">
-                <stop stop-color="#22d3ee" />
-                <stop offset="1" stop-color="#10b981" />
-              </linearGradient>
-            </defs>
-          </svg>
+  <div class="app-layout">
+    
+    <!-- Sidebar de Navigation Gauche (Apple Style Minimal) -->
+    <aside class="app-sidebar">
+      
+      <!-- Brand Header -->
+      <div class="sidebar-header">
+        <div class="brand-badge flex-center">
+          <Zap size="18" class="text-teal" />
         </div>
-        <div>
-          <h1 class="brand-title text-gradient">EcoSwitch</h1>
-          <p class="brand-subtitle hide-on-mobile">Simulateur & Calculateur de Rentabilité</p>
+        <div class="brand-text">
+          <span class="brand-name">EcoSwitch</span>
+          <span class="brand-tagline">Optimisation Automobile</span>
         </div>
       </div>
 
-      <!-- Navigation Onglets -->
-      <nav class="sidebar-nav flex flex-column gap-2 mt-5">
-        <button class="nav-btn justify-start" :class="activeTab === 'direct' ? 'active' : ''" @click="setTab('direct')">
-          <HelpCircle size="16" /> Simulateur direct
+      <!-- Navigation Links -->
+      <nav class="sidebar-nav">
+        <button
+          class="nav-link"
+          :class="{ active: activeTab === 'direct-sim' }"
+          @click="activeTab = 'direct-sim'"
+        >
+          <Zap size="17" />
+          <span>Simulateur Express</span>
         </button>
-        <button class="nav-btn" :class="activeTab === 'compare' ? 'active' : ''" @click="setTab('compare')">
-          <BarChart3 size="16" /> Comparateur
+
+        <button
+          class="nav-link"
+          :class="{ active: activeTab === 'comparator' }"
+          @click="activeTab = 'comparator'"
+        >
+          <BarChart3 size="17" />
+          <span>Comparateur Flotte</span>
         </button>
-        <button class="nav-btn" :class="activeTab === 'catalog' ? 'active' : ''" @click="setTab('catalog')">
-          <Car size="16" /> Catalogue H2
+
+        <button
+          class="nav-link"
+          :class="{ active: activeTab === 'vehicles' }"
+          @click="activeTab = 'vehicles'"
+        >
+          <Car size="17" />
+          <span>Catalogue Véhicules</span>
         </button>
-        <button v-if="currentUser" class="nav-btn" :class="activeTab === 'saved' ? 'active' : ''" @click="setTab('saved')">
-          <Sparkles size="16" class="text-cyan" /> Mes Simulations
+
+        <button
+          v-if="currentUser"
+          class="nav-link"
+          :class="{ active: activeTab === 'saved-sims' }"
+          @click="activeTab = 'saved-sims'"
+        >
+          <Bookmark size="17" />
+          <span>Mes Simulations</span>
         </button>
-        <button v-if="currentUser" class="nav-btn text-teal" @click="showProfileModal = true">
-          <Settings size="16" /> Profil Véhicule
+
+        <button
+          v-if="currentUser"
+          class="nav-link"
+          @click="profileModalOpen = true"
+        >
+          <Settings size="17" />
+          <span>Mon Garage & Profil</span>
         </button>
       </nav>
 
-      <!-- Lien vers Admin H2/Monitoring + Espace User -->
-      <div class="sidebar-bottom mt-auto flex flex-column gap-3">
-        <a href="http://localhost:8080/admin/index.html" target="_blank" class="admin-link flex-center gap-1 text-xs hide-on-mobile">
-          <ShieldCheck size="16" class="text-cyan" />
-          <span class="admin-text">Console H2</span>
-          <ExternalLink size="12" />
-        </a>
-
-        <div class="flex-between w-100 theme-toggle-container theme-toggle-mobile">
-          <!-- Bouton bascule de thème -->
-          <button class="icon-btn-nav flex-center theme-toggle-btn" @click="toggleTheme" :title="currentTheme === 'light' ? 'Activer le mode sombre' : 'Activer le mode clair'" :aria-label="currentTheme === 'light' ? 'Activer le mode sombre' : 'Activer le mode clair'">
-            <Sun v-if="currentTheme === 'light'" size="16" class="text-amber" />
-            <Moon v-else size="16" class="text-cyan" />
-          </button>
-        </div>
-
-        <!-- Authentification Section -->
-        <div class="user-auth-section border-t border-glass pt-3 w-100">
-          <div v-if="currentUser" class="user-session flex-between w-100 gap-2">
-            <div class="flex gap-2 items-center">
-              <div class="user-avatar flex-center">{{ currentUser.name.charAt(0) }}</div>
-              <div class="user-info-navbar hide-on-mobile">
-                <div class="text-xs font-semibold truncate" style="max-width: 120px;">{{ currentUser.name }}</div>
-              </div>
-            </div>
-            <button class="icon-btn-nav hover-text-rose shrink-0" @click="logout" title="Se déconnecter" aria-label="Se déconnecter">
-              <LogOut size="14" />
-            </button>
+      <!-- Sidebar Footer (Theme, Admin, Auth) -->
+      <div class="sidebar-footer">
+        <!-- Energy Ticker Mini -->
+        <div class="energy-mini-card mb-3 p-2.5 rounded-xl border-glass bg-card-subtle">
+          <div class="flex-between items-center mb-1.5">
+            <span class="text-xxs uppercase font-bold text-dimmed flex items-center gap-1">
+              <Fuel size="11" class="text-teal" /> Énergies (FR)
+            </span>
+            <span class="badge badge-teal badge-small">2026</span>
           </div>
-          <button v-else class="btn btn-secondary w-100 btn-small flex-center gap-1 glow-teal" @click="openAuth">
-            <User size="14" />
-            <span class="auth-text">Espace Client</span>
+          <div class="flex-between text-xxs py-0.5">
+            <span class="text-muted">SP95-E10</span>
+            <span class="font-mono font-bold text-main">1,88 €/L</span>
+          </div>
+          <div class="flex-between text-xxs py-0.5">
+            <span class="text-muted">Gazole B7</span>
+            <span class="font-mono font-bold text-main">1,74 €/L</span>
+          </div>
+          <div class="flex-between text-xxs py-0.5">
+            <span class="text-muted">Électricité</span>
+            <span class="font-mono font-bold text-teal">0,25 €/kWh</span>
+          </div>
+        </div>
+
+        <!-- Theme Toggle & Admin -->
+        <div class="flex-between items-center mb-3">
+          <a
+            href="http://localhost:8080/admin"
+            target="_blank"
+            class="btn-admin-link flex items-center gap-1.5 text-xxs text-muted"
+          >
+            <ShieldCheck size="13" />
+            <span>Console Admin</span>
+            <ExternalLink size="10" />
+          </a>
+
+          <button
+            class="btn-theme-toggle flex-center"
+            @click="toggleTheme"
+            :title="theme === 'dark' ? 'Passer en thème clair' : 'Passer en thème sombre'"
+          >
+            <Sun v-if="theme === 'dark'" size="14" class="text-amber" />
+            <Moon v-else size="14" class="text-dimmed" />
           </button>
         </div>
+
+        <!-- User Capsule -->
+        <div v-if="currentUser" class="user-capsule p-2 rounded-xl border-glass flex-between">
+          <div class="flex items-center gap-2 truncate">
+            <div class="user-avatar flex-center">
+              {{ currentUser.email.charAt(0).toUpperCase() }}
+            </div>
+            <div class="truncate">
+              <div class="user-email truncate text-xs font-bold">{{ currentUser.email }}</div>
+              <div class="text-xxs text-teal font-semibold">Compte Vérifié</div>
+            </div>
+          </div>
+          <button class="btn-logout flex-center" @click="handleLogout" title="Se déconnecter">
+            <LogOut size="14" />
+          </button>
+        </div>
+
+        <button
+          v-else
+          class="btn btn-primary w-100 text-xs font-bold flex items-center justify-center gap-2"
+          @click="openLoginModal"
+        >
+          <User size="14" />
+          <span>Espace Client</span>
+        </button>
       </div>
     </aside>
 
-    <!-- Zone principale centrale -->
-    <main class="main-content-area py-5 px-4 w-100">
-      <div class="max-w-7xl mx-auto w-100 h-100 flex flex-column">
-        <div class="flex-1">
-          <Transition name="fade" mode="out-in">
-            <div :key="activeTab">
-              <DirectSimulator v-if="activeTab === 'direct'" :loadedSimulation="loadedSimulation" :currentUser="currentUser" :userProfile="activeUserProfile" />
-              <CatalogComparator v-else-if="activeTab === 'compare'" :currentUser="currentUser" :userProfiles="userProfiles" :activeUserProfile="activeUserProfile" />
-              <VehicleManager v-else-if="activeTab === 'catalog'" :currentUser="currentUser" :userProfile="activeUserProfile" @open-simulator="setTab('direct')" />
-              <SavedSimulations v-else-if="activeTab === 'saved' && currentUser" :currentUser="currentUser" @load-simulation="handleLoadSimulation" />
-            </div>
-          </Transition>
-        </div>
-        <!-- Footer Premium -->
-        <footer class="footer-glass py-4 px-4 text-center text-xs text-dimmed mt-4 rounded-xl" style="border-radius: 12px;">
-          <p>&copy; 2026 EcoSwitch. Tous droits réservés.</p>
-        </footer>
+    <!-- Canvas Principal Central (Largeur Maîtrisée, Aérée et Responsive) -->
+    <main class="app-main">
+      <div class="main-container">
+        
+        <!-- Simulateur Direct & Express -->
+        <DirectSimulator
+          v-if="activeTab === 'direct-sim'"
+          :currentUser="currentUser"
+          :userProfile="activeUserProfile"
+          :loadedSimulation="simulationToLoad"
+          @open-garage="profileModalOpen = true"
+          @open-auth="openLoginModal"
+        />
+
+        <!-- Comparateur de Catalogue -->
+        <CatalogComparator
+          v-else-if="activeTab === 'comparator'"
+          :currentUser="currentUser"
+          :userProfiles="userProfiles"
+          :activeUserProfile="activeUserProfile"
+        />
+
+        <!-- Catalogue Véhicules -->
+        <VehicleManager
+          v-else-if="activeTab === 'vehicles'"
+          :currentUser="currentUser"
+          :userProfile="activeUserProfile"
+          @open-simulator="activeTab = 'direct-sim'"
+        />
+
+        <!-- Simulations Sauvegardées -->
+        <SavedSimulations
+          v-else-if="activeTab === 'saved-sims' && currentUser"
+          :currentUser="currentUser"
+          @load-simulation="handleLoadSimulation"
+        />
+
       </div>
     </main>
 
-    <!-- Sidebar Droite (Context & Value Add) -->
-    <aside class="sidebar-right hide-on-mobile">
-      <div class="card-glass glow-teal mb-4 p-4">
-        <h3 class="text-sm font-bold flex items-center gap-2 mb-3 text-gradient-teal">
-          <Sparkles size="16" /> Astuces EcoSwitch
-        </h3>
-        <ul class="text-xs text-muted list-none flex flex-column gap-3 m-0 p-0">
-          <li class="flex gap-2">
-            <Check size="14" class="text-teal mt-1 shrink-0" />
-            <span style="line-height: 1.4;">Roulez souple : une conduite apaisée économise jusqu'à 20% d'énergie.</span>
-          </li>
-          <li class="flex gap-2">
-            <Check size="14" class="text-teal mt-1 shrink-0" />
-            <span style="line-height: 1.4;">La pression des pneus influe directement sur l'autonomie électrique.</span>
-          </li>
-          <li class="flex gap-2">
-            <Check size="14" class="text-teal mt-1 shrink-0" />
-            <span style="line-height: 1.4;">Utilisez le freinage régénératif au maximum.</span>
-          </li>
-        </ul>
-      </div>
+    <!-- Modal Mon Garage / Profils -->
+    <UserProfileModal
+      :show="profileModalOpen"
+      :profiles="userProfiles"
+      @close="profileModalOpen = false"
+      @profiles-updated="loadUserProfiles"
+    />
 
-      <div v-if="currentUser" class="card-glass p-4 mt-auto">
-        <h3 class="text-xs text-dimmed mb-2 uppercase font-bold">Votre Impact</h3>
-        <div class="flex items-end gap-2 mb-1">
-          <span class="text-2xl font-bold text-teal" style="line-height: 1;">12%</span>
-          <span class="text-xs text-muted mb-1">d'économie</span>
-        </div>
-        <p class="text-xxs text-dimmed mt-1">Basé sur vos récentes simulations</p>
-      </div>
-    </aside>
-  </div>
-
-  <!-- Barre de Navigation Basse sur Mobile (Style Snapchat/Instagram) -->
-  <nav class="mobile-bottom-nav">
-    <button class="mobile-nav-btn" :class="activeTab === 'direct' ? 'active' : ''" @click="setTab('direct')" title="Simulateur direct" aria-label="Simulateur direct">
-      <HelpCircle size="22" />
-    </button>
-    <button class="mobile-nav-btn" :class="activeTab === 'compare' ? 'active' : ''" @click="setTab('compare')" title="Comparateur" aria-label="Comparateur">
-      <BarChart3 size="22" />
-    </button>
-    <button class="mobile-nav-btn" :class="activeTab === 'catalog' ? 'active' : ''" @click="setTab('catalog')" title="Catalogue H2" aria-label="Catalogue H2">
-      <Car size="22" />
-    </button>
-    <template v-if="currentUser">
-      <button class="mobile-nav-btn" @click="showProfileModal = true" title="Profil Véhicule" aria-label="Profil Véhicule">
-        <Settings size="22" />
-      </button>
-      <button class="mobile-nav-btn" :class="activeTab === 'saved' ? 'active' : ''" @click="setTab('saved')" title="Mes Simulations" aria-label="Mes Simulations">
-        <Sparkles size="22" />
-      </button>
-    </template>
-  </nav>
-
-  <div>
-    <!-- Modale d'Authentification (SaaS Sign In/Up) -->
-    <div v-if="showAuthModal" class="auth-modal-overlay flex-center">
-      <div class="card-glass glow-teal auth-modal-card p-4 relative max-w-md w-100">
-        <button class="absolute top-4 right-4 text-dimmed hover-text-main" @click="closeAuth" aria-label="Fermer la fenêtre">
-          <X size="20" />
+    <!-- Modal Authentification Apple Style -->
+    <div v-if="authModalOpen" class="auth-modal-overlay flex-center">
+      <div class="card-glass auth-modal-card p-5 relative max-w-sm w-100 animation-fadeIn">
+        <button class="icon-btn-close absolute top-4 right-4" @click="authModalOpen = false">
+          ✕
         </button>
 
-        <h3 class="text-gradient mb-3">{{ isRegister ? 'Créer un compte client' : 'Espace Client Connexion' }}</h3>
-        <p class="text-xs text-muted mb-4">
-          {{ isRegister ? 'Inscrivez-vous pour débloquer la sauvegarde et l\'export CSV.' : 'Entrez vos identifiants pour accéder à vos simulations sauvegardées.' }}
-        </p>
-
-        <div class="auth-form mt-2">
-          <div v-if="isRegister" class="form-group mb-3">
-            <label class="form-label">Nom complet</label>
-            <input v-model="authName" type="text" class="form-control" placeholder="Williams Modeste" required />
+        <div class="text-center mb-4">
+          <div class="auth-icon-badge mx-auto mb-2 flex-center">
+            <User size="20" class="text-teal" />
           </div>
+          <h3 class="text-main font-heading text-lg font-bold m-0">
+            {{ authMode === 'login' ? 'Connexion Espace Client' : 'Création de Compte' }}
+          </h3>
+          <p class="text-xs text-muted mt-1 m-0">
+            {{ authMode === 'login' ? 'Accédez à votre garage et simulations enregistrées' : 'Enregistrez vos véhicules et comparez en 1 clic' }}
+          </p>
+        </div>
+
+        <div v-if="authError" class="p-2.5 rounded-xl border-glass bg-card text-rose text-xs mb-3 text-center">
+          {{ authError }}
+        </div>
+
+        <!-- Google SSO Action (Bouton Officiel Google Identity Services) -->
+        <div class="google-auth-section mb-2">
+          <div id="google-signin-btn" class="flex-center w-100" style="min-height: 44px;"></div>
+        </div>
+
+        <div class="auth-divider flex-center my-3">
+          <span class="divider-line"></span>
+          <span class="divider-text text-xxs text-dimmed uppercase px-2">ou avec adresse email</span>
+          <span class="divider-line"></span>
+        </div>
+
+        <form @submit.prevent="authMode === 'login' ? handleLogin() : handleRegister()">
           <div class="form-group mb-3">
-            <label class="form-label">Adresse Email</label>
-            <div class="input-with-icon">
-              <input v-model="authEmail" type="email" class="form-control" placeholder="williams@saas.com" required />
-            </div>
+            <label class="form-label text-xxs">Adresse Email</label>
+            <input v-model="authEmail" type="email" class="form-control text-xs" placeholder="nom@exemple.com" required />
           </div>
+
           <div class="form-group mb-4">
-            <label class="form-label">Mot de passe</label>
-            <div class="input-with-icon">
-              <input v-model="authPassword" type="password" class="form-control" placeholder="••••••••" required />
-            </div>
+            <label class="form-label text-xxs">Mot de passe</label>
+            <input v-model="authPassword" type="password" class="form-control text-xs" placeholder="••••••••" required />
           </div>
 
-          <!-- Message d'erreur -->
-          <div v-if="authError" class="auth-error-msg mb-2">{{ authError }}</div>
-
-          <button class="btn btn-primary w-100 mb-2" @click="handleAuth" :disabled="authLoading">
-            <span>{{ authLoading ? 'Connexion...' : (isRegister ? 'Créer mon compte' : 'Se connecter') }}</span>
-            <Lock size="16" />
+          <button type="submit" class="btn btn-primary w-100 py-2.5 text-xs font-bold mb-3" :disabled="authLoading">
+            <span v-if="authLoading" class="spinner mr-2"></span>
+            <span>{{ authMode === 'login' ? 'Se connecter' : 'Créer mon compte' }}</span>
           </button>
+        </form>
 
-
-          <!-- Séparateur "OU" -->
-          <div class="flex-center gap-3 my-3 text-xxs text-dimmed uppercase">
-            <span class="border-b border-glass flex-1" style="height: 1px;"></span>
-            <span>ou</span>
-            <span class="border-b border-glass flex-1" style="height: 1px;"></span>
-          </div>
-
-          <!-- Véritable Bouton Google SSO (Identity Services) -->
-          <div id="google-signin-btn" class="flex-center w-100 mb-3" style="min-height: 40px;"></div>
-
-          <div class="text-center text-xs text-dimmed">
-            <span v-if="isRegister">Déjà client ? </span>
-            <span v-else>Pas encore de compte ? </span>
-            <button class="btn-link text-cyan pointer-events-auto" @click="isRegister = !isRegister">
-              {{ isRegister ? 'Se connecter' : 'Créer un compte' }}
-            </button>
-          </div>
+        <div class="text-center pt-3 border-t border-glass text-xs">
+          <button
+            type="button"
+            class="btn-text-toggle text-dimmed hover:text-main cursor-pointer"
+            @click="authMode = authMode === 'login' ? 'register' : 'login'; authError = ''"
+          >
+            {{ authMode === 'login' ? "Pas encore de compte ? S'inscrire" : 'Déjà un compte ? Se connecter' }}
+          </button>
         </div>
       </div>
     </div>
 
-    <!-- Modale Profil Utilisateur (Garage) -->
-    <UserProfileModal
-      :show="showProfileModal"
-      :profiles="userProfiles"
-      @close="showProfileModal = false"
-      @profiles-updated="handleProfileSaved"
-    />
-
-    <!-- Google Identity Services script manages the real OAuth popup window, no more mock modals -->
   </div>
 </template>
 
-<style>
-/* =============================================
-   BACKGROUND DECORATIVE LAYER
-   ============================================= */
-.bg-decor {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  overflow: hidden;
+<style scoped>
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+  background-color: var(--bg-app);
 }
 
-.bg-icon {
-  position: absolute;
-  left: var(--x);
-  top: var(--y);
-  font-size: var(--s);
-  width: var(--s);
-  height: var(--s);
-  transform: rotate(var(--r));
-  opacity: var(--op);
-  animation: bg-float 20s ease-in-out infinite;
-  animation-delay: var(--d);
-  user-select: none;
-  line-height: 1;
+/* Sidebar */
+.app-sidebar {
+  width: 250px;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-glass);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 20px 16px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  flex-shrink: 0;
+  z-index: 100;
 }
 
-/* Voitures : couleur teal (accent principal) */
-.bg-car {
-  color: hsl(var(--accent-teal));
-}
-
-/* Recyclage : couleur cyan */
-.bg-recycle {
-  color: hsl(var(--accent-cyan));
-}
-
-/* Devises : dégradé entre teal et cyan via couleur ambre pour contraste */
-.bg-currency {
-  color: hsl(var(--accent-teal));
-  font-family: var(--font-heading);
-  font-weight: 800;
+.sidebar-header {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 12px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
-/* Alternance couleur sur les $ (pairs) */
-.bg-currency:nth-child(odd) {
-  color: hsl(var(--accent-cyan));
-}
-
-@keyframes bg-float {
-  0%   { transform: rotate(var(--r)) translateY(0px);   opacity: var(--op); }
-  30%  { opacity: calc(var(--op) * 1.5); }
-  50%  { transform: rotate(var(--r)) translateY(-18px);  opacity: var(--op); }
-  70%  { opacity: calc(var(--op) * 0.6); }
-  100% { transform: rotate(var(--r)) translateY(0px);   opacity: var(--op); }
-}
-
-/* S'assure que le contenu applicatif est au-dessus du décor */
-.app-shell > aside,
-.app-shell > main,
-.app-shell > nav {
-  position: relative;
-  z-index: 1;
-}
-
-.app-shell {
-  display: grid;
-  grid-template-columns: 240px 1fr 280px;
-  height: 100vh;
-  width: 100%;
-  overflow: hidden;
-}
-@media (min-width: 1920px) {
-  .app-shell {
-    grid-template-columns: 260px 1fr 320px;
-  }
-}
-@media (min-width: 2560px) {
-  .app-shell {
-    grid-template-columns: 280px 1fr 360px;
-  }
-}
-
-.sidebar-left {
-  background: rgba(var(--bg-nav));
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-right: 1px solid hsl(var(--border-glass));
-  display: flex;
-  flex-direction: column;
-  padding: 1.5rem 1rem;
-  overflow-y: auto;
-  z-index: 10;
-}
-
-.sidebar-left .nav-btn {
-  justify-content: flex-start;
-  width: 100%;
-}
-
-.sidebar-right {
-  background: rgba(var(--bg-footer));
-  border-left: 1px solid hsl(var(--border-glass));
-  display: flex;
-  flex-direction: column;
-  padding: 1.5rem 1rem;
-  overflow-y: auto;
-  z-index: 10;
-}
-
-.main-content-area {
-  overflow-y: auto;
-  height: 100vh;
-}
-
-/* App Root variables and resets */
-.min-h-screen { min-height: 100vh; }
-.flex { display: flex; }
-.flex-column { flex-direction: column; }
-.flex-1 { flex: 1; }
-.flex-center { display: flex; align-items: center; justify-content: center; }
-.flex-between { display: flex; align-items: center; justify-content: space-between; }
-.gap-2 { gap: 8px; }
-.gap-3 { gap: 12px; }
-.list-none { list-style: none; }
-.items-center { align-items: center; }
-.max-w-7xl { 
-  max-width: 80rem; 
-  width: 100%;
-}
-@media (min-width: 1920px) {
-  .max-w-7xl {
-    max-width: 110rem;
-  }
-}
-@media (min-width: 2560px) {
-  .max-w-7xl {
-    max-width: 140rem;
-  }
-}
-.mx-auto { margin-left: auto; margin-right: auto; }
-.w-100 { width: 100%; }
-.mt-auto { margin-top: auto; }
-.mt-4 { margin-top: 1rem; }
-.my-3 { margin-top: 0.75rem; margin-bottom: 0.75rem; }
-.px-4 { padding-left: 1rem; padding-right: 1rem; }
-.py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
-.py-4 { padding-top: 1rem; padding-bottom: 1rem; }
-.py-5 { padding-top: 2.5rem; padding-bottom: 2.5rem; }
-.pl-3 { padding-left: 0.75rem; }
-.relative { position: relative; }
-.overflow-hidden { overflow: hidden; }
-
-/* Sticky Navbar & Footer */
-.navbar-glass {
-  background: rgba(var(--bg-nav));
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid hsl(var(--border-glass));
-}
-.footer-glass {
-  background: rgba(var(--bg-footer));
-  border-top: 1px solid hsl(var(--border-glass));
-}
-.logo-box {
-  width: 38px;
-  height: 38px;
+.brand-badge {
+  width: 36px;
+  height: 36px;
   border-radius: 10px;
-  background: rgba(20, 184, 166, 0.1);
-  border: 1px solid rgba(20, 184, 166, 0.3);
-}
-.brand-title {
-  font-size: 1.15rem;
-  font-weight: 700;
-  line-height: 1.2;
-}
-.brand-subtitle {
-  font-size: 0.65rem;
-  color: hsl(var(--text-muted));
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  background: var(--accent-teal-soft);
+  border: 1px solid rgba(16, 124, 65, 0.15);
 }
 
-/* Navbar Buttons */
-.nav-btn {
-  background: transparent;
-  border: none;
-  outline: none;
-  font-family: var(--font-heading);
-  font-size: 0.88rem;
-  font-weight: 500;
-  color: hsl(var(--text-muted));
-  padding: 10px 14px;
-  border-radius: 8px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  transition: all 0.2s ease;
-}
-.nav-btn:hover {
-  color: hsl(var(--text-main));
-  background: rgba(var(--bg-hover));
-}
-.nav-btn.active {
-  color: hsl(var(--accent-teal));
-  background: rgba(20, 184, 166, 0.08);
-  border: 1px solid rgba(20, 184, 166, 0.2);
-}
-.admin-link {
-  color: hsl(var(--text-muted));
-  text-decoration: none;
-  font-weight: 500;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: rgba(8, 145, 178, 0.06);
-  border: 1px solid rgba(8, 145, 178, 0.2);
-  transition: all 0.2s ease;
-}
-.admin-link:hover {
-  color: hsl(var(--text-main));
-  background: rgba(8, 145, 178, 0.12);
-  border-color: hsl(var(--accent-cyan) / 0.4);
-}
-
-/* User avatar and profile section */
-.user-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, hsl(var(--accent-teal)) 0%, hsl(var(--accent-cyan)) 100%);
-  color: hsl(var(--bg-deep));
-  font-family: var(--font-heading);
-  font-weight: bold;
-  font-size: 0.9rem;
-}
-.user-info-navbar {
-  display: flex;
-  flex-direction: column;
+.brand-name {
+  display: block;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-main);
   line-height: 1.1;
 }
-.icon-btn-nav {
+
+.brand-tagline {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dimmed);
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 16px;
+  flex: 1;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: var(--radius-md);
   background: transparent;
   border: none;
-  color: hsl(var(--text-muted));
+  font-family: var(--font-sans);
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+  width: 100%;
+}
+
+.nav-link:hover {
+  background: var(--bg-card-subtle);
+  color: var(--text-main);
+}
+
+.nav-link.active {
+  background: var(--accent-teal-soft);
+  color: var(--accent-teal);
+  font-weight: 700;
+}
+
+.btn-admin-link {
+  text-decoration: none;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+.btn-admin-link:hover {
+  background: var(--bg-card-subtle);
+  color: var(--text-main);
+}
+
+.btn-theme-toggle {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-glass);
+  cursor: pointer;
+}
+
+.user-capsule {
+  background: var(--bg-card-subtle);
+}
+
+.user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent-teal);
+  color: #FFFFFF;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.btn-logout {
+  background: transparent;
+  border: none;
+  color: var(--text-dimmed);
   cursor: pointer;
   padding: 4px;
-  transition: color 0.2s ease;
+  border-radius: 6px;
 }
-.theme-toggle-btn {
-  border-radius: 8px;
-  padding: 8px;
-  background: rgba(var(--bg-hover));
-  border: 1px solid hsl(var(--border-glass));
-  color: hsl(var(--text-muted));
-  transition: all 0.2s ease;
+.btn-logout:hover {
+  color: var(--accent-rose);
 }
-.theme-toggle-btn:hover {
-  color: hsl(var(--text-main));
-  background: hsl(var(--border-glass) / 0.4);
-  border-color: hsl(var(--text-muted) / 0.3);
-}
-.hover-text-rose:hover {
-  color: hsl(var(--accent-rose));
-}
-.border-l { border-left: 1px solid; }
 
-/* Pricing SaaS Grid */
-.pricing-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
-  max-width: 60rem;
+/* Canvas Principal */
+.app-main {
+  flex: 1;
+  min-width: 0;
+  padding: 32px 40px;
+  overflow-y: auto;
+}
+
+.main-container {
+  max-width: 1080px;
   margin: 0 auto;
 }
-@media (max-width: 900px) {
-  .pricing-grid {
-    grid-template-columns: 1fr;
-    max-width: 25rem;
-  }
-}
-.border-teal-active {
-  border-color: hsl(var(--accent-teal) / 0.5) !important;
-}
-.popular-tag {
-  background: hsl(var(--accent-teal));
-  color: hsl(var(--bg-deep));
-}
-.text-teal-muted {
-  color: hsl(var(--accent-teal) / 0.7);
-}
-.text-dimmed { color: hsl(var(--text-dimmed)); }
-.text-xs { font-size: 0.75rem; }
-.text-xxs { font-size: 0.65rem; }
-.text-3xl { font-size: 2rem; font-weight: 700; }
-.text-lg { font-size: 1.15rem; }
-.font-bold { font-weight: 700; }
-.uppercase { text-transform: uppercase; }
 
-/* Auth Modale Overlay */
 .auth-modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(var(--bg-overlay));
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   z-index: 1000;
-}
-.auth-modal-card {
-  z-index: 1001;
-  background: hsl(var(--bg-auth-card));
-}
-.hover-text-main:hover {
-  color: hsl(var(--text-main));
-}
-.btn-link {
-  background: transparent;
-  border: none;
-  font-weight: 500;
-  cursor: pointer;
-  text-decoration: underline;
-}
-.btn-link:hover {
-  color: hsl(var(--text-main));
-}
-.pointer-events-auto { pointer-events: auto; }
-.absolute { position: absolute; }
-.top-4 { top: 1rem; }
-.right-4 { right: 1rem; }
-.max-w-md { max-width: 28rem; }
-
-/* Slow spinner micro-animation */
-@keyframes spin-slow {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-.spinner-slow {
-  animation: spin-slow 8s linear infinite;
-}
-
-/* Page transitions */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.15s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-
-/* Message d'erreur dans la modale auth */
-.auth-error-msg {
-  background: rgba(225, 29, 72, 0.12);
-  border: 1px solid rgba(225, 29, 72, 0.35);
-  border-radius: 8px;
-  color: hsl(355, 80%, 72%);
-  font-size: 0.8rem;
-  padding: 8px 12px;
-  text-align: center;
-}
-
-/* Layout adjustments for smaller screens */
-@media (max-width: 1200px) {
-  .app-shell {
-    grid-template-columns: 240px 1fr; /* Hide right sidebar */
-  }
-  .sidebar-right {
-    display: none;
-  }
-}
-
-@media (max-width: 1024px) {
-  .app-shell {
-    display: flex;
-    flex-direction: column;
-    height: auto;
-    padding-bottom: 75px !important;
-    overflow: visible;
-  }
-  .sidebar-left {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.75rem 1rem;
-    border-right: none;
-    border-bottom: 1px solid hsl(var(--border-glass));
-    position: sticky;
-    top: 0;
-    width: 100%;
-    z-index: 50;
-  }
-  .sidebar-left .sidebar-nav {
-    display: none; /* Hidden on mobile, use bottom nav instead */
-  }
-  .sidebar-left .sidebar-bottom {
-    flex-direction: row;
-    margin-top: 0;
-    gap: 0.5rem;
-    align-items: center;
-  }
-  .sidebar-left .user-auth-section {
-    border-top: none;
-    padding-top: 0;
-    width: auto !important;
-  }
-  .sidebar-left .theme-toggle-mobile {
-    width: auto !important;
-  }
-  .sidebar-left .user-session {
-    width: auto !important;
-  }
-  .sidebar-left .admin-text, .sidebar-left .auth-text {
-    display: none;
-  }
-  .main-content-area {
-    height: auto;
-    overflow-y: visible;
-  }
-  
-  .hide-on-mobile {
-    display: none !important;
-  }
-  .hide-on-desktop {
-    display: flex !important;
-  }
-}
-
-.mobile-bottom-nav {
-  display: none;
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 65px;
-  background: hsl(var(--bg-deep) / 0.95);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-top: 1px solid hsl(var(--border-glass));
-  justify-content: space-around;
-  align-items: center;
-  z-index: 999;
-  padding-bottom: env(safe-area-inset-bottom);
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
-}
-
-@media (max-width: 1024px) {
-  .mobile-bottom-nav {
-    display: flex;
-  }
-}
-
-.mobile-nav-btn {
-  background: transparent;
-  border: none;
-  color: hsl(var(--text-muted));
-  padding: 12px 20px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 20px;
+}
+
+.auth-modal-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  position: relative;
+  box-sizing: border-box;
+}
+
+.icon-btn-close {
+  background: transparent;
+  border: none;
+  color: var(--text-dimmed);
   cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: all 0.15s ease;
+}
+.icon-btn-close:hover {
+  color: var(--text-main);
+  background: var(--bg-card-subtle);
 }
 
-.mobile-nav-btn:active {
-  transform: scale(0.9);
+.auth-icon-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--accent-teal-soft);
+  border: 1px solid rgba(16, 124, 65, 0.2);
 }
 
-.mobile-nav-btn.active {
-  color: hsl(var(--accent-teal));
-  background: rgba(20, 184, 166, 0.08);
+.btn-google-sso {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  transition: all 0.15s ease;
+  box-shadow: var(--shadow-sm);
+}
+.btn-google-sso:hover {
+  background: var(--bg-card-subtle);
+  border-color: var(--border-hover);
+  transform: translateY(-1px);
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  margin: 1rem 0;
+}
+.divider-line {
+  flex: 1;
+  height: 1px;
+  background: var(--border-glass);
+}
+.divider-text {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.btn-text-toggle {
+  background: transparent;
+  border: none;
+  font-family: var(--font-sans);
+}
+
+@media (max-width: 900px) {
+  .app-layout {
+    flex-direction: column;
+  }
+  .app-sidebar {
+    width: 100%;
+    height: auto;
+    position: relative;
+    border-right: none;
+    border-bottom: 1px solid var(--border-glass);
+  }
+  .app-main {
+    padding: 20px 16px;
+  }
 }
 </style>
-

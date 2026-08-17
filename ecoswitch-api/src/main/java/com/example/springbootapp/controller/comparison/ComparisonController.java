@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.springbootapp.model.entity.Vehicule;
 import com.example.springbootapp.business.comparison.ComparisonBusiness;
+import com.example.springbootapp.service.AiAdvisorService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -27,9 +28,21 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 public class ComparisonController {
 
 	private final ComparisonBusiness comparisonBusiness;
+	private final AiAdvisorService aiAdvisorService;
 
-	public ComparisonController(ComparisonBusiness comparisonBusiness) {
+	public ComparisonController(ComparisonBusiness comparisonBusiness, AiAdvisorService aiAdvisorService) {
 		this.comparisonBusiness = comparisonBusiness;
+		this.aiAdvisorService = aiAdvisorService;
+	}
+
+	@PostMapping("/ai-advisor")
+	@Operation(summary = "Générer une synthèse et un diagnostic IA personnalisé via Gemini")
+	@ApiResponses({
+			@ApiResponse(responseCode = "200", description = "Synthèse IA générée"),
+			@ApiResponse(responseCode = "400", description = "Données invalides")
+	})
+	public AiAdvisorService.AiAdvisorResponse getAiAdvisorSummary(@RequestBody AiAdvisorService.AiAdvisorRequest request) {
+		return aiAdvisorService.generateAdvice(request);
 	}
 
 	@PostMapping("/profitability")

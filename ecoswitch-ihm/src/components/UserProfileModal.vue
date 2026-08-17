@@ -1,6 +1,6 @@
 <script setup>
 import { ref, watch, computed, onMounted } from 'vue'
-import { X, Save, Car, Fuel, Zap, AlertCircle, Plus, Star, Search, Trash2 } from '@lucide/vue'
+import { X, Save, Car, Fuel, Zap, AlertCircle, Plus, Star, Search, Trash2, Sparkles } from '@lucide/vue'
 import { apiCreateUserVehicleProfile, apiUpdateUserVehicleProfile, apiDeleteUserVehicleProfile } from '../utils/api.js'
 
 const props = defineProps({
@@ -46,7 +46,6 @@ const form = ref({ ...defaultForm })
 // Synchroniser form quand activeProfileId change ou quand profiles change
 watch(() => [props.show, activeProfileId.value, props.profiles], () => {
   if (props.show) {
-    // RàZ du sélecteur ADEME lors du changement de tab
     selectedBrand.value = ''
     selectedModel.value = ''
     selectedVersion.value = null
@@ -54,7 +53,6 @@ watch(() => [props.show, activeProfileId.value, props.profiles], () => {
     versions.value = []
 
     if (activeProfileId.value === 'new') {
-      // Hériter des prix d'énergie du dernier profil si existant
       const inheritedPrices = props.profiles.length > 0 ? {
         petrolPrice: props.profiles[props.profiles.length - 1].petrolPrice,
         dieselPrice: props.profiles[props.profiles.length - 1].dieselPrice,
@@ -70,7 +68,6 @@ watch(() => [props.show, activeProfileId.value, props.profiles], () => {
   }
 }, { immediate: true })
 
-// Sélectionner par défaut s'il y a des profils
 watch(() => props.show, (newVal) => {
   if (newVal) {
     error.value = null
@@ -141,7 +138,7 @@ const onVersionChange = () => {
   form.value.maintenanceCost = v.maintenanceCost || 400
   if (v.resaleValue) form.value.resaleValue = v.resaleValue
   
-  successMsg.value = `Véhicule trouvé : ${form.value.name}`
+  successMsg.value = `Données ADEME chargées : ${form.value.name}`
   setTimeout(() => successMsg.value = null, 3000)
 }
 
@@ -153,7 +150,7 @@ const saveProfile = async () => {
   try {
     if (activeProfileId.value === 'new') {
       await apiCreateUserVehicleProfile(form.value)
-      successMsg.value = 'Véhicule ajouté avec succès !'
+      successMsg.value = 'Véhicule ajouté au garage !'
     } else {
       await apiUpdateUserVehicleProfile(activeProfileId.value, form.value)
       successMsg.value = 'Profil mis à jour !'
@@ -161,7 +158,7 @@ const saveProfile = async () => {
     emit('profiles-updated')
     setTimeout(() => {
       emit('close')
-    }, 1500)
+    }, 1200)
   } catch (err) {
     error.value = err.message
   } finally {
@@ -171,13 +168,13 @@ const saveProfile = async () => {
 
 const deleteProfile = async () => {
   if (activeProfileId.value === 'new') return
-  if (!confirm("Voulez-vous vraiment supprimer ce véhicule ?")) return
+  if (!confirm("Voulez-vous vraiment supprimer ce véhicule de votre garage ?")) return
 
   loading.value = true
   error.value = null
   try {
     await apiDeleteUserVehicleProfile(activeProfileId.value)
-    successMsg.value = 'Véhicule supprimé.'
+    successMsg.value = 'Véhicule retiré du garage.'
     emit('profiles-updated')
     setTimeout(() => {
       activeProfileId.value = 'new'
@@ -197,53 +194,58 @@ onMounted(() => {
 
 <template>
   <div v-if="show" class="auth-modal-overlay flex-center">
-    <div class="card-glass glow-teal auth-modal-card p-4 relative w-100" style="max-width: 650px;">
-      <button class="absolute top-4 right-4 text-dimmed hover-text-main" @click="emit('close')">
-        <X size="20" />
+    <div class="card-glass auth-modal-card p-4 relative w-100 max-w-2xl animation-fadeIn">
+      <button class="icon-btn-close absolute top-4 right-4" @click="emit('close')">
+        <X size="18" />
       </button>
 
-      <h3 class="text-gradient mb-3 flex items-center gap-2">
-        <Car size="20" /> Mon Garage
-      </h3>
+      <div class="flex items-center gap-2.5 mb-3">
+        <div class="garage-icon-badge flex-center">
+          <Car size="18" class="text-teal" />
+        </div>
+        <div>
+          <h3 class="text-main font-heading text-md font-bold m-0">Mon Garage Virtuel</h3>
+          <p class="text-muted text-xxs m-0">Gérez vos véhicules enregistrés pour pré-remplir les simulateurs</p>
+        </div>
+      </div>
       
-      <!-- Sélecteur de profils -->
-      <div class="profiles-tabs flex gap-2 mb-4 overflow-x-auto pb-2">
+      <!-- Sélecteur de profils d'onglets Apple -->
+      <div class="profiles-tabs flex gap-2 mb-4 overflow-x-auto pb-1">
         <button 
           v-for="p in profiles" :key="p.id"
-          class="btn btn-secondary btn-small flex items-center gap-1"
-          :class="{ 'active-tab': activeProfileId === p.id }"
+          class="btn-tab flex items-center gap-1.5 text-xs font-semibold"
+          :class="{ active: activeProfileId === p.id }"
           @click="activeProfileId = p.id; error = null; successMsg = null"
         >
           <Star v-if="p.default" size="12" class="text-amber fill-amber" />
-          {{ p.name }}
+          <span>{{ p.name }}</span>
         </button>
         <button 
-          class="btn btn-secondary btn-small flex items-center gap-1 border-teal text-teal"
-          :class="{ 'active-tab': activeProfileId === 'new' }"
+          class="btn-tab btn-tab-new flex items-center gap-1 text-xs font-semibold text-teal"
+          :class="{ active: activeProfileId === 'new' }"
           @click="activeProfileId = 'new'; error = null; successMsg = null"
         >
-          <Plus size="14" /> Nouveau véhicule
+          <Plus size="14" /> <span>Nouveau véhicule</span>
         </button>
       </div>
 
-      <div v-if="error" class="alert-banner bg-warning-glass border-rose text-rose p-3 rounded mb-4 flex-between">
-        <div class="flex-center">
-          <AlertCircle size="18" class="mr-2" /> {{ error }}
-        </div>
+      <div v-if="error" class="p-2.5 rounded-xl border-glass bg-card text-rose text-xs mb-3 flex items-center gap-2">
+        <AlertCircle size="16" class="shrink-0" />
+        <span>{{ error }}</span>
       </div>
       
-      <div v-if="successMsg" class="alert-banner bg-success-glass border-teal text-teal p-3 rounded mb-4 flex-between">
-        <div class="flex-center">
-          <Zap size="18" class="mr-2" /> {{ successMsg }}
-        </div>
+      <div v-if="successMsg" class="p-2.5 rounded-xl border-glass bg-card text-teal text-xs mb-3 flex items-center gap-2">
+        <Zap size="16" class="shrink-0" />
+        <span>{{ successMsg }}</span>
       </div>
 
-      <!-- Sélection ADEME (uniquement si nouveau) -->
-      <div v-if="activeProfileId === 'new'" class="p-3 mb-4 rounded border-glass bg-deep-glass">
-        <label class="form-label text-cyan text-sm flex items-center gap-1 mb-2 font-semibold">
-          ⚡ Remplissage rapide par Marque / Modèle / Version
+      <!-- Remplissage ADEME si nouveau véhicule -->
+      <div v-if="activeProfileId === 'new'" class="p-3 mb-3.5 rounded-xl border-glass bg-card-subtle">
+        <label class="form-label text-xxs uppercase mb-2 font-bold text-teal flex items-center gap-1">
+          <Sparkles size="13" />
+          <span>Pré-remplissage ADEME automatique</span>
         </label>
-        <div class="grid-3-fields">
+        <div class="grid-3-fields gap-2">
           <div class="form-group mb-0">
             <select v-model="selectedBrand" class="form-control form-select text-xs" @change="fetchModels">
               <option value="">Marque</option>
@@ -268,81 +270,93 @@ onMounted(() => {
       <div class="profile-grid">
         <!-- Colonne 1 : Caractéristiques du véhicule -->
         <div>
-          <h4 class="text-sm text-cyan mb-3 border-b border-glass pb-1 flex-between">
-            <span>Caractéristiques</span>
-            <label class="flex items-center gap-1 text-amber cursor-pointer text-xs">
+          <div class="flex-between items-center mb-2 pb-1 border-b border-glass">
+            <h4 class="text-xs font-bold text-main uppercase m-0">Caractéristiques</h4>
+            <label class="flex items-center gap-1 text-amber cursor-pointer text-xxs font-bold">
               <input type="checkbox" v-model="form.default" />
-              <Star size="14" :class="form.default ? 'fill-amber' : ''" /> Favori
+              <Star size="12" :class="form.default ? 'fill-amber' : ''" /> Véhicule favori
             </label>
-          </h4>
-          <div class="form-group mb-3">
-            <label class="form-label">Nom du modèle</label>
-            <input v-model="form.name" type="text" class="form-control" placeholder="ex: Renault Clio" required />
           </div>
-          <div class="form-group mb-3">
-            <label class="form-label">Type d'énergie</label>
-            <select v-model="form.fuelType" class="form-control form-select">
+          
+          <div class="form-group mb-2.5">
+            <label class="form-label text-xxs">Nom du modèle</label>
+            <input v-model="form.name" type="text" class="form-control text-xs" placeholder="ex: Renault Clio V" required />
+          </div>
+          <div class="form-group mb-2.5">
+            <label class="form-label text-xxs">Énergie</label>
+            <select v-model="form.fuelType" class="form-control form-select text-xs">
               <option value="PETROL">Essence</option>
               <option value="DIESEL">Diesel</option>
               <option value="HYBRID">Hybride</option>
               <option value="ELECTRIC">Électrique</option>
             </select>
           </div>
-          <div class="form-group mb-3">
-            <label class="form-label">Conso moyenne (L ou kWh/100km)</label>
-            <input v-model.number="form.consumption" type="number" step="0.1" class="form-control" required />
+          <div class="grid-2-fields mb-2.5">
+            <div class="form-group mb-0">
+              <label class="form-label text-xxs">Conso (L/100km)</label>
+              <input v-model.number="form.consumption" type="number" step="0.1" class="form-control text-xs" required />
+            </div>
+            <div class="form-group mb-0">
+              <label class="form-label text-xxs">Km annuel (km/an)</label>
+              <input v-model.number="form.annualMileage" type="number" class="form-control text-xs" required />
+            </div>
           </div>
-          <div class="form-group mb-3">
-            <label class="form-label">Kilométrage annuel (km/an)</label>
-            <input v-model.number="form.annualMileage" type="number" class="form-control" required />
-          </div>
-          <div class="form-group mb-3">
-            <label class="form-label">Valeur de revente estimée (€)</label>
-            <input v-model.number="form.resaleValue" type="number" class="form-control" required />
+          <div class="form-group mb-0">
+            <label class="form-label text-xxs">Valeur de revente estimée (€)</label>
+            <input v-model.number="form.resaleValue" type="number" class="form-control text-xs" required />
           </div>
         </div>
 
-        <!-- Colonne 2 : Tarifs Énergies & Entretien -->
+        <!-- Colonne 2 : Budget Annuel & Prix locaux -->
         <div>
-          <h4 class="text-sm text-cyan mb-3 border-b border-glass pb-1 flex items-center gap-2">
-            <Fuel size="16" /> Budget Annuel & Énergies
-          </h4>
-          <div class="form-group mb-3">
-            <label class="form-label">Assurance annuelle (€/an)</label>
-            <input v-model.number="form.insuranceCost" type="number" class="form-control" required />
+          <div class="mb-2 pb-1 border-b border-glass">
+            <h4 class="text-xs font-bold text-main uppercase m-0 flex items-center gap-1.5">
+              <Fuel size="14" class="text-teal" /> <span>Budget Annuel & Tarifs Énergies</span>
+            </h4>
           </div>
-          <div class="form-group mb-3">
-            <label class="form-label">Entretien annuel (€/an)</label>
-            <input v-model.number="form.maintenanceCost" type="number" class="form-control" required />
+          
+          <div class="grid-2-fields mb-2.5">
+            <div class="form-group mb-0">
+              <label class="form-label text-xxs">Assurance (€/an)</label>
+              <input v-model.number="form.insuranceCost" type="number" class="form-control text-xs" required />
+            </div>
+            <div class="form-group mb-0">
+              <label class="form-label text-xxs">Entretien (€/an)</label>
+              <input v-model.number="form.maintenanceCost" type="number" class="form-control text-xs" required />
+            </div>
           </div>
-          <div class="form-group mb-3 mt-4 border-t border-glass pt-3">
-            <label class="form-label text-xs text-dimmed mb-2 block">Prix locaux des énergies :</label>
-            <div class="flex gap-2 mb-2 items-center">
-              <label class="w-20 text-xxs uppercase">Essence</label>
-              <input v-model.number="form.petrolPrice" type="number" step="0.01" class="form-control form-control-sm" />
-            </div>
-            <div class="flex gap-2 mb-2 items-center">
-              <label class="w-20 text-xxs uppercase">Diesel</label>
-              <input v-model.number="form.dieselPrice" type="number" step="0.01" class="form-control form-control-sm" />
-            </div>
-            <div class="flex gap-2 mb-2 items-center">
-              <label class="w-20 text-xxs uppercase">Élec.</label>
-              <input v-model.number="form.electricPrice" type="number" step="0.01" class="form-control form-control-sm" />
+
+          <div class="p-2.5 rounded-xl border-glass bg-card-subtle mt-3">
+            <label class="form-label text-xxs text-dimmed uppercase mb-2 block font-bold">Prix des énergies (€/L ou €/kWh)</label>
+            <div class="grid-3-fields gap-1.5">
+              <div class="form-group mb-0">
+                <label class="form-label text-xxs">Essence</label>
+                <input v-model.number="form.petrolPrice" type="number" step="0.01" class="form-control text-xs" />
+              </div>
+              <div class="form-group mb-0">
+                <label class="form-label text-xxs">Diesel</label>
+                <input v-model.number="form.dieselPrice" type="number" step="0.01" class="form-control text-xs" />
+              </div>
+              <div class="form-group mb-0">
+                <label class="form-label text-xxs">Élec.</label>
+                <input v-model.number="form.electricPrice" type="number" step="0.01" class="form-control text-xs" />
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="flex justify-between gap-3 mt-4 pt-3 border-t border-glass">
-        <button v-if="activeProfileId !== 'new'" class="btn btn-secondary text-rose border-rose hover-bg-rose flex-center gap-1" @click="deleteProfile" :disabled="loading">
-          <Trash2 size="16" />
+      <div class="flex-between items-center mt-4 pt-3 border-t border-glass">
+        <button v-if="activeProfileId !== 'new'" class="icon-btn hover-rose" @click="deleteProfile" :disabled="loading" title="Supprimer ce véhicule">
+          <Trash2 size="15" />
         </button>
-        <div v-else></div> <!-- spacer -->
+        <div v-else></div>
         
-        <div class="flex gap-3">
-          <button class="btn btn-secondary" @click="emit('close')">Fermer</button>
-          <button :disabled="loading" class="btn btn-primary flex-center gap-2" @click="saveProfile">
-            <Save size="16" /> {{ loading ? 'Sauvegarde...' : 'Enregistrer' }}
+        <div class="flex gap-2">
+          <button class="btn btn-secondary text-xs" @click="emit('close')">Fermer</button>
+          <button :disabled="loading" class="btn btn-primary text-xs font-bold flex items-center gap-1.5" @click="saveProfile">
+            <Save size="14" />
+            <span>{{ loading ? 'Sauvegarde...' : 'Enregistrer le véhicule' }}</span>
           </button>
         </div>
       </div>
@@ -351,45 +365,68 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.auth-modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  z-index: 2000;
+.garage-icon-badge {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: hsla(var(--accent-teal) / 0.12);
+  border: 1px solid hsla(var(--accent-teal) / 0.25);
 }
-.auth-modal-card {
-  z-index: 2001;
-  background: hsl(var(--bg-deep) / 0.95);
-  max-height: 90vh;
-  overflow-y: auto;
+
+.profiles-tabs {
+  border-bottom: 1px solid hsl(var(--border-glass));
 }
+
+.btn-tab {
+  background: hsl(var(--bg-card-subtle));
+  border: 1px solid hsl(var(--border-glass));
+  border-radius: 8px;
+  padding: 5px 12px;
+  color: hsl(var(--text-muted));
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-tab:hover {
+  color: hsl(var(--text-main));
+  border-color: hsl(var(--text-dimmed));
+}
+.btn-tab.active {
+  background: hsla(var(--accent-teal) / 0.15);
+  border-color: hsl(var(--accent-teal));
+  color: hsl(var(--accent-teal));
+}
+
 .profile-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 24px;
+  gap: 20px;
 }
-@media (max-width: 600px) {
+@media (max-width: 640px) {
   .profile-grid {
     grid-template-columns: 1fr;
   }
 }
-.active-tab {
-  background: hsl(var(--accent-cyan) / 0.2);
-  border-color: hsl(var(--accent-cyan));
-  color: white;
+
+.icon-btn {
+  background: hsl(var(--bg-card-subtle));
+  border: 1px solid hsl(var(--border-glass));
+  color: hsl(var(--text-dimmed));
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
-.border-b { border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
-.border-t { border-top: 1px solid rgba(255, 255, 255, 0.1); }
-.pt-3 { padding-top: 12px; }
-.pb-1 { padding-bottom: 4px; }
-.w-20 { width: 5rem; }
-.tracking-widest { letter-spacing: 0.1em; }
-.text-amber { color: #fbbf24; }
-.fill-amber { fill: #fbbf24; }
-.hover-bg-rose:hover { background: rgba(225, 29, 72, 0.1); }
+.icon-btn:hover.hover-rose {
+  color: hsl(var(--accent-rose));
+  border-color: hsl(var(--accent-rose));
+  background: hsla(var(--accent-rose) / 0.1);
+}
+
+.text-amber { color: hsl(var(--accent-amber)); }
+.fill-amber { fill: hsl(var(--accent-amber)); }
+.max-w-2xl { max-width: 42rem; }
 </style>

@@ -6,6 +6,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -15,6 +17,7 @@ import com.example.springbootapp.model.entity.AppUser;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import com.example.springbootapp.business.auth.AuthBusiness;
@@ -97,6 +100,27 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Erreur interne lors de la validation du jeton Google."));
         }
+    }
+
+    // ── Profil utilisateur connecté ────────────────────────────────────────
+    
+    @GetMapping("/me")
+    @Operation(summary = "Récupérer les informations de l'utilisateur connecté via JWT", security = { @SecurityRequirement(name = "bearerAuth") })
+    @ApiResponse(responseCode = "200", description = "Profil utilisateur")
+    @ApiResponse(responseCode = "401", description = "Non authentifié")
+    public ResponseEntity<?> getMe(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Non authentifié"));
+        }
+        String email = authentication.getName();
+        return authBusiness.getUserByEmail(email)
+                .map(user -> ResponseEntity.ok(Map.of(
+                        "name", user.getName() != null ? user.getName() : "Utilisateur",
+                        "email", user.getEmail(),
+                        "plan", user.getPlan() != null ? user.getPlan() : "Pro",
+                        "role", user.getRole() != null ? user.getRole() : "USER"
+                )))
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
     }
 
     // ── Helper ────────────────────────────────────────────────────────────

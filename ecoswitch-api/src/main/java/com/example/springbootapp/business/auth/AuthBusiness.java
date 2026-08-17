@@ -65,5 +65,9 @@ public class AuthBusiness {
         return new AuthResult(user, token);
     }
 
+    public java.util.Optional<AppUser> getUserByEmail(String email) {
+        return userService.findByEmail(email);
+    }
+
     public record AuthResult(AppUser user, String token) {}
 }
