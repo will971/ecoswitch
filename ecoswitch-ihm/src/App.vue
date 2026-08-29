@@ -53,6 +53,9 @@ const openAuth = () => {
   openLoginModal()
 }
 
+// Lien Console Admin dynamique
+const adminUrl = import.meta.env.PROD ? 'https://ecoswitch-api.up.railway.app/admin' : 'http://localhost:8080/admin'
+
 // Theme (Default Light Studio)
 const theme = ref(localStorage.getItem('eco_theme') || 'light')
 
@@ -446,7 +449,7 @@ onMounted(() => {
         <!-- Theme Toggle & Admin -->
         <div class="flex-between items-center mb-3">
           <a
-            href="http://localhost:8080/admin"
+            :href="adminUrl"
             target="_blank"
             class="btn-admin-link flex items-center gap-1.5 text-xxs text-muted"
           >
