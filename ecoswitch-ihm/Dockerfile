@@ -11,7 +11,9 @@ FROM nginx:1.27-alpine
 WORKDIR /usr/share/nginx/html
 
 COPY --from=build /app/dist ./
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+ENV API_HOST=api:8080
+ENV NGINX_ENVSUBST_FILTER=API_HOST
+COPY nginx.conf /etc/nginx/templates/default.conf.template
 
 EXPOSE 80
 

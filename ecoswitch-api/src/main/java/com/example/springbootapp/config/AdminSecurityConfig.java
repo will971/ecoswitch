@@ -1,5 +1,6 @@
 package com.example.springbootapp.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -13,6 +14,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.Arrays;
+import java.util.List;
 
 import com.example.springbootapp.security.JwtAuthFilter;
 
@@ -21,9 +28,32 @@ import jakarta.servlet.http.HttpServletResponse;
 @Configuration
 public class AdminSecurityConfig {
 
+    @Value("${app.security.cors.allowed-origins:*}")
+    private String allowedOrigins;
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return PasswordEncoderFactories.createDelegatingPasswordEncoder();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        if ("*".equals(allowedOrigins.trim())) {
+            configuration.addAllowedOriginPattern("*");
+            configuration.setAllowCredentials(true);
+        } else {
+            configuration.setAllowedOrigins(Arrays.stream(allowedOrigins.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .toList());
+            configuration.setAllowCredentials(true);
+        }
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("*"));
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 
     // ── Chain 1 : API REST — Stateless + JWT ────────────────────────────────
@@ -35,6 +65,7 @@ public class AdminSecurityConfig {
                                               JwtAuthFilter jwtAuthFilter) throws Exception {
         http
             .securityMatcher("/api/**", "/h2-console/**")
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .headers(h -> h.frameOptions(fo -> fo.sameOrigin())) // H2 console

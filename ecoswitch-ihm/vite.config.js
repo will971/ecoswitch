@@ -10,9 +10,25 @@ export default defineConfig({
       include: 'src/**/*',
       exclude: ['node_modules', 'test/'],
       extension: ['.js', '.vue'],
-      requireEnv: false
+      requireEnv: true
     })
   ],
+  build: {
+    target: 'es2022',
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/vue')) {
+            return 'vendor-vue'
+          }
+          if (id.includes('node_modules/@lucide') || id.includes('node_modules/lucide-vue-next')) {
+            return 'vendor-icons'
+          }
+        }
+      }
+    }
+  },
   server: {
     // Vite 8 has two security layers for the dev server:
     // 1. cors: controls Access-Control-Allow-Origin headers (for ES module loading)

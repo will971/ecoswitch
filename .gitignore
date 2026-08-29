@@ -5,6 +5,7 @@ springboot-app/.gradle/
 # Secrets / env
 **/.env
 **/.env.*
+!.env.example
 
 # Builds / dependencies
 **/node_modules/

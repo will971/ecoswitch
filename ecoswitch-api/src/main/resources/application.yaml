@@ -1,9 +1,24 @@
+server:
+  port: ${PORT:8080}
+  compression:
+    enabled: true
+    min-response-size: 1024
+    mime-types:
+      - text/html
+      - text/xml
+      - text/plain
+      - text/css
+      - text/javascript
+      - application/javascript
+      - application/json
+      - application/xml
+
 spring:
   application:
     name: springboot-app
   jpa:
     hibernate:
-      ddl-auto: create-drop   # H2 en mémoire : tables créées au démarrage
+      ddl-auto: create-drop   # H2 en mémoire en local : tables créées au démarrage
     show-sql: false
   h2:
     console:
@@ -23,6 +38,8 @@ app:
     vehicles-file: classpath:data/vehicules-seed.csv
     vehicles-url: https://raw.githubusercontent.com/williamsmodeste/antigravity-auto-db/main/vehicles.json
   security:
+    cors:
+      allowed-origins: ${CORS_ALLOWED_ORIGINS:*}
     google:
       client-id: ${GOOGLE_CLIENT_ID:}
     jwt:
@@ -32,3 +49,4 @@ app:
   gemini:
     api-key: ${GEMINI_API_KEY:}
     model: ${GEMINI_MODEL:gemini-flash-lite-latest}
+

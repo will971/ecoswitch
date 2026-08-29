@@ -42,10 +42,10 @@ graph TD
 Le backend est développé avec **Spring Boot 4.1.0** et s'exécute sur une machine virtuelle **Java 26**.
 
 ### A. Persistance & Base de Données
-Le stockage utilise une base de données **H2 en mémoire**.
-*   **Configuration JPA/Hibernate** : Définie dans [application.yaml](../ecoswitch-api/src/main/resources/application.yaml).
-*   **ddl-auto** : Positionné sur `create-drop`. Les tables de la base de données sont recréées automatiquement à chaque démarrage de l'application et détruites lors de l'arrêt.
-*   **Console H2** : Activée sur le chemin `/h2-console` pour inspecter les tables en direct.
+Le stockage s'adapte selon le profil d'environnement :
+*   **Mode Développement (Profil par défaut)** : Utilise une base **H2 en mémoire** (`ddl-auto: create-drop`), tables recréées à chaque démarrage et console H2 activée sur `/h2-console`.
+*   **Mode Production (Profil `prod`)** : Utilise une base relationnelle **PostgreSQL** avec `ddl-auto: update` (les données utilisateurs et simulations sont conservées) et la console H2 est désactivée pour des raisons de sécurité.
+*   **Compression HTTP** : Active nativement (`server.compression.enabled: true`) pour compresser en Gzip toutes les réponses JSON et optimiser les temps de transit réseau.
 
 ### B. Double Chaîne de Sécurité (Spring Security)
 La sécurité est configurée de manière robuste dans la classe [AdminSecurityConfig.java](../ecoswitch-api/src/main/java/com/example/springbootapp/config/AdminSecurityConfig.java) avec deux chaînes de filtres distinctes ordonnées par la directive `@Order`.
