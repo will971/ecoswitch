@@ -28,7 +28,7 @@ public class VehiculeRepository {
 			""";
 		KeyHolder keyHolder = new GeneratedKeyHolder();
 		jdbcTemplate.update(connection -> {
-			PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+			PreparedStatement statement = connection.prepareStatement(sql, new String[] { "id" });
 			statement.setString(1, vehicule.getName());
 			statement.setString(2, vehicule.getBrand());
 			statement.setString(3, vehicule.getModel());
@@ -47,9 +47,19 @@ public class VehiculeRepository {
 			return statement;
 		}, keyHolder);
 
-		Number key = keyHolder.getKey();
-		if (key != null) {
-			vehicule.setId(key.longValue());
+		if (keyHolder.getKeys() != null && keyHolder.getKeys().containsKey("id")) {
+			Object idObj = keyHolder.getKeys().get("id");
+			if (idObj instanceof Number num) {
+				vehicule.setId(num.longValue());
+			}
+		} else {
+			try {
+				Number key = keyHolder.getKey();
+				if (key != null) {
+					vehicule.setId(key.longValue());
+				}
+			} catch (Exception ignored) {
+			}
 		}
 		return vehicule;
 	}
