@@ -188,7 +188,7 @@ const calculate = async () => {
       customLeasingMonthlyPrice: customLeasingMonthlyPrice.value
     }
 
-    const response = await fetch('/api/v1/comparisons/profitability', {
+    const response = await fetch('/api/v1/comparisons/profitability/direct', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
