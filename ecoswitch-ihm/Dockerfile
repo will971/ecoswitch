@@ -11,11 +11,10 @@ FROM nginx:1.27-alpine
 WORKDIR /usr/share/nginx/html
 
 COPY --from=build /app/dist ./
-ENV PORT=80
+COPY nginx.conf /etc/nginx/nginx.conf.template
+
 ENV API_HOST=api:8080
-ENV NGINX_ENVSUBST_FILTER="PORT API_HOST"
-COPY nginx.conf /etc/nginx/templates/default.conf.template
 
 EXPOSE 80
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["/bin/sh", "-c", "envsubst '${API_HOST}' < /etc/nginx/nginx.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]
