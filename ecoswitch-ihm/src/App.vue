@@ -20,7 +20,10 @@ import {
   Moon,
   Bookmark,
   TrendingUp,
-  Fuel
+  Fuel,
+  Menu,
+  X,
+  SlidersHorizontal
 } from '@lucide/vue'
 
 import DirectSimulator from './components/DirectSimulator.vue'
@@ -30,8 +33,25 @@ import SavedSimulations from './components/SavedSimulations.vue'
 import UserProfileModal from './components/UserProfileModal.vue'
 import { apiLogin, apiRegister, apiGoogleLogin, apiGetMe, apiGetUserVehicleProfiles } from './utils/api.js'
 
-// Vue active
+// Vue active & Tiroir Mobile
 const activeTab = ref('direct-sim')
+const mobileDrawerOpen = ref(false)
+
+const selectTab = (tab) => {
+  activeTab.value = tab
+  mobileDrawerOpen.value = false
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+const openGarage = () => {
+  mobileDrawerOpen.value = false
+  profileModalOpen.value = true
+}
+
+const openAuth = () => {
+  mobileDrawerOpen.value = false
+  openLoginModal()
+}
 
 // Theme (Default Light Studio)
 const theme = ref(localStorage.getItem('eco_theme') || 'light')
@@ -269,18 +289,85 @@ onMounted(() => {
 <template>
   <div class="app-layout">
     
-    <!-- Sidebar de Navigation Gauche (Apple Style Minimal) -->
-    <aside class="app-sidebar">
-      
-      <!-- Brand Header -->
-      <div class="sidebar-header">
+    <!-- Header Mobile (Visible < 900px) -->
+    <header class="mobile-header">
+      <div class="flex items-center gap-2.5" @click="selectTab('direct-sim')" style="cursor: pointer;">
         <div class="brand-badge flex-center">
-          <Zap size="18" class="text-teal" />
+          <Zap size="17" class="text-teal" />
         </div>
         <div class="brand-text">
           <span class="brand-name">EcoSwitch</span>
-          <span class="brand-tagline">Optimisation Automobile</span>
         </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button
+          class="btn-theme-toggle flex-center"
+          @click="toggleTheme"
+          :title="theme === 'dark' ? 'Passer en thème clair' : 'Passer en thème sombre'"
+        >
+          <Sun v-if="theme === 'dark'" size="14" class="text-amber" />
+          <Moon v-else size="14" class="text-dimmed" />
+        </button>
+
+        <button
+          v-if="currentUser"
+          class="user-avatar flex-center"
+          style="cursor: pointer; width: 30px; height: 30px; border: none;"
+          @click="openGarage"
+          :title="currentUser.email"
+        >
+          {{ currentUser.email.charAt(0).toUpperCase() }}
+        </button>
+        <button
+          v-else
+          class="btn-mobile-login flex items-center gap-1 text-xxs font-bold"
+          @click="openAuth"
+        >
+          <User size="12" />
+          <span>Connexion</span>
+        </button>
+
+        <button
+          class="btn-mobile-menu flex-center"
+          @click="mobileDrawerOpen = !mobileDrawerOpen"
+          aria-label="Menu"
+        >
+          <Menu v-if="!mobileDrawerOpen" size="18" />
+          <X v-else size="18" />
+        </button>
+      </div>
+    </header>
+
+    <!-- Mobile Drawer Backdrop -->
+    <div
+      v-if="mobileDrawerOpen"
+      class="mobile-drawer-backdrop"
+      @click="mobileDrawerOpen = false"
+    ></div>
+
+    <!-- Sidebar de Navigation Gauche (Desktop fixe / Mobile tiroir coulissant) -->
+    <aside class="app-sidebar" :class="{ 'drawer-open': mobileDrawerOpen }">
+      
+      <!-- Brand Header -->
+      <div class="sidebar-header flex-between items-center">
+        <div class="flex items-center gap-2.5">
+          <div class="brand-badge flex-center">
+            <Zap size="18" class="text-teal" />
+          </div>
+          <div class="brand-text">
+            <span class="brand-name">EcoSwitch</span>
+            <span class="brand-tagline">Optimisation Automobile</span>
+          </div>
+        </div>
+
+        <button
+          class="btn-close-drawer flex-center"
+          @click="mobileDrawerOpen = false"
+          aria-label="Fermer le menu"
+        >
+          <X size="18" />
+        </button>
       </div>
 
       <!-- Navigation Links -->
@@ -288,7 +375,7 @@ onMounted(() => {
         <button
           class="nav-link"
           :class="{ active: activeTab === 'direct-sim' }"
-          @click="activeTab = 'direct-sim'"
+          @click="selectTab('direct-sim')"
         >
           <Zap size="17" />
           <span>Simulateur Express</span>
@@ -297,7 +384,7 @@ onMounted(() => {
         <button
           class="nav-link"
           :class="{ active: activeTab === 'comparator' }"
-          @click="activeTab = 'comparator'"
+          @click="selectTab('comparator')"
         >
           <BarChart3 size="17" />
           <span>Comparateur Flotte</span>
@@ -306,7 +393,7 @@ onMounted(() => {
         <button
           class="nav-link"
           :class="{ active: activeTab === 'vehicles' }"
-          @click="activeTab = 'vehicles'"
+          @click="selectTab('vehicles')"
         >
           <Car size="17" />
           <span>Catalogue Véhicules</span>
@@ -316,7 +403,7 @@ onMounted(() => {
           v-if="currentUser"
           class="nav-link"
           :class="{ active: activeTab === 'saved-sims' }"
-          @click="activeTab = 'saved-sims'"
+          @click="selectTab('saved-sims')"
         >
           <Bookmark size="17" />
           <span>Mes Simulations</span>
@@ -325,7 +412,7 @@ onMounted(() => {
         <button
           v-if="currentUser"
           class="nav-link"
-          @click="profileModalOpen = true"
+          @click="openGarage"
         >
           <Settings size="17" />
           <span>Mon Garage & Profil</span>
@@ -397,7 +484,7 @@ onMounted(() => {
         <button
           v-else
           class="btn btn-primary w-100 text-xs font-bold flex items-center justify-center gap-2"
-          @click="openLoginModal"
+          @click="openAuth"
         >
           <User size="14" />
           <span>Espace Client</span>
@@ -444,6 +531,55 @@ onMounted(() => {
 
       </div>
     </main>
+
+    <!-- Bottom Navigation Bar tactile (Visible < 900px) -->
+    <nav class="mobile-bottom-nav">
+      <button
+        class="bottom-nav-item"
+        :class="{ active: activeTab === 'direct-sim' && !mobileDrawerOpen }"
+        @click="selectTab('direct-sim')"
+      >
+        <Zap size="19" />
+        <span>Simulateur</span>
+      </button>
+
+      <button
+        class="bottom-nav-item"
+        :class="{ active: activeTab === 'comparator' && !mobileDrawerOpen }"
+        @click="selectTab('comparator')"
+      >
+        <BarChart3 size="19" />
+        <span>Comparateur</span>
+      </button>
+
+      <button
+        class="bottom-nav-item"
+        :class="{ active: activeTab === 'vehicles' && !mobileDrawerOpen }"
+        @click="selectTab('vehicles')"
+      >
+        <Car size="19" />
+        <span>Catalogue</span>
+      </button>
+
+      <button
+        v-if="currentUser"
+        class="bottom-nav-item"
+        :class="{ active: activeTab === 'saved-sims' && !mobileDrawerOpen }"
+        @click="selectTab('saved-sims')"
+      >
+        <Bookmark size="19" />
+        <span>Sauvegardes</span>
+      </button>
+
+      <button
+        class="bottom-nav-item"
+        :class="{ active: mobileDrawerOpen }"
+        @click="mobileDrawerOpen = !mobileDrawerOpen"
+      >
+        <SlidersHorizontal size="19" />
+        <span>Menu</span>
+      </button>
+    </nav>
 
     <!-- Modal Mon Garage / Profils -->
     <UserProfileModal
@@ -753,19 +889,162 @@ onMounted(() => {
   font-family: var(--font-sans);
 }
 
+/* Mobile Components (Hidden on Desktop) */
+.mobile-header {
+  display: none;
+}
+
+.btn-mobile-login {
+  background: var(--accent-teal);
+  color: #FFFFFF;
+  border: none;
+  padding: 5px 9px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-mobile-menu {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-glass);
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.btn-close-drawer {
+  display: none;
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-glass);
+  color: var(--text-dimmed);
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.mobile-drawer-backdrop {
+  display: none;
+}
+
+.mobile-bottom-nav {
+  display: none;
+}
+
+.bottom-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: transparent;
+  border: none;
+  color: var(--text-dimmed);
+  font-family: var(--font-sans);
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 6px 0 8px 0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bottom-nav-item.active {
+  color: var(--accent-teal);
+  font-weight: 700;
+}
+
+.bottom-nav-item.active svg {
+  transform: translateY(-1px);
+}
+
+/* Mobile Breakpoint (< 900px) */
 @media (max-width: 900px) {
   .app-layout {
     flex-direction: column;
-  }
-  .app-sidebar {
-    width: 100%;
-    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
     position: relative;
-    border-right: none;
-    border-bottom: 1px solid var(--border-glass);
   }
-  .app-main {
+
+  .mobile-header {
+    display: flex;
+    position: sticky;
+    top: 0;
+    z-index: 90;
+    height: 56px;
+    padding: 0 16px;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border-glass);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .mobile-drawer-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 198;
+  }
+
+  .app-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 290px;
+    max-width: 85vw;
+    height: 100%;
+    z-index: 199;
+    background: var(--bg-card);
+    box-shadow: var(--shadow-lg);
+    border-right: 1px solid var(--border-glass);
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
     padding: 20px 16px;
+  }
+
+  .app-sidebar.drawer-open {
+    transform: translateX(0);
+  }
+
+  .btn-close-drawer {
+    display: flex;
+  }
+
+  .app-main {
+    padding: 16px 14px 84px 14px;
+    overflow-x: hidden;
+  }
+
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 95;
+    height: 60px;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: var(--bg-card);
+    border-top: 1px solid var(--border-glass);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    justify-content: space-around;
+    align-items: center;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
   }
 }
 </style>
