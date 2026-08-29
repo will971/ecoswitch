@@ -16,8 +16,9 @@ RUN rm -rf /usr/share/nginx/html/*
 COPY --from=build /app/dist/ /usr/share/nginx/html/
 COPY nginx.conf /etc/nginx/nginx.conf.template
 
+ENV PORT=80
 ENV API_HOST=api:8080
 
 EXPOSE 80
 
-CMD ["/bin/sh", "-c", "envsubst '${API_HOST}' < /etc/nginx/nginx.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]
+CMD ["/bin/sh", "-c", "export PORT=${PORT:-80}; envsubst '${PORT} ${API_HOST}' < /etc/nginx/nginx.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]
