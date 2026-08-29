@@ -12,6 +12,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+import com.example.springbootapp.service.AiAdvisorService;
 import com.example.springbootapp.business.comparison.ComparisonBusiness;
 
 class ComparisonControllerTest {
@@ -19,7 +20,8 @@ class ComparisonControllerTest {
 	private final VehiculeService vehiculeService = Mockito.mock(VehiculeService.class);
 	private final CostCalculationService costCalculationService = new CostCalculationService();
 	private final ComparisonBusiness comparisonBusiness = new ComparisonBusiness(vehiculeService, costCalculationService);
-	private final ComparisonController comparisonController = new ComparisonController(comparisonBusiness);
+	private final AiAdvisorService aiAdvisorService = Mockito.mock(AiAdvisorService.class);
+	private final ComparisonController comparisonController = new ComparisonController(comparisonBusiness, aiAdvisorService);
 
 	@Test
 	void shouldCalculateDirectProfitabilitySuccessfully() {
