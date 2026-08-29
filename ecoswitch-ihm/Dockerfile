@@ -24,4 +24,4 @@ ENV API_HOST=api:8080
 
 EXPOSE 80
 
-CMD ["/bin/sh", "-c", "TARGET_HOST=$(echo \"${API_HOST:-api:8080}\" | sed -e 's|^https\\?://||' -e 's|/$||'); sed -i \"s|__API_PASS__|http://${TARGET_HOST}/api/|g\" /etc/nginx/conf.d/default.conf && nginx -t && nginx -g 'daemon off;'"]
+CMD ["/bin/sh", "-c", "if echo \"${API_HOST:-api:8080}\" | grep -q '^https://'; then CLEAN=$(echo \"${API_HOST}\" | sed -e 's|/$||'); TARGET_URL=\"${CLEAN}/api/\"; elif echo \"${API_HOST:-api:8080}\" | grep -q '^http://'; then CLEAN=$(echo \"${API_HOST}\" | sed -e 's|/$||'); TARGET_URL=\"${CLEAN}/api/\"; else CLEAN=$(echo \"${API_HOST:-api:8080}\" | sed -e 's|/$||'); TARGET_URL=\"http://${CLEAN}/api/\"; fi; sed -i \"s|__API_PASS__|${TARGET_URL}|g\" /etc/nginx/conf.d/default.conf && nginx -t && nginx -g 'daemon off;'"]
