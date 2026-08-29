@@ -14,11 +14,10 @@ RUN rm -rf /usr/share/nginx/html/*
 
 # Copy built frontend files
 COPY --from=build /app/dist/ /usr/share/nginx/html/
-COPY nginx.conf /etc/nginx/nginx.conf.template
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-ENV PORT=80
 ENV API_HOST=api:8080
 
 EXPOSE 80
 
-CMD ["/bin/sh", "-c", "export PORT=${PORT:-80}; envsubst '${PORT} ${API_HOST}' < /etc/nginx/nginx.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]
+CMD ["/bin/sh", "-c", "CLEAN_API_HOST=$(echo \"${API_HOST:-api:8080}\" | sed -e 's|^https\\?://||' -e 's|/$||'); sed -i \"s|__API_HOST__|${CLEAN_API_HOST}|g\" /etc/nginx/conf.d/default.conf && nginx -t && nginx -g 'daemon off;'"]
