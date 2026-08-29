@@ -515,7 +515,7 @@
 				<span class="badge badge-teal">⚡ Console d'Administration Live</span>
 			</div>
 			<div class="header-links" style="display: flex; gap: 12px; align-items: center;">
-				<a href="/swagger-ui.html" target="_blank">📖 Documentation Swagger</a>
+				<a id="publicAppBackLink" href="https://ecoswich.up.railway.app/" style="color: hsl(var(--accent-teal)); text-decoration: none; font-size: 0.82rem; font-weight: 600; padding: 6px 12px; border-radius: 8px; background: hsl(var(--bg-glass)); border: 1px solid hsl(var(--border-glass));">🚗 Retour à l'application</a>
 				<button class="btn btn-secondary" id="themeToggleBtn" onclick="toggleTheme()" style="padding: 8px; border-radius: 8px; line-height: 1;" title="Changer le thème">
 					🌓
 				</button>
@@ -808,6 +808,12 @@
 		}
 
 		async function init() {
+			const backLink = document.getElementById('publicAppBackLink');
+			if (backLink) {
+				const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+				backLink.href = isLocal ? 'http://localhost:5173/' : 'https://ecoswich.up.railway.app/';
+			}
+
 			await refreshLogFiles();
 			await refreshLogLevel();
 			await refreshUsage();

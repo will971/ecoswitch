@@ -341,11 +341,24 @@
 		</main>
 
 		<div class="back-link">
-			<a href="http://localhost:5173/">&larr; Retourner sur le simulateur public</a>
+			<a id="publicAppBackLink" href="https://ecoswich.up.railway.app/">&larr; Retourner sur le simulateur public</a>
 		</div>
 	</div>
 
 	<script>
+		// Resolution dynamique du lien de retour vers le front
+		document.addEventListener('DOMContentLoaded', () => {
+			const link = document.getElementById('publicAppBackLink');
+			if (link) {
+				const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+				if (isLocal) {
+					link.href = 'http://localhost:5173/';
+				} else {
+					link.href = 'https://ecoswich.up.railway.app/';
+				}
+			}
+		});
+
 		// Show error alert dynamically if Spring Security query param contains '?error'
 		if (window.location.search.includes('error')) {
 			document.getElementById('errorAlert').style.display = 'flex';
