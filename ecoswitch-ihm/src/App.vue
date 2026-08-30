@@ -33,13 +33,72 @@ import SavedSimulations from './components/SavedSimulations.vue'
 import UserProfileModal from './components/UserProfileModal.vue'
 import { apiLogin, apiRegister, apiGoogleLogin, apiGetMe, apiGetUserVehicleProfiles } from './utils/api.js'
 
+// ── SYSTÈME DE ROUTING DYNAMIQUE HTML5 HISTORY API ───────────────────────────
+const ROUTES = {
+  'direct-sim': {
+    path: '/simulateur',
+    title: 'EcoSwitch · Simulateur TCO & Économies Réelles',
+    aliases: ['/', '/simulateur', '/simulator']
+  },
+  'comparator': {
+    path: '/comparateur',
+    title: 'EcoSwitch · Comparateur de Flotte & Arbitrage ROI',
+    aliases: ['/comparateur', '/comparator', '/compare']
+  },
+  'vehicles': {
+    path: '/catalogue',
+    title: 'EcoSwitch · Catalogue Constructeurs & Véhicules',
+    aliases: ['/catalogue', '/catalog', '/vehicles']
+  },
+  'saved-sims': {
+    path: '/mes-simulations',
+    title: 'EcoSwitch · Mes Simulations & Études Sauvegardées',
+    aliases: ['/mes-simulations', '/saved-sims', '/simulations']
+  }
+}
+
+const getTabFromPath = (pathname) => {
+  if (typeof window === 'undefined') return 'direct-sim'
+  const raw = pathname || window.location.pathname || '/'
+  const cleanPath = raw.toLowerCase().replace(/\/+$/, '') || '/'
+  
+  for (const [tab, config] of Object.entries(ROUTES)) {
+    if (config.aliases.includes(cleanPath)) {
+      return tab
+    }
+  }
+  return 'direct-sim'
+}
+
+const syncUrlToTab = (tab, replace = false) => {
+  if (typeof window === 'undefined') return
+  const config = ROUTES[tab] || ROUTES['direct-sim']
+  const currentPath = window.location.pathname.toLowerCase().replace(/\/+$/, '') || '/'
+  
+  if (config.title) {
+    document.title = config.title
+  }
+  
+  if (currentPath !== config.path && !(config.path === '/simulateur' && currentPath === '/')) {
+    if (replace) {
+      history.replaceState({ tab }, '', config.path)
+    } else {
+      history.pushState({ tab }, '', config.path)
+    }
+  }
+}
+
 // Vue active & Tiroir Mobile
-const activeTab = ref('direct-sim')
+const initialTab = getTabFromPath(typeof window !== 'undefined' ? window.location.pathname : '/')
+const activeTab = ref(initialTab)
 const mobileDrawerOpen = ref(false)
 
-const selectTab = (tab) => {
+const selectTab = (tab, pushHistory = true) => {
   activeTab.value = tab
   mobileDrawerOpen.value = false
+  if (pushHistory) {
+    syncUrlToTab(tab, false)
+  }
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
@@ -266,12 +325,24 @@ const openLoginModal = () => {
 
 const handleLoadSimulation = (simData) => {
   simulationToLoad.value = { ...simData, _loadTimestamp: Date.now() }
-  activeTab.value = 'direct-sim'
+  selectTab('direct-sim')
 }
 
 onMounted(() => {
   applyTheme(theme.value)
   checkCurrentUser()
+
+  // Synchronise l'URL et le titre au premier chargement
+  syncUrlToTab(activeTab.value, true)
+
+  // Écoute des boutons Suivant/Précédent du navigateur
+  window.addEventListener('popstate', (e) => {
+    const tab = e.state?.tab || getTabFromPath(window.location.pathname)
+    activeTab.value = tab
+    if (ROUTES[tab]?.title) {
+      document.title = ROUTES[tab].title
+    }
+  })
 
   // Chargement propre du script Google Identity Services
   if (!document.getElementById('google-gsi-script')) {
@@ -386,42 +457,46 @@ onMounted(() => {
 
       <!-- Navigation Links -->
       <nav class="sidebar-nav">
-        <button
+        <a
+          href="/simulateur"
           class="nav-link"
           :class="{ active: activeTab === 'direct-sim' }"
-          @click="selectTab('direct-sim')"
+          @click.prevent="selectTab('direct-sim')"
         >
           <Zap size="17" />
           <span>Simulateur Express</span>
-        </button>
+        </a>
 
-        <button
+        <a
+          href="/comparateur"
           class="nav-link"
           :class="{ active: activeTab === 'comparator' }"
-          @click="selectTab('comparator')"
+          @click.prevent="selectTab('comparator')"
         >
           <BarChart3 size="17" />
           <span>Comparateur Flotte</span>
-        </button>
+        </a>
 
-        <button
+        <a
+          href="/catalogue"
           class="nav-link"
           :class="{ active: activeTab === 'vehicles' }"
-          @click="selectTab('vehicles')"
+          @click.prevent="selectTab('vehicles')"
         >
           <Car size="17" />
           <span>Catalogue Véhicules</span>
-        </button>
+        </a>
 
-        <button
+        <a
           v-if="currentUser"
+          href="/mes-simulations"
           class="nav-link"
           :class="{ active: activeTab === 'saved-sims' }"
-          @click="selectTab('saved-sims')"
+          @click.prevent="selectTab('saved-sims')"
         >
           <Bookmark size="17" />
           <span>Mes Simulations</span>
-        </button>
+        </a>
 
         <button
           v-if="currentUser"
@@ -549,42 +624,46 @@ onMounted(() => {
 
     <!-- Bottom Navigation Bar tactile (Visible < 900px) -->
     <nav class="mobile-bottom-nav">
-      <button
+      <a
+        href="/simulateur"
         class="bottom-nav-item"
         :class="{ active: activeTab === 'direct-sim' && !mobileDrawerOpen }"
-        @click="selectTab('direct-sim')"
+        @click.prevent="selectTab('direct-sim')"
       >
         <Zap size="19" />
         <span>Simulateur</span>
-      </button>
+      </a>
 
-      <button
+      <a
+        href="/comparateur"
         class="bottom-nav-item"
         :class="{ active: activeTab === 'comparator' && !mobileDrawerOpen }"
-        @click="selectTab('comparator')"
+        @click.prevent="selectTab('comparator')"
       >
         <BarChart3 size="19" />
         <span>Comparateur</span>
-      </button>
+      </a>
 
-      <button
+      <a
+        href="/catalogue"
         class="bottom-nav-item"
         :class="{ active: activeTab === 'vehicles' && !mobileDrawerOpen }"
-        @click="selectTab('vehicles')"
+        @click.prevent="selectTab('vehicles')"
       >
         <Car size="19" />
         <span>Catalogue</span>
-      </button>
+      </a>
 
-      <button
+      <a
         v-if="currentUser"
+        href="/mes-simulations"
         class="bottom-nav-item"
         :class="{ active: activeTab === 'saved-sims' && !mobileDrawerOpen }"
-        @click="selectTab('saved-sims')"
+        @click.prevent="selectTab('saved-sims')"
       >
         <Bookmark size="19" />
         <span>Sauvegardes</span>
-      </button>
+      </a>
 
       <button
         class="bottom-nav-item"
@@ -746,6 +825,7 @@ onMounted(() => {
   font-size: 0.84rem;
   font-weight: 600;
   color: var(--text-muted);
+  text-decoration: none;
   cursor: pointer;
   transition: all 0.15s ease;
   text-align: left;
@@ -958,6 +1038,7 @@ onMounted(() => {
   background: transparent;
   border: none;
   color: var(--text-dimmed);
+  text-decoration: none;
   font-family: var(--font-sans);
   font-size: 0.65rem;
   font-weight: 600;
