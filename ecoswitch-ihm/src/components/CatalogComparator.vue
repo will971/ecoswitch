@@ -411,7 +411,7 @@ onMounted(() => {
   <div class="luxury-comparator-root animation-fadeIn">
     
     <!-- ── 1. LUXURY EDITORIAL HERO ─────────────────────────────────────────── -->
-    <header class="luxury-hero-banner">
+    <header class="luxury-hero-banner hide-on-mobile">
       <div class="hero-glow-backdrop"></div>
       <div class="hero-inner">
         <div class="hero-left">
@@ -2528,11 +2528,14 @@ onMounted(() => {
 
 @media (max-width: 900px) {
   .luxury-comparator-root {
-    gap: 12px;
+    gap: 8px;
+    margin-top: 0;
+    padding-top: 0;
   }
 
   /* Masquer le hero éditorial lourd sur mobile pour libérer 100% de l'espace */
-  .luxury-hero-banner {
+  .luxury-hero-banner,
+  .hide-on-mobile {
     display: none !important;
   }
 
@@ -2546,8 +2549,8 @@ onMounted(() => {
     background: linear-gradient(180deg, var(--bg-app) 0%, rgba(var(--bg-app-rgb, 245, 245, 247), 0.98) 100%);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    padding: 4px 0 10px 0;
-    margin: -10px 0 8px 0;
+    padding: 6px 0 10px 0;
+    margin: -4px 0 6px 0;
     width: 100%;
     box-sizing: border-box;
   }

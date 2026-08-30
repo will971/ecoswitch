@@ -1121,8 +1121,9 @@ onMounted(() => {
   }
 
   .app-main {
-    padding: 10px 12px 84px 12px;
-    overflow-x: hidden;
+    padding: 4px 12px 84px 12px;
+    overflow-x: clip;
+    overflow-y: visible;
   }
 
   .mobile-bottom-nav {
