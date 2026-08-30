@@ -1058,8 +1058,8 @@ onMounted(() => {
   transform: translateY(-1px);
 }
 
-/* Mobile Breakpoint (< 900px) */
-@media (max-width: 900px) {
+/* Mobile Breakpoint (< 1024px) */
+@media (max-width: 1024px) {
   .app-layout {
     flex-direction: column;
     min-height: 100vh;

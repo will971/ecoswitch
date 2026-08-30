@@ -2492,24 +2492,24 @@ onMounted(() => {
 .spinner { animation: spin 1s linear infinite; }
 @keyframes spin { 100% { transform: rotate(360deg); } }
 
-/* ── RESPONSIVE MOBILE & TABLET OPTIMIZATIONS (< 1024px & < 900px & < 640px) ── */
+/* ── RESPONSIVE MOBILE & TABLET OPTIMIZATIONS (< 1024px) ───────────────── */
 
 @media (max-width: 1024px) {
-  .workflow-tabs-nav {
-    display: flex;
-    overflow-x: auto;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
+  .luxury-comparator-root {
     gap: 8px;
-    padding: 6px 2px 10px 2px;
+    margin-top: 0;
+    padding-top: 0;
   }
-  .workflow-tabs-nav::-webkit-scrollbar {
-    display: none;
+
+  /* Masquer le hero éditorial lourd sur mobile/tablette pour libérer 100% de l'espace */
+  .luxury-hero-banner,
+  .hide-on-mobile {
+    display: none !important;
   }
 
   .luxury-main-grid {
     grid-template-columns: 1fr;
-    gap: 16px;
+    gap: 12px;
   }
 
   .luxury-panel {
@@ -2518,25 +2518,6 @@ onMounted(() => {
 
   .luxury-panel.mobile-active {
     display: flex !important;
-  }
-}
-
-/* Barre Flottante Fixe Téléportée (Par défaut masquée sur Desktop) */
-.showroom-mobile-floating-bar {
-  display: none;
-}
-
-@media (max-width: 900px) {
-  .luxury-comparator-root {
-    gap: 8px;
-    margin-top: 0;
-    padding-top: 0;
-  }
-
-  /* Masquer le hero éditorial lourd sur mobile pour libérer 100% de l'espace */
-  .luxury-hero-banner,
-  .hide-on-mobile {
-    display: none !important;
   }
 
   /* Conteneur Sticky Opaque et Flou parfaitement positionné sous le Header Mobile (56px) */
