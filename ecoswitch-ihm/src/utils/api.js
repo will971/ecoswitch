@@ -20,6 +20,28 @@ function getApiBaseUrl() {
 
 const BASE_URL = getApiBaseUrl()
 
+/**
+ * Normalise les chemins relatifs d'images (/uploads/...) vers une URL directe absolue en production.
+ */
+export function formatImageUrl(url) {
+  if (!url || typeof url !== 'string') return ''
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+    return url
+  }
+  const cleanUrl = url.startsWith('/') ? url : `/${url}`
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    if (import.meta.env.VITE_API_URL) return `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}${cleanUrl}`
+    if (import.meta.env.VITE_API_BASE_URL) return `${import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '')}${cleanUrl}`
+  }
+  if (typeof window !== 'undefined' && window.location) {
+    const host = window.location.hostname || ''
+    if (host.includes('railway.app') && !host.includes('api')) {
+      return `https://ecoswitch-api.up.railway.app${cleanUrl}`
+    }
+  }
+  return cleanUrl
+}
+
 /** Récupère le token JWT stocké après connexion */
 function getToken() {
   try {
@@ -204,13 +226,33 @@ export async function apiGetAiAdvisorSummary(simulationPayload) {
 export async function apiGetCatalogHierarchy() {
   const res = await apiFetch('/catalog/hierarchy')
   if (!res.ok) throw new Error("Impossible de charger l'arborescence du catalogue.")
-  return await res.json()
+  const data = await res.json()
+  return (data || []).map(b => ({
+    ...b,
+    logoUrl: formatImageUrl(b.logoUrl),
+    models: (b.models || []).map(m => ({
+      ...m,
+      imageUrl: formatImageUrl(m.imageUrl),
+      finitions: (m.finitions || []).map(f => ({
+        ...f,
+        imageUrl: formatImageUrl(f.imageUrl)
+      })),
+      motorisations: (m.motorisations || []).map(mot => ({
+        ...mot,
+        availableFinitions: (mot.availableFinitions || []).map(af => ({
+          ...af,
+          finitionImageUrl: formatImageUrl(af.finitionImageUrl)
+        }))
+      }))
+    }))
+  }))
 }
 
 export async function apiGetCatalogBrands() {
   const res = await apiFetch('/catalog/brands')
   if (!res.ok) throw new Error("Impossible de charger les marques.")
-  return await res.json()
+  const data = await res.json()
+  return (data || []).map(b => ({ ...b, logoUrl: formatImageUrl(b.logoUrl) }))
 }
 
 export async function apiCreateBrand(brand) {
@@ -242,7 +284,12 @@ export async function apiGetCatalogModels(brandId = null) {
   const q = brandId ? `?brandId=${brandId}` : ''
   const res = await apiFetch(`/catalog/models${q}`)
   if (!res.ok) throw new Error("Impossible de charger les modèles.")
-  return await res.json()
+  const data = await res.json()
+  return (data || []).map(m => ({
+    ...m,
+    imageUrl: formatImageUrl(m.imageUrl),
+    brandLogoUrl: formatImageUrl(m.brandLogoUrl)
+  }))
 }
 
 export async function apiCreateModel(brandId, model) {
@@ -306,7 +353,8 @@ export async function apiGetCatalogFinitions(modelId = null) {
   const q = modelId ? `?modelId=${modelId}` : ''
   const res = await apiFetch(`/catalog/finitions${q}`)
   if (!res.ok) throw new Error("Impossible de charger les finitions.")
-  return await res.json()
+  const data = await res.json()
+  return (data || []).map(f => ({ ...f, imageUrl: formatImageUrl(f.imageUrl) }))
 }
 
 export async function apiCreateFinition(modelId, finition) {
@@ -342,7 +390,13 @@ export async function apiGetCatalogVariants(modelId = null, motorisationId = nul
   const q = params.toString() ? `?${params.toString()}` : ''
   const res = await apiFetch(`/catalog/variants${q}`)
   if (!res.ok) throw new Error("Impossible de charger les tarifs des variantes.")
-  return await res.json()
+  const data = await res.json()
+  return (data || []).map(v => ({
+    ...v,
+    brandLogoUrl: formatImageUrl(v.brandLogoUrl),
+    imageUrl: formatImageUrl(v.imageUrl),
+    finitionImageUrl: formatImageUrl(v.finitionImageUrl)
+  }))
 }
 
 export async function apiCreateVariant(finitionId, motorisationId, variant) {
