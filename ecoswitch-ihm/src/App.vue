@@ -1121,7 +1121,7 @@ onMounted(() => {
   }
 
   .app-main {
-    padding: 4px 12px 84px 12px;
+    padding: 0 12px 84px 12px;
     overflow-x: clip;
     overflow-y: visible;
   }

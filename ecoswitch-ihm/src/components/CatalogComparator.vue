@@ -2520,18 +2520,18 @@ onMounted(() => {
     display: flex !important;
   }
 
-  /* Conteneur Sticky Opaque et Flou parfaitement positionné sous le Header Mobile (56px) */
+  /* Conteneur Sticky Opaque et Flou collé directement sous le Header Mobile (top: 0 dans app-main) */
   .stepper-sticky-container {
     display: block;
     position: sticky;
-    top: 56px;
+    top: 0;
     z-index: 85;
     background: var(--bg-app);
     background: linear-gradient(180deg, var(--bg-app) 0%, rgba(var(--bg-app-rgb, 245, 245, 247), 0.98) 100%);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    padding: 6px 0 10px 0;
-    margin: -4px 0 6px 0;
+    padding: 8px 0 10px 0;
+    margin: 0 0 10px 0;
     width: 100%;
     box-sizing: border-box;
   }
