@@ -307,6 +307,13 @@ const selectAllFiltered = () => {
   }
 }
 
+const switchMobileTab = (tab) => {
+  activeMobileView.value = tab
+  if (typeof window !== 'undefined') {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+}
+
 const selectAllProfitable = () => {
   onlyProfitableFilter.value = true
   const ids = profitableVehicles.value.map(v => v.id)
@@ -318,24 +325,28 @@ const clearAllSelection = () => {
 }
 
 const compare = async () => {
-  if (selectedTargetIds.value.length === 0) {
-    error.value = "Veuillez sélectionner au moins un véhicule cible dans le showroom pour lancer l'arbitrage."
-    return
-  }
-
+  if (selectedTargetIds.value.length === 0) return
   calculating.value = true
   error.value = null
-  result.value = null
 
-  let currentVehicleData = null
+  let currentVehicleData
   if (referenceMode.value === 'GARAGE' && selectedProfileId.value) {
-    const profile = props.userProfiles.find(p => p.id === selectedProfileId.value)
+    const profile = props.userProfiles?.find(p => p.id === selectedProfileId.value)
     if (profile) {
-      currentVehicleData = { ...profile, purchasePrice: 0 }
-    } else {
-      currentVehicleData = { ...manualVehicle.value }
+      currentVehicleData = {
+        name: profile.name,
+        fuelType: profile.fuelType,
+        consumption: profile.consumption || 6.5,
+        annualMileage: profile.annualMileage || 15000,
+        purchasePrice: 0,
+        resaleValue: profile.resaleValue || 5000,
+        insuranceCost: profile.insuranceCost || 600,
+        maintenanceCost: profile.maintenanceCost || 400
+      }
     }
-  } else {
+  }
+
+  if (!currentVehicleData) {
     currentVehicleData = { ...manualVehicle.value }
   }
 
@@ -348,6 +359,9 @@ const compare = async () => {
       immediateRepairCost: immediateRepairCost.value
     })
     activeMobileView.value = 'results'
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
   } catch (err) {
     error.value = err.message
   } finally {
@@ -432,28 +446,28 @@ onMounted(() => {
       <button 
         class="workflow-step-btn" 
         :class="{ active: activeMobileView === 'config' }"
-        @click="activeMobileView = 'config'"
+        @click="switchMobileTab('config')"
       >
         <span class="step-num">1</span>
-        <span class="step-label">Véhicule Source & Référence</span>
+        <span class="step-label">1. Véhicule Source</span>
       </button>
 
       <button 
         class="workflow-step-btn" 
         :class="{ active: activeMobileView === 'showroom' }"
-        @click="activeMobileView = 'showroom'"
+        @click="switchMobileTab('showroom')"
       >
         <span class="step-num">2</span>
-        <span class="step-label">Showroom des Alternatives ({{ selectedTargetIds.length }})</span>
+        <span class="step-label">2. Showroom ({{ selectedTargetIds.length }})</span>
       </button>
 
       <button 
         class="workflow-step-btn" 
         :class="{ active: activeMobileView === 'results', disabled: !result }"
-        @click="result && (activeMobileView = 'results')"
+        @click="result && switchMobileTab('results')"
       >
         <span class="step-num">3</span>
-        <span class="step-label">Tableau de Bord Stratégique</span>
+        <span class="step-label">3. Tableau de Bord</span>
       </button>
     </div>
 
@@ -664,7 +678,7 @@ onMounted(() => {
 
         <!-- CTA Mobile pour aller au showroom -->
         <div class="mobile-only mt-4">
-          <button class="luxury-cta-btn w-100" @click="activeMobileView = 'showroom'">
+          <button class="luxury-cta-btn w-100" @click="switchMobileTab('showroom')">
             <span>Explorer le Showroom ({{ selectedTargetIds.length }} choisis)</span>
             <ChevronRight size="16" />
           </button>
@@ -954,7 +968,7 @@ onMounted(() => {
 
         <!-- Bouton Retour Showroom sur Mobile -->
         <div class="mobile-return-banner hide-on-desktop">
-          <button type="button" class="luxury-ghost-btn w-100 flex-center gap-1.5" @click="activeMobileView = 'showroom'">
+          <button type="button" class="luxury-ghost-btn w-100 flex-center gap-1.5" @click="switchMobileTab('showroom')">
             <ArrowLeft size="14" />
             <span>Modifier la sélection des modèles</span>
           </button>
@@ -2341,87 +2355,359 @@ onMounted(() => {
 .spinner { animation: spin 1s linear infinite; }
 @keyframes spin { 100% { transform: rotate(360deg); } }
 
-/* ── RESPONSIVE MOBILE OPTIMIZATIONS (< 768px) ────────────────────────── */
-@media (max-width: 768px) {
-  .luxury-hero-banner {
+/* ── RESPONSIVE MOBILE & TABLET OPTIMIZATIONS (< 1024px & < 900px & < 640px) ── */
+
+@media (max-width: 1024px) {
+  .workflow-tabs-nav {
+    display: flex;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    gap: 8px;
+    padding: 6px 2px 10px 2px;
+  }
+  .workflow-tabs-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .luxury-main-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .luxury-panel {
+    display: none;
+  }
+
+  .luxury-panel.mobile-active {
+    display: flex !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .luxury-comparator-root {
+    gap: 14px;
+  }
+
+  /* Stepper Sticky Navigation sous le header mobile (56px) */
+  .workflow-tabs-nav {
+    position: sticky;
+    top: 56px;
+    z-index: 85;
+    background: var(--bg-app, #F5F5F7);
+    background: linear-gradient(180deg, var(--bg-card) 0%, rgba(var(--bg-card-rgb, 255, 255, 255), 0.92) 100%);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    padding: 8px 12px;
+    margin: -8px -14px 10px -14px;
+    border-bottom: 1px solid var(--border-glass);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+  }
+  [data-theme="dark"] .workflow-tabs-nav {
+    background: linear-gradient(180deg, rgba(22, 22, 24, 0.98) 0%, rgba(16, 16, 18, 0.92) 100%);
+  }
+
+  .workflow-step-btn {
+    padding: 8px 12px;
+    font-size: 0.74rem;
+    font-weight: 700;
+    flex: 1;
+    min-width: 130px;
+    justify-content: center;
+    border-radius: var(--radius-md);
+  }
+
+  .step-num {
+    width: 20px;
+    height: 20px;
+    font-size: 0.7rem;
+  }
+
+  /* Panels Mobile */
+  .luxury-panel {
     padding: 16px 14px;
     border-radius: var(--radius-lg);
+    gap: 14px;
   }
-  .hero-luxury-title {
-    font-size: 1.2rem;
+
+  .showroom-panel {
+    min-height: auto;
+    padding-bottom: 120px; /* Espace pour la barre flottante fixe */
   }
-  .hero-luxury-subtitle {
-    font-size: 0.75rem;
-    margin-bottom: 10px;
-  }
-  .hero-specs-row {
-    gap: 6px;
-  }
-  .spec-tag {
-    font-size: 0.68rem;
-    padding: 3px 8px;
-  }
-  .luxury-panel {
-    padding: 14px;
-    border-radius: var(--radius-lg);
-    gap: 12px;
-  }
+
   .panel-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 10px;
   }
+
   .header-actions {
     width: 100%;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .luxury-profitable-quick-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 8px 12px;
+    font-size: 0.76rem;
+  }
+
+  /* Showroom Grid : Suppression du scroll trap interne sur mobile */
+  .showroom-vehicles-grid {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    max-height: none !important;
+    overflow-y: visible !important;
+    padding-right: 0;
+    gap: 10px;
+  }
+
+  /* Barre d'Action Flottante Fixe en bas sur Mobile */
+  .showroom-bottom-bar {
+    position: fixed;
+    bottom: 60px; /* Au-dessus de la bottom nav bar (60px) */
+    left: 0;
+    right: 0;
+    z-index: 88;
+    background: var(--bg-card);
+    background: linear-gradient(180deg, rgba(var(--bg-card-rgb, 255, 255, 255), 0.98), var(--bg-card));
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-top: 1px solid var(--border-glass);
+    padding: 10px 16px;
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.15);
+    display: flex;
     justify-content: space-between;
+    align-items: center;
+    gap: 12px;
   }
-  .energy-chips-grid {
-    grid-template-columns: repeat(2, 1fr);
+  [data-theme="dark"] .showroom-bottom-bar {
+    background: linear-gradient(180deg, rgba(24, 24, 28, 0.98), #121214);
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.5);
   }
+
+  .selection-counter {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  .count-badge {
+    font-size: 0.78rem;
+    padding: 2px 8px;
+    background: var(--accent-teal);
+    color: #fff;
+    border-radius: 9999px;
+    font-weight: 800;
+  }
+
+  .count-text {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-muted);
+  }
+
+  .showroom-bottom-bar .luxury-cta-btn {
+    flex: 1;
+    max-width: 260px;
+    padding: 10px 14px;
+    font-size: 0.78rem;
+    justify-content: center;
+  }
+
+  /* Podium 1 colonne */
+  .luxury-podium-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  /* Cartes alternatives */
+  .luxury-alt-card {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .alt-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .alt-badges-block {
+    width: 100%;
+  }
+
+  .roi-status-pill {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .alt-metrics-luxury-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .luxury-simulator-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 10px 14px;
+    font-size: 0.78rem;
+  }
+
+  /* Matrice TCO Mobile : Colonne Véhicule Sticky */
+  .matrix-table-wrapper {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .luxury-matrix-table th:first-child,
+  .luxury-matrix-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--bg-card);
+    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+  }
+}
+
+@media (max-width: 640px) {
+  /* Hero Mobile */
+  .luxury-hero-banner {
+    padding: 16px 14px;
+    border-radius: var(--radius-md);
+  }
+
+  .hero-luxury-title {
+    font-size: 1.25rem;
+    line-height: 1.25;
+  }
+
+  .hero-luxury-subtitle {
+    font-size: 0.75rem;
+    margin-bottom: 10px;
+  }
+
+  .hero-specs-row {
+    gap: 6px;
+  }
+
+  .spec-tag {
+    font-size: 0.65rem;
+    padding: 3px 6px;
+  }
+
+  /* Stepper ultra-compact */
+  .workflow-tabs-nav {
+    padding: 6px 8px;
+    margin: -6px -12px 8px -12px;
+    gap: 4px;
+  }
+
+  .workflow-step-btn {
+    padding: 6px 8px;
+    min-width: 100px;
+    font-size: 0.68rem;
+    gap: 5px;
+  }
+
+  .step-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Cartes Showroom 1 colonne */
   .showroom-vehicles-grid {
     grid-template-columns: 1fr;
-    max-height: 440px;
+    gap: 8px;
   }
-  .showroom-bottom-bar {
-    position: sticky;
-    bottom: 0;
-    background: var(--bg-card);
-    padding: 10px 0 0 0;
-    z-index: 10;
+
+  .showroom-vehicle-card {
+    padding: 12px;
+    gap: 8px;
+    border-radius: var(--radius-md);
   }
-  .luxury-cta-btn {
-    width: 100%;
-    padding: 12px 16px;
-    font-size: 0.82rem;
+
+  .showroom-vehicle-card:active {
+    transform: scale(0.98);
   }
+
+  .svc-image-container {
+    height: 80px;
+  }
+
+  .svc-vehicle-img {
+    width: 85%;
+    height: 85%;
+  }
+
+  .svc-name {
+    font-size: 0.9rem;
+  }
+
+  .svc-price-main {
+    font-size: 0.95rem;
+  }
+
+  .svc-check-circle {
+    width: 32px;
+    height: 32px;
+  }
+
+  /* Formulaire Config */
+  .energy-chips-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .energy-chip {
+    padding: 8px;
+    font-size: 0.72rem;
+  }
+
+  .luxury-grid-2 {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .luxury-input {
+    padding: 7px 10px;
+    font-size: 0.78rem;
+  }
+
+  /* Résultats */
   .alt-metrics-luxury-grid {
     grid-template-columns: 1fr 1fr;
     gap: 6px;
   }
-  .luxury-alt-card {
-    padding: 14px;
-    gap: 10px;
+
+  .metric-luxury-card {
+    padding: 8px 10px;
   }
-  .alt-card-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
+
+  .m-lux-label {
+    font-size: 0.6rem;
   }
-  .alt-rank-number {
-    font-size: 0.95rem;
-  }
-  .alt-vehicle-title {
-    font-size: 0.85rem;
-  }
+
   .m-lux-val {
     font-size: 0.88rem;
   }
+
+  .m-lux-sub {
+    font-size: 0.58rem;
+  }
+
   .podium-card {
     padding: 12px;
   }
+
   .podium-highlight-val {
-    font-size: 1rem;
+    font-size: 1.05rem;
   }
+
   .mobile-return-banner {
     margin-bottom: 8px;
   }
