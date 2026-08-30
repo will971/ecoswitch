@@ -9,7 +9,7 @@
           <span v-if="isAdmin" class="admin-status-badge">🛡️ Mode Administrateur ({{ currentUser?.email }})</span>
           <span v-else class="consultation-status-badge">👁️ Mode Consultation</span>
         </h2>
-        <p class="manager-subtitle">
+        <p class="manager-subtitle hide-on-mobile">
           Administration relationnelle des constructeurs, modèles, motorisations certifiées WLTP, finitions et barèmes de prix (Achat, LOA, LLD).
         </p>
       </div>
@@ -1163,7 +1163,7 @@ onMounted(() => {
   gap: 16px;
   align-items: start;
 }
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
   .catalog-main-layout {
     grid-template-columns: 1fr;
   }
@@ -1819,38 +1819,275 @@ onMounted(() => {
   padding: 6px 0;
 }
 
-/* ── Mobile Optimizations (< 900px) ───────────────────────────────────── */
-@media (max-width: 900px) {
-  .brands-sidebar-card {
-    max-height: 240px;
-  }
-  .model-hero-inner {
-    flex-direction: column;
-    text-align: center;
+/* ── Mobile & Tablet Optimizations (< 1024px) ───────────────────────── */
+@media (max-width: 1024px) {
+  .catalog-manager-app {
     gap: 12px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+    box-sizing: border-box;
   }
-  .hero-badges-row,
-  .hero-actions-row {
-    justify-content: center;
-  }
+
   .manager-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 10px;
+    gap: 8px;
+    margin-bottom: 4px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .manager-main-title {
+    font-size: 1.05rem;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .hide-on-mobile {
+    display: none !important;
   }
   .header-actions {
     width: 100%;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .catalog-main-layout {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  /* PANE 1 : Sélecteur de Marques Horizontal */
+  .brands-sidebar-card {
+    padding: 10px 12px;
+    max-height: none;
+    gap: 8px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+  .sidebar-header {
+    padding-bottom: 4px;
+  }
+  .sidebar-search-box {
+    margin-bottom: 2px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .sidebar-search-input {
+    padding: 6px 10px;
+    font-size: 0.76rem;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .brands-items-list {
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    gap: 6px;
+    padding: 2px 0 6px 0;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+  .brands-items-list::-webkit-scrollbar {
+    display: none;
+  }
+  .brand-row-item {
+    flex-shrink: 0;
+    padding: 5px 10px;
+    border-radius: 9999px;
+    gap: 6px;
+  }
+  .brand-logo-box {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+  }
+  .brand-name-text {
+    font-size: 0.75rem;
+    white-space: nowrap;
+  }
+  .models-count-pill {
+    font-size: 0.6rem;
+    padding: 1px 5px;
+  }
+
+  /* PANE 2 : Sélecteur de Modèles Horizontal */
+  .brand-detail-main,
+  .space-y-main {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .models-selector-card {
+    padding: 10px 12px;
+    gap: 8px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+  .models-bar-header {
+    padding-bottom: 6px;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .brand-heading {
+    font-size: 0.88rem;
+  }
+  .models-tabs-grid {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    gap: 6px;
+    padding: 2px 0 6px 0;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+  .models-tabs-grid::-webkit-scrollbar {
+    display: none;
+  }
+  .model-tab-btn {
+    flex-shrink: 0;
+    padding: 6px 10px;
+    border-radius: 8px;
+    gap: 6px;
+  }
+  .tab-img-box {
+    width: 24px;
+    height: 16px;
+  }
+  .tab-model-name {
+    font-size: 0.72rem;
+    white-space: nowrap;
+  }
+  .tab-category {
+    font-size: 0.6rem;
+  }
+
+  /* Détail Modèle */
+  .model-detail-card {
+    padding: 12px 10px;
+    gap: 12px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+  .model-hero-banner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding-bottom: 10px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .hero-left {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 8px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .hero-vehicle-media {
+    width: 100%;
+    max-width: 240px;
+    height: 110px;
+    margin: 0 auto;
+  }
+  .hero-info {
+    align-items: center;
+    text-align: center;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .hero-model-title {
+    font-size: 1.05rem;
+  }
+  .hero-badges {
+    justify-content: center;
+  }
+  .hero-actions {
+    width: 100%;
+    justify-content: center;
+  }
+  .hero-actions button {
+    flex: 1;
+  }
+
+  /* Finitions */
+  .finitions-pill-grid {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 6px;
+  }
+  .finition-card-pill {
+    padding: 4px 8px;
+  }
+  .finition-name {
+    font-size: 0.72rem;
+  }
+
+  /* Motorisations & Variantes */
+  .motorisation-item-card {
+    padding: 10px 8px;
+    gap: 8px;
+  }
+  .mot-header-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    padding-bottom: 6px;
+  }
+  .mot-header-left {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+  }
+  .mot-header-right {
+    width: 100%;
     justify-content: space-between;
   }
-  .motorisations-cards-grid {
+  .btn-associate-pricing {
+    flex: 1;
+    text-align: center;
+    padding: 5px 8px;
+  }
+
+  .variants-cards-grid {
     grid-template-columns: 1fr;
+    gap: 8px;
   }
-  .finitions-cards-grid {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  .variant-price-card {
+    padding: 8px 10px;
+    gap: 6px;
   }
-  .modal-lux-content {
-    width: 94vw;
-    padding: 16px;
+
+  /* Modals */
+  .modal-box,
+  .modal-box-lg {
+    max-width: 95vw;
+    padding: 16px 12px;
   }
   .grid-2-modal,
   .grid-3-modal {
