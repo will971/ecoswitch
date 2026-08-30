@@ -867,7 +867,7 @@ onMounted(() => {
                   class="svc-vehicle-img" 
                   @error="(e) => e.target.style.opacity = '0.3'"
                 />
-                <Car v-else size="32" class="text-dimmed opacity-40" />
+                <Car v-else size="28" class="text-dimmed opacity-40" />
               </div>
               <img v-if="v.brandLogoUrl" :src="v.brandLogoUrl" :alt="v.brand" class="svc-brand-mini-badge" />
             </div>
@@ -880,7 +880,7 @@ onMounted(() => {
                   <h3 class="svc-name">{{ v.model }}</h3>
                   <span class="svc-finition">{{ v.finitionName }}</span>
                 </div>
-                <span class="svc-category-badge">{{ v.category }}</span>
+                <span class="svc-category-badge hide-on-mobile">{{ v.category }}</span>
               </div>
 
               <!-- Badge Rentabilité Instantané -->
@@ -890,7 +890,7 @@ onMounted(() => {
                   class="roi-chip-tag tag-rentable"
                 >
                   <Sparkles size="10" />
-                  Rentable en {{ getVehicleMetrics(v).breakEvenYears.toFixed(1) }} ans (+{{ formatCurrency(getVehicleMetrics(v).annualSavings) }}/an)
+                  Rentable en {{ getVehicleMetrics(v).breakEvenYears.toFixed(1) }} ans
                 </span>
                 <span 
                   v-else-if="getVehicleMetrics(v).annualSavings > 0" 
@@ -902,20 +902,17 @@ onMounted(() => {
                   v-else 
                   class="roi-chip-tag tag-neutral"
                 >
-                  Coût non avantageux
+                  Non avantageux
                 </span>
               </div>
 
               <!-- Motorisation & Badges Énergie -->
               <div class="svc-tech-row">
-                <div class="svc-powertrain">{{ v.motorisationName }}</div>
-                <div class="svc-specs-tags">
-                  <span class="spec-chip" :class="v.fuelType === 'ELECTRIC' ? 'chip-electric' : 'chip-hybrid'">
-                    {{ v.fuelType === 'ELECTRIC' ? '⚡ Élec' : '🍃 Hyb' }}
-                  </span>
-                  <span v-if="v.powerHp" class="spec-chip chip-neutral">{{ v.powerHp }} ch</span>
-                  <span class="spec-chip chip-wltp">{{ v.consumption }} {{ v.fuelType === 'ELECTRIC' ? 'kWh' : 'L' }}/100</span>
-                </div>
+                <span class="spec-chip" :class="v.fuelType === 'ELECTRIC' ? 'chip-electric' : 'chip-hybrid'">
+                  {{ v.fuelType === 'ELECTRIC' ? '⚡ Élec' : '🍃 Hyb' }}
+                </span>
+                <span class="svc-powertrain">{{ v.motorisationName }}</span>
+                <span v-if="v.powerHp" class="spec-chip chip-neutral hide-on-mobile">{{ v.powerHp }} ch</span>
               </div>
             </div>
 
@@ -923,11 +920,11 @@ onMounted(() => {
             <div class="svc-action-box">
               <div class="svc-pricing">
                 <div class="svc-price-main">{{ formatCurrency(v.purchasePrice) }}</div>
-                <div v-if="v.monthlyLoa" class="svc-price-sub">LOA : {{ formatCurrency(v.monthlyLoa) }}/m</div>
+                <div v-if="v.monthlyLoa" class="svc-price-sub">{{ formatCurrency(v.monthlyLoa) }}/m</div>
               </div>
               
               <div class="svc-check-circle" :class="{ checked: selectedTargetIds.includes(v.id) }">
-                <Check v-if="selectedTargetIds.includes(v.id)" size="15" />
+                <Check v-if="selectedTargetIds.includes(v.id)" size="14" />
               </div>
             </div>
           </div>
@@ -1228,6 +1225,9 @@ onMounted(() => {
   flex-direction: column;
   gap: 20px;
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 /* ── 1. HERO EDITORIAL ─────────────────────────────────────────────────── */
@@ -1367,6 +1367,10 @@ onMounted(() => {
   grid-template-columns: 360px 1fr;
   gap: 20px;
   align-items: start;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
 }
 @media (max-width: 1024px) {
   .luxury-main-grid {
@@ -1389,6 +1393,11 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .panel-header {
@@ -1399,6 +1408,8 @@ onMounted(() => {
   padding-bottom: 12px;
   flex-wrap: wrap;
   gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
 }
 .panel-title-wrapper {
   display: flex;
@@ -1733,10 +1744,17 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+  overflow: hidden;
 }
 .search-luxury-bar {
   position: relative;
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 .search-luxury-icon {
   position: absolute;
@@ -1747,6 +1765,7 @@ onMounted(() => {
 }
 .search-luxury-input {
   width: 100%;
+  box-sizing: border-box;
   padding: 8px 32px 8px 34px;
   border-radius: var(--radius-full);
   border: 1px solid var(--border-glass);
@@ -1775,6 +1794,14 @@ onMounted(() => {
   gap: 6px;
   overflow-x: auto;
   padding-bottom: 2px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.filter-chips-row::-webkit-scrollbar {
+  display: none;
 }
 .filter-pill {
   display: flex;
@@ -1789,6 +1816,7 @@ onMounted(() => {
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
+  flex-shrink: 0;
   transition: all 0.15s ease;
 }
 .filter-pill.active {
@@ -1825,6 +1853,14 @@ onMounted(() => {
   gap: 6px;
   overflow-x: auto;
   padding-bottom: 4px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.brands-pills-carousel::-webkit-scrollbar {
+  display: none;
 }
 .brand-pill-item {
   display: flex;
@@ -1839,6 +1875,7 @@ onMounted(() => {
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+  flex-shrink: 0;
   transition: all 0.15s ease;
 }
 .brand-pill-item.active {
@@ -1864,6 +1901,10 @@ onMounted(() => {
   max-height: 480px;
   overflow-y: auto;
   padding-right: 4px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .showroom-vehicle-card {
@@ -2513,8 +2554,10 @@ onMounted(() => {
     background: linear-gradient(180deg, var(--bg-card) 0%, rgba(var(--bg-card-rgb, 255, 255, 255), 0.92) 100%);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    padding: 8px 12px;
-    margin: -8px -14px 10px -14px;
+    padding: 8px 10px;
+    margin: -8px -12px 10px -12px;
+    width: calc(100% + 24px);
+    box-sizing: border-box;
     border-bottom: 1px solid var(--border-glass);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
   }
@@ -2527,7 +2570,7 @@ onMounted(() => {
     font-size: 0.72rem;
     font-weight: 700;
     flex: 1;
-    min-width: 110px;
+    min-width: 100px;
     justify-content: center;
     border-radius: var(--radius-md);
   }
@@ -2540,20 +2583,30 @@ onMounted(() => {
 
   /* Panels Mobile */
   .luxury-panel {
-    padding: 14px 12px;
+    padding: 12px 10px;
     border-radius: var(--radius-lg);
-    gap: 12px;
+    gap: 10px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
   }
 
   .showroom-panel {
     min-height: auto;
     padding-bottom: 130px; /* Espace impératif pour la barre flottante fixe */
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
   }
 
   .panel-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 10px;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .header-actions {
@@ -2567,15 +2620,15 @@ onMounted(() => {
   .luxury-profitable-quick-btn {
     width: 100%;
     justify-content: center;
-    padding: 10px 14px;
-    font-size: 0.8rem;
+    padding: 9px 12px;
+    font-size: 0.78rem;
   }
 
   .luxury-cta-btn-header {
     width: 100%;
     justify-content: center;
-    padding: 9px 14px;
-    font-size: 0.78rem;
+    padding: 9px 12px;
+    font-size: 0.76rem;
   }
 
   /* Showroom Grid : Format Liste Horizontale Compacte sur Mobile (Anti-débordement) */
@@ -2586,20 +2639,24 @@ onMounted(() => {
     max-height: none !important;
     overflow-y: visible !important;
     padding-right: 0;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
   }
 
   .showroom-vehicle-card {
     display: flex;
     flex-direction: row;
     align-items: center;
-    padding: 8px 10px;
-    gap: 8px;
-    min-height: 76px;
+    padding: 8px 8px;
+    gap: 6px;
+    min-height: 70px;
     width: 100%;
+    max-width: 100%;
     box-sizing: border-box;
     overflow: hidden;
     background: var(--bg-card);
-    border: 1px solid var(--border-glass);
+    border: 1.5px solid var(--border-glass);
     border-radius: var(--radius-md);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
     cursor: pointer;
@@ -2610,12 +2667,16 @@ onMounted(() => {
     transform: scale(0.985);
     background: var(--bg-card-hover);
   }
+  .showroom-vehicle-card.selected {
+    border-color: var(--accent-teal);
+    background: linear-gradient(90deg, rgba(16, 124, 65, 0.08), var(--bg-card));
+  }
 
   .svc-thumb-box {
-    width: 60px;
-    min-width: 60px;
-    max-width: 60px;
-    height: 50px;
+    width: 52px;
+    min-width: 52px;
+    max-width: 52px;
+    height: 44px;
     flex-shrink: 0;
     position: relative;
     display: flex;
@@ -2680,13 +2741,13 @@ onMounted(() => {
     text-overflow: ellipsis;
   }
   .svc-brand-label {
-    font-size: 0.65rem;
+    font-size: 0.62rem;
     font-weight: 700;
     color: var(--text-dimmed);
     text-transform: uppercase;
   }
   .svc-name {
-    font-size: 0.84rem;
+    font-size: 0.82rem;
     font-weight: 800;
     color: var(--text-main);
     margin: 0;
@@ -2695,18 +2756,9 @@ onMounted(() => {
     white-space: nowrap;
   }
   .svc-finition {
-    font-size: 0.64rem;
+    font-size: 0.62rem;
     color: var(--text-dimmed);
     font-weight: 600;
-  }
-  .svc-category-badge {
-    font-size: 0.55rem;
-    padding: 1px 4px;
-    border-radius: 3px;
-    background: var(--bg-card-subtle);
-    color: var(--text-dimmed);
-    white-space: nowrap;
-    flex-shrink: 0;
   }
 
   .svc-roi-indicator {
@@ -2731,7 +2783,6 @@ onMounted(() => {
 
   .svc-tech-row {
     display: flex;
-    justify-content: space-between;
     align-items: center;
     gap: 4px;
     font-size: 0.6rem;
@@ -2743,8 +2794,9 @@ onMounted(() => {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    font-size: 0.62rem;
-    max-width: 130px;
+    font-size: 0.6rem;
+    flex: 1;
+    min-width: 0;
   }
 
   .svc-action-box {
@@ -2753,8 +2805,9 @@ onMounted(() => {
     flex-direction: column;
     align-items: flex-end;
     justify-content: center;
-    min-width: 68px;
-    gap: 4px;
+    min-width: 64px;
+    max-width: 68px;
+    gap: 2px;
     border-top: none;
     padding-top: 0;
     margin-top: 0;
@@ -2763,14 +2816,14 @@ onMounted(() => {
     text-align: right;
   }
   .svc-price-main {
-    font-size: 0.84rem;
+    font-size: 0.82rem;
     font-weight: 800;
     color: var(--text-main);
     line-height: 1.1;
     white-space: nowrap;
   }
   .svc-price-sub {
-    font-size: 0.56rem;
+    font-size: 0.54rem;
     color: var(--accent-cyan);
     font-weight: 600;
     line-height: 1.1;
@@ -2778,9 +2831,9 @@ onMounted(() => {
   }
 
   .svc-check-circle {
-    width: 28px;
-    height: 28px;
-    min-width: 28px;
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
     border-radius: 9999px;
     border: 1.5px solid var(--border-glass);
     background: var(--bg-card-subtle);
