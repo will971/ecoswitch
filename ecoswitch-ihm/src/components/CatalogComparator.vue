@@ -838,78 +838,77 @@ onMounted(() => {
             }"
             @click="toggleTargetSelection(v.id)"
           >
-            <!-- Badge Catégorie & Marque -->
-            <div class="svc-top-bar">
-              <div class="svc-brand-tag">
-                <img v-if="v.brandLogoUrl" :src="v.brandLogoUrl" :alt="v.brand" class="svc-brand-logo" />
-                <span class="svc-brand-name">{{ v.brand }}</span>
+            <!-- Bloc 1 : Vignette Visuelle Silhouette + Logo Marque -->
+            <div class="svc-thumb-box">
+              <div class="svc-image-container">
+                <img 
+                  v-if="v.imageUrl" 
+                  :src="v.imageUrl" 
+                  :alt="v.name" 
+                  class="svc-vehicle-img" 
+                  @error="(e) => e.target.style.opacity = '0.3'"
+                />
+                <Car v-else size="32" class="text-dimmed opacity-40" />
               </div>
-              <span class="svc-category-badge">{{ v.category }}</span>
+              <img v-if="v.brandLogoUrl" :src="v.brandLogoUrl" :alt="v.brand" class="svc-brand-mini-badge" />
             </div>
 
-            <!-- Visuel Silhouette Véhicule -->
-            <div class="svc-image-container">
-              <img 
-                v-if="v.imageUrl" 
-                :src="v.imageUrl" 
-                :alt="v.name" 
-                class="svc-vehicle-img" 
-                @error="(e) => e.target.style.opacity = '0.3'"
-              />
-              <Car v-else size="40" class="text-dimmed opacity-40" />
-            </div>
-
-            <!-- Badge Rentabilité Instantané -->
-            <div class="svc-roi-indicator">
-              <span 
-                v-if="getVehicleMetrics(v).isProfitable" 
-                class="roi-chip-tag tag-rentable"
-              >
-                <Sparkles size="10" />
-                Rentable en {{ getVehicleMetrics(v).breakEvenYears.toFixed(1) }} ans (+{{ formatCurrency(getVehicleMetrics(v).annualSavings) }}/an)
-              </span>
-              <span 
-                v-else-if="getVehicleMetrics(v).annualSavings > 0" 
-                class="roi-chip-tag tag-long"
-              >
-                Amorti en {{ getVehicleMetrics(v).breakEvenYears.toFixed(1) }} ans (> {{ maxYears }} ans)
-              </span>
-              <span 
-                v-else 
-                class="roi-chip-tag tag-neutral"
-              >
-                Coût d'usage non avantageux
-              </span>
-            </div>
-
-            <!-- Titre & Spécifications -->
-            <div class="svc-details">
+            <!-- Bloc 2 : Titres, Badges ROI & Spécifications -->
+            <div class="svc-info-box">
               <div class="svc-title-row">
-                <h3 class="svc-name">{{ v.model }}</h3>
-                <span class="svc-finition">{{ v.finitionName }}</span>
+                <div class="svc-title-left">
+                  <span class="svc-brand-label">{{ v.brand }}</span>
+                  <h3 class="svc-name">{{ v.model }}</h3>
+                  <span class="svc-finition">{{ v.finitionName }}</span>
+                </div>
+                <span class="svc-category-badge">{{ v.category }}</span>
               </div>
-              <div class="svc-powertrain">{{ v.motorisationName }}</div>
 
-              <!-- Badges Techniques -->
-              <div class="svc-specs-tags">
-                <span class="spec-chip" :class="v.fuelType === 'ELECTRIC' ? 'chip-electric' : 'chip-hybrid'">
-                  {{ v.fuelType === 'ELECTRIC' ? '⚡ Élec' : '🍃 Hyb' }}
+              <!-- Badge Rentabilité Instantané -->
+              <div class="svc-roi-indicator">
+                <span 
+                  v-if="getVehicleMetrics(v).isProfitable" 
+                  class="roi-chip-tag tag-rentable"
+                >
+                  <Sparkles size="10" />
+                  Rentable en {{ getVehicleMetrics(v).breakEvenYears.toFixed(1) }} ans (+{{ formatCurrency(getVehicleMetrics(v).annualSavings) }}/an)
                 </span>
-                <span v-if="v.powerHp" class="spec-chip chip-neutral">{{ v.powerHp }} ch</span>
-                <span v-if="v.batteryCapacityKwh" class="spec-chip chip-neutral">{{ v.batteryCapacityKwh }} kWh</span>
-                <span class="spec-chip chip-wltp">{{ v.consumption }} {{ v.fuelType === 'ELECTRIC' ? 'kWh' : 'L' }}/100</span>
+                <span 
+                  v-else-if="getVehicleMetrics(v).annualSavings > 0" 
+                  class="roi-chip-tag tag-long"
+                >
+                  Amorti en {{ getVehicleMetrics(v).breakEvenYears.toFixed(1) }} ans
+                </span>
+                <span 
+                  v-else 
+                  class="roi-chip-tag tag-neutral"
+                >
+                  Coût non avantageux
+                </span>
+              </div>
+
+              <!-- Motorisation & Badges Énergie -->
+              <div class="svc-tech-row">
+                <div class="svc-powertrain">{{ v.motorisationName }}</div>
+                <div class="svc-specs-tags">
+                  <span class="spec-chip" :class="v.fuelType === 'ELECTRIC' ? 'chip-electric' : 'chip-hybrid'">
+                    {{ v.fuelType === 'ELECTRIC' ? '⚡ Élec' : '🍃 Hyb' }}
+                  </span>
+                  <span v-if="v.powerHp" class="spec-chip chip-neutral">{{ v.powerHp }} ch</span>
+                  <span class="spec-chip chip-wltp">{{ v.consumption }} {{ v.fuelType === 'ELECTRIC' ? 'kWh' : 'L' }}/100</span>
+                </div>
               </div>
             </div>
 
-            <!-- Tarifs & Bouton de sélection tactile -->
-            <div class="svc-footer">
+            <!-- Bloc 3 : Tarifs & Checkbox tactile -->
+            <div class="svc-action-box">
               <div class="svc-pricing">
                 <div class="svc-price-main">{{ formatCurrency(v.purchasePrice) }}</div>
-                <div v-if="v.monthlyLoa" class="svc-price-sub">LOA : {{ formatCurrency(v.monthlyLoa) }}/mois</div>
+                <div v-if="v.monthlyLoa" class="svc-price-sub">LOA : {{ formatCurrency(v.monthlyLoa) }}/m</div>
               </div>
               
               <div class="svc-check-circle" :class="{ checked: selectedTargetIds.includes(v.id) }">
-                <Check v-if="selectedTargetIds.includes(v.id)" size="14" />
+                <Check v-if="selectedTargetIds.includes(v.id)" size="15" />
               </div>
             </div>
           </div>
@@ -1809,35 +1808,10 @@ onMounted(() => {
   box-shadow: 0 0 0 1px var(--accent-teal);
 }
 
-.svc-top-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.svc-thumb-box {
+  position: relative;
+  width: 100%;
 }
-.svc-brand-tag {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.svc-brand-logo {
-  width: 16px;
-  height: 16px;
-  object-fit: contain;
-}
-.svc-brand-name {
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: var(--text-dimmed);
-}
-.svc-category-badge {
-  font-size: 0.62rem;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-glass);
-  color: var(--text-dimmed);
-}
-
 .svc-image-container {
   height: 75px;
   display: flex;
@@ -1857,9 +1831,72 @@ onMounted(() => {
 .showroom-vehicle-card:hover .svc-vehicle-img {
   transform: scale(1.04);
 }
+.svc-brand-mini-badge {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  background: var(--bg-card);
+  border-radius: 4px;
+  padding: 2px;
+  border: 1px solid var(--border-glass);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.svc-info-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+.svc-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px;
+}
+.svc-title-left {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.svc-brand-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-dimmed);
+  text-transform: uppercase;
+}
+.svc-name {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--text-main);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.svc-finition {
+  font-size: 0.68rem;
+  color: var(--text-dimmed);
+  font-weight: 600;
+}
+.svc-category-badge {
+  font-size: 0.6rem;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  color: var(--text-dimmed);
+  white-space: nowrap;
+}
 
 .svc-roi-indicator {
-  margin-top: -2px;
+  margin: 1px 0;
 }
 .roi-chip-tag {
   display: inline-flex;
@@ -1887,29 +1924,10 @@ onMounted(() => {
   border: 1px solid var(--border-glass);
 }
 
-.svc-details {
+.svc-tech-row {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-}
-.svc-title-row {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-}
-.svc-name {
-  font-size: 0.85rem;
-  font-weight: 800;
-  color: var(--text-main);
-  margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.svc-finition {
-  font-size: 0.68rem;
-  color: var(--text-dimmed);
-  font-weight: 600;
+  gap: 3px;
 }
 .svc-powertrain {
   font-size: 0.68rem;
@@ -1918,12 +1936,10 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
 .svc-specs-tags {
   display: flex;
   gap: 4px;
   flex-wrap: wrap;
-  margin-top: 4px;
 }
 .spec-chip {
   font-size: 0.62rem;
@@ -1950,13 +1966,17 @@ onMounted(() => {
   color: var(--text-muted);
 }
 
-.svc-footer {
+.svc-action-box {
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
   border-top: 1px solid var(--border-glass);
   padding-top: 8px;
   margin-top: auto;
+}
+.svc-pricing {
+  display: flex;
+  flex-direction: column;
 }
 .svc-price-main {
   font-size: 0.88rem;
@@ -1969,14 +1989,15 @@ onMounted(() => {
   font-weight: 600;
 }
 .svc-check-circle {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: 9999px;
   border: 1.5px solid var(--border-glass);
   background: var(--bg-card);
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: all 0.15s ease;
 }
 .svc-check-circle.checked {
   background: var(--accent-teal);
@@ -2456,13 +2477,193 @@ onMounted(() => {
     font-size: 0.76rem;
   }
 
-  /* Showroom Grid : Suppression du scroll trap interne sur mobile */
+  /* Showroom Grid : Format Liste Horizontale Compacte sur Mobile */
   .showroom-vehicles-grid {
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
     max-height: none !important;
     overflow-y: visible !important;
     padding-right: 0;
+  }
+
+  .showroom-vehicle-card {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 8px 10px;
     gap: 10px;
+    min-height: 80px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-md);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    cursor: pointer;
+    transition: all 0.12s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .showroom-vehicle-card:active {
+    transform: scale(0.985);
+    background: var(--bg-card-hover);
+  }
+
+  .svc-thumb-box {
+    width: 68px;
+    min-width: 68px;
+    height: 56px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-card-subtle);
+    border: 1px solid var(--border-glass);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .svc-image-container {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: transparent;
+    border-radius: 0;
+  }
+  .svc-vehicle-img {
+    width: 92%;
+    height: 92%;
+    object-fit: contain;
+  }
+  .svc-brand-mini-badge {
+    position: absolute;
+    bottom: 2px;
+    left: 2px;
+    top: auto;
+    width: 14px;
+    height: 14px;
+    padding: 1px;
+    border-radius: 3px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-glass);
+  }
+
+  .svc-info-box {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .svc-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 4px;
+  }
+  .svc-title-left {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .svc-brand-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--text-dimmed);
+    text-transform: uppercase;
+  }
+  .svc-name {
+    font-size: 0.85rem;
+    font-weight: 800;
+    color: var(--text-main);
+    margin: 0;
+  }
+  .svc-finition {
+    font-size: 0.65rem;
+    color: var(--text-dimmed);
+    font-weight: 600;
+  }
+  .svc-category-badge {
+    font-size: 0.55rem;
+    padding: 1px 4px;
+    border-radius: 3px;
+    background: var(--bg-card-subtle);
+    color: var(--text-dimmed);
+  }
+
+  .svc-roi-indicator {
+    margin: 1px 0;
+  }
+  .roi-chip-tag {
+    font-size: 0.62rem;
+    font-weight: 800;
+    padding: 1px 5px;
+    border-radius: 3px;
+    width: auto;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .svc-tech-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.62rem;
+    color: var(--text-muted);
+  }
+  .svc-powertrain {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.62rem;
+    max-width: 130px;
+  }
+
+  .svc-action-box {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: space-between;
+    min-width: 68px;
+    gap: 4px;
+    border-top: none;
+    padding-top: 0;
+    margin-top: 0;
+  }
+  .svc-pricing {
+    text-align: right;
+  }
+  .svc-price-main {
+    font-size: 0.85rem;
+    font-weight: 800;
+    color: var(--text-main);
+    line-height: 1.1;
+  }
+  .svc-price-sub {
+    font-size: 0.58rem;
+    color: var(--accent-cyan);
+    font-weight: 600;
+    line-height: 1.1;
+  }
+
+  .svc-check-circle {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    border-radius: 9999px;
+    border: 1.5px solid var(--border-glass);
+    background: var(--bg-card-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .svc-check-circle.checked {
+    background: var(--accent-teal);
+    border-color: var(--accent-teal);
+    color: #fff;
   }
 
   /* Barre d'Action Flottante Fixe en bas sur Mobile */
@@ -2576,85 +2777,47 @@ onMounted(() => {
 @media (max-width: 640px) {
   /* Hero Mobile */
   .luxury-hero-banner {
-    padding: 16px 14px;
+    padding: 14px 12px;
     border-radius: var(--radius-md);
   }
 
   .hero-luxury-title {
-    font-size: 1.25rem;
+    font-size: 1.15rem;
     line-height: 1.25;
   }
 
   .hero-luxury-subtitle {
-    font-size: 0.75rem;
-    margin-bottom: 10px;
+    font-size: 0.72rem;
+    margin-bottom: 8px;
   }
 
   .hero-specs-row {
-    gap: 6px;
+    gap: 5px;
   }
 
   .spec-tag {
-    font-size: 0.65rem;
-    padding: 3px 6px;
+    font-size: 0.62rem;
+    padding: 2px 6px;
   }
 
   /* Stepper ultra-compact */
   .workflow-tabs-nav {
-    padding: 6px 8px;
-    margin: -6px -12px 8px -12px;
+    padding: 6px 6px;
+    margin: -6px -10px 8px -10px;
     gap: 4px;
   }
 
   .workflow-step-btn {
-    padding: 6px 8px;
-    min-width: 100px;
-    font-size: 0.68rem;
-    gap: 5px;
+    padding: 6px 6px;
+    min-width: 90px;
+    font-size: 0.66rem;
+    gap: 4px;
   }
 
   .step-label {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-
-  /* Cartes Showroom 1 colonne */
-  .showroom-vehicles-grid {
-    grid-template-columns: 1fr;
-    gap: 8px;
-  }
-
-  .showroom-vehicle-card {
-    padding: 12px;
-    gap: 8px;
-    border-radius: var(--radius-md);
-  }
-
-  .showroom-vehicle-card:active {
-    transform: scale(0.98);
-  }
-
-  .svc-image-container {
-    height: 80px;
-  }
-
-  .svc-vehicle-img {
-    width: 85%;
-    height: 85%;
-  }
-
-  .svc-name {
-    font-size: 0.9rem;
-  }
-
-  .svc-price-main {
-    font-size: 0.95rem;
-  }
-
-  .svc-check-circle {
-    width: 32px;
-    height: 32px;
   }
 
   /* Formulaire Config */
