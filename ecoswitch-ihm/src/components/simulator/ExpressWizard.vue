@@ -389,6 +389,54 @@ const selectedIncomeTier = ref('standard')
 const showCustomIncome = ref(false)
 const showTaxHelp = ref(false)
 
+// Options statiques pour l'étape 1
+const fuelOptions = [
+  { value: 'PETROL', label: 'Essence', icon: '⛽' },
+  { value: 'DIESEL', label: 'Diesel', icon: '🛢️' },
+  { value: 'HYBRID', label: 'Hybride', icon: '🔋' },
+  { value: 'ELECTRIC', label: 'Électrique', icon: '⚡' }
+]
+
+const consumptionHints = computed(() => {
+  if (props.currentVehicle.fuelType === 'ELECTRIC') {
+    return [
+      { label: '12 kWh', value: 12 },
+      { label: '15 kWh', value: 15 },
+      { label: '18 kWh', value: 18 },
+      { label: '22 kWh', value: 22 }
+    ]
+  }
+  if (props.currentVehicle.fuelType === 'HYBRID') {
+    return [
+      { label: '3.5 L', value: 3.5 },
+      { label: '4.5 L', value: 4.5 },
+      { label: '5.5 L', value: 5.5 }
+    ]
+  }
+  if (props.currentVehicle.fuelType === 'DIESEL') {
+    return [
+      { label: '4 L', value: 4 },
+      { label: '5 L', value: 5 },
+      { label: '6 L', value: 6 },
+      { label: '7 L', value: 7 }
+    ]
+  }
+  return [
+    { label: '5 L', value: 5 },
+    { label: '6.5 L', value: 6.5 },
+    { label: '8 L', value: 8 },
+    { label: '10 L', value: 10 }
+  ]
+})
+
+const resaleHints = [
+  { l: '2 000 €', v: 2000 },
+  { l: '5 000 €', v: 5000 },
+  { l: '8 000 €', v: 8000 },
+  { l: '12 000 €', v: 12000 },
+  { l: '18 000 €', v: 18000 }
+]
+
 onMounted(async () => {
   try {
     const data = await apiGetCatalogVariants()
@@ -480,8 +528,7 @@ const setMileagePreset = (km) => {
 }
 
 const canGoToStep2 = computed(() => {
-  return !!(props.currentVehicle.name &&
-    props.currentVehicle.fuelType &&
+  return !!(props.currentVehicle.fuelType &&
     props.currentVehicle.consumption > 0 &&
     props.currentVehicle.annualMileage > 0)
 })
@@ -575,181 +622,116 @@ const formatFuelBadge = (fuelType) => {
       </div>
     </div>
 
-    <!-- ÉTAPE 1 : VÉHICULE ACTUEL -->
+    <!-- ÉTAPE 1 : VÉHICULE ACTUEL — Saisie directe -->
     <div v-if="currentStep === 1" class="wizard-step-body animation-fadeIn">
-      <div class="step-intro mb-3.5">
+      <div class="step-intro mb-4">
         <h4 class="step-title font-heading text-main">
-          1. Quel véhicule conduisez-vous actuellement ?
+          1. Votre véhicule actuel
         </h4>
         <p class="step-subtitle text-muted text-xs">
-          Sélectionnez votre modèle ou recherchez-le dans le catalogue officiel ADEME.
+          Renseignez les caractéristiques de votre véhicule pour calculer son coût annuel réel.
         </p>
       </div>
 
-      <!-- Grille des voitures actuelles populaires issues du catalogue -->
-      <div class="cars-grid mb-4">
-        <div
-          v-for="car in dynamicCurrentCars"
-          :key="car.id || car.name"
-          class="wizard-car-card"
-          :class="{ selected: currentVehicle.name === car.name }"
-          @click="selectCurrentCar(car)"
-        >
-          <!-- Vignette miniature du modèle (gauche) -->
-          <div class="car-thumbnail-box">
-            <img
-              v-if="car.imageUrl"
-              :src="car.imageUrl"
-              :alt="car.name"
-              class="car-thumbnail-img"
-              @error="(e) => e.target.style.display = 'none'"
-            />
-            <span v-else class="car-thumbnail-fallback">🚗</span>
-          </div>
-
-          <!-- Contenu texte (droite) -->
-          <div class="car-content-box">
-            <div class="car-header-row flex-between">
-              <div class="flex items-center gap-1.5">
-                <img v-if="car.brandLogoUrl" :src="car.brandLogoUrl" class="brand-mini-logo" />
-                <span class="badge badge-small" :class="car.fuelType === 'DIESEL' ? 'badge-amber' : car.fuelType === 'HYBRID' ? 'badge-cyan' : 'badge-teal'">
-                  {{ car.tag }}
-                </span>
-              </div>
-              <div v-if="currentVehicle.name === car.name" class="check-circle flex-center">
-                <Check size="11" />
-              </div>
-            </div>
-            <div class="car-card-name text-main">{{ car.name }}</div>
-            <div class="car-card-meta text-xxs text-dimmed">
-              {{ car.consumption }} L/100km &middot; Reprise ~{{ formatCurrency(car.resaleValue) }}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Option de recherche personnalisée / ADEME -->
-      <div class="custom-search-container p-3 rounded-xl border-glass mb-4 bg-card-subtle">
-        <button
-          type="button"
-          class="btn-toggle-custom flex-between w-100"
-          @click="showCurrentCustom = !showCurrentCustom"
-        >
-          <span class="flex items-center gap-2 text-xs font-semibold text-main">
-            <Search size="14" class="text-teal" />
-            <span>Mon modèle n'est pas dans la liste (Recherche catalogue ADEME)</span>
-          </span>
-          <span class="text-xs text-teal font-semibold">{{ showCurrentCustom ? 'Masquer ▲' : 'Rechercher ▼' }}</span>
-        </button>
-
-        <div v-if="showCurrentCustom" class="custom-search-inputs mt-3 pt-3 border-t border-glass">
-          <div class="form-group relative mb-3">
-            <label class="form-label text-xxs">Rechercher par marque ou modèle</label>
-            <input
-              v-model="searchCurrentQuery"
-              type="text"
-              class="form-control text-xs"
-              placeholder="ex: C4, Clio, Yaris, 308..."
-            />
-            <div v-if="currentSearchResults.length > 0" class="search-dropdown card-glass">
-              <div
-                v-for="v in currentSearchResults"
-                :key="v.id"
-                class="dropdown-item"
-                @click="selectCurrentCar(v)"
+      <!-- Bloc principal : carburant + consommation -->
+      <div class="current-form-card mb-3">
+        <div class="current-form-row">
+          <!-- Type de carburant -->
+          <div class="form-group mb-0 flex-1">
+            <label class="form-label text-xs font-bold">⛽ Type de carburant</label>
+            <div class="fuel-pills-row">
+              <button
+                v-for="fuel in fuelOptions"
+                :key="fuel.value"
+                type="button"
+                class="fuel-pill"
+                :class="{ active: currentVehicle.fuelType === fuel.value }"
+                @click="currentVehicle.fuelType = fuel.value"
               >
-                <span class="font-bold text-xs text-main">{{ v.name }}</span>
-                <span class="text-xxs text-muted">
-                  {{ formatFuelBadge(v.fuelType) }} &middot; {{ v.consumption }} {{ v.fuelType === 'ELECTRIC' ? 'kWh' : 'L' }}/100km
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div class="grid-3-fields">
-            <div class="form-group mb-0">
-              <label class="form-label text-xxs">Nom du modèle</label>
-              <input v-model="currentVehicle.name" type="text" class="form-control text-xs" placeholder="ex: Renault Megane" />
-            </div>
-            <div class="form-group mb-0">
-              <label class="form-label text-xxs">Carburant</label>
-              <select v-model="currentVehicle.fuelType" class="form-control form-select text-xs">
-                <option value="PETROL">Essence</option>
-                <option value="DIESEL">Diesel</option>
-                <option value="HYBRID">Hybride</option>
-                <option value="ELECTRIC">Électrique</option>
-              </select>
-            </div>
-            <div class="form-group mb-0">
-              <label class="form-label text-xxs">Consommation (L/100km)</label>
-              <input v-model.number="currentVehicle.consumption" type="number" step="0.1" class="form-control text-xs" />
+                <span class="fuel-pill-icon">{{ fuel.icon }}</span>
+                <span class="fuel-pill-label">{{ fuel.label }}</span>
+              </button>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- Kilométrage & Valeur de reprise -->
-      <div class="usage-params p-4 rounded-xl border-glass mb-4 bg-card-subtle">
-        <div class="form-group mb-4">
-          <div class="flex-between items-center mb-2">
-            <label class="form-label text-xs font-bold m-0">Votre kilométrage annuel estimé</label>
-            <span class="badge badge-teal font-bold text-sm">{{ Number(currentVehicle.annualMileage || 0).toLocaleString('fr-FR') }} km / an</span>
-          </div>
-          
-          <!-- Presets de km rapides -->
-          <div class="mileage-presets flex gap-2 mb-3">
-            <button
-              type="button"
-              class="btn-preset"
-              :class="{ active: currentVehicle.annualMileage === 8000 }"
-              @click="setMileagePreset(8000)"
-            >
-              8 000 km <span class="preset-desc">(Urbain)</span>
-            </button>
-            <button
-              type="button"
-              class="btn-preset"
-              :class="{ active: currentVehicle.annualMileage === 15000 }"
-              @click="setMileagePreset(15000)"
-            >
-              15 000 km <span class="preset-desc">(Moyenne FR)</span>
-            </button>
-            <button
-              type="button"
-              class="btn-preset"
-              :class="{ active: currentVehicle.annualMileage === 25000 }"
-              @click="setMileagePreset(25000)"
-            >
-              25 000 km <span class="preset-desc">(Gros rouleur)</span>
-            </button>
-          </div>
-
-          <input
-            v-model.number="currentVehicle.annualMileage"
-            type="range"
-            min="3000"
-            max="40000"
-            step="1000"
-            class="w-100 accent-teal cursor-pointer"
-            @input="targetVehicle.annualMileage = currentVehicle.annualMileage"
-          />
-        </div>
-
-        <div class="grid-2-fields">
-          <div class="form-group mb-0">
-            <label class="form-label text-xs">Estimation de valeur de reprise actuelle (€)</label>
+        <!-- Consommation -->
+        <div class="form-group mt-3 mb-0">
+          <label class="form-label text-xs font-bold">
+            📊 Consommation
+            <span class="text-dimmed font-normal">
+              ({{ currentVehicle.fuelType === 'ELECTRIC' ? 'kWh/100km' : 'L/100km' }})
+            </span>
+          </label>
+          <div class="consumption-input-row">
             <input
-              v-model.number="currentVehicle.resaleValue"
+              v-model.number="currentVehicle.consumption"
               type="number"
-              class="form-control text-xs"
-              placeholder="ex: 8000"
+              step="0.1"
+              min="0"
+              class="form-control text-xs consumption-input"
+              :placeholder="currentVehicle.fuelType === 'ELECTRIC' ? 'ex: 15.0' : 'ex: 6.0'"
             />
-            <p class="text-xxs text-dimmed mt-1 m-0">Sera déduite du coût net d'acquisition du nouveau modèle.</p>
+            <div class="consumption-hints">
+              <button
+                v-for="hint in consumptionHints"
+                :key="hint.value"
+                type="button"
+                class="hint-chip"
+                :class="{ active: currentVehicle.consumption === hint.value }"
+                @click="currentVehicle.consumption = hint.value"
+              >{{ hint.label }}</button>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Bouton Suivant Étape 1 -->
+      <!-- Kilométrage annuel -->
+      <div class="current-form-card mb-3">
+        <label class="form-label text-xs font-bold mb-2 block">🗓️ Kilométrage annuel</label>
+        <div class="mileage-presets flex gap-2 mb-3">
+          <button type="button" class="btn-preset flex-1" :class="{ active: currentVehicle.annualMileage === 8000 }" @click="setMileagePreset(8000)">
+            <span class="preset-km">8 000 km</span><span class="preset-desc">Urbain</span>
+          </button>
+          <button type="button" class="btn-preset flex-1" :class="{ active: currentVehicle.annualMileage === 15000 }" @click="setMileagePreset(15000)">
+            <span class="preset-km">15 000 km</span><span class="preset-desc">Moyenne FR</span>
+          </button>
+          <button type="button" class="btn-preset flex-1" :class="{ active: currentVehicle.annualMileage === 25000 }" @click="setMileagePreset(25000)">
+            <span class="preset-km">25 000 km</span><span class="preset-desc">Grand rouleur</span>
+          </button>
+        </div>
+        <div class="flex-between items-center mb-1">
+          <span class="text-xxs text-dimmed">3 000 km</span>
+          <span class="badge badge-teal font-bold">{{ Number(currentVehicle.annualMileage || 0).toLocaleString('fr-FR') }} km / an</span>
+          <span class="text-xxs text-dimmed">40 000 km</span>
+        </div>
+        <input
+          v-model.number="currentVehicle.annualMileage"
+          type="range" min="3000" max="40000" step="500"
+          class="w-100 accent-teal cursor-pointer"
+          @input="targetVehicle.annualMileage = currentVehicle.annualMileage"
+        />
+      </div>
+
+      <!-- Valeur de reprise -->
+      <div class="current-form-card mb-4">
+        <label class="form-label text-xs font-bold mb-1 block">💰 Valeur de reprise estimée de votre véhicule</label>
+        <p class="text-xxs text-dimmed mb-2">Sera déduite du coût net d'acquisition du nouveau véhicule.</p>
+        <div class="resale-input-row">
+          <input
+            v-model.number="currentVehicle.resaleValue"
+            type="number"
+            class="form-control text-xs"
+            placeholder="ex: 8 000"
+          />
+          <span class="resale-unit text-xs text-dimmed">€</span>
+        </div>
+        <div class="resale-hints flex gap-2 mt-2">
+          <button v-for="h in resaleHints" :key="h.v" type="button" class="hint-chip" :class="{ active: currentVehicle.resaleValue === h.v }" @click="currentVehicle.resaleValue = h.v">{{ h.l }}</button>
+        </div>
+      </div>
+
+      <!-- Bouton Suivant -->
       <div class="wizard-actions flex justify-end">
         <button
           type="button"
@@ -757,13 +739,14 @@ const formatFuelBadge = (fuelType) => {
           :disabled="!canGoToStep2"
           @click="nextStep"
         >
-          <span>Continuer vers le logement & les aides</span>
+          <span>Continuer vers le logement &amp; les aides</span>
           <ArrowRight size="16" />
         </button>
       </div>
     </div>
 
     <!-- ÉTAPE 2 : LOGEMENT & AIDES D'ÉTAT -->
+
     <div v-else-if="currentStep === 2" class="wizard-step-body animation-fadeIn">
       <div class="step-intro mb-3.5">
         <h4 class="step-title font-heading text-main">
@@ -1456,5 +1439,126 @@ const formatFuelBadge = (fuelType) => {
   .stepper-track {
     padding: 0;
   }
+}
+
+/* ── Step 1 Direct Form ─────────────────────────────────────── */
+.current-form-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+}
+
+/* Fuel pills */
+.fuel-pills-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.fuel-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border-glass);
+  background: var(--bg-card-subtle);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex: 1;
+  min-width: 64px;
+}
+.fuel-pill:hover {
+  border-color: var(--border-hover);
+}
+.fuel-pill.active {
+  border-color: var(--accent-teal);
+  background: var(--accent-teal-soft);
+  box-shadow: 0 0 0 1px var(--accent-teal);
+}
+.fuel-pill-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+.fuel-pill-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.fuel-pill.active .fuel-pill-label {
+  color: var(--accent-teal);
+}
+
+/* Consumption row */
+.consumption-input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.consumption-input {
+  width: 100px;
+  flex-shrink: 0;
+}
+.consumption-hints {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Generic hint chip */
+.hint-chip {
+  padding: 4px 10px;
+  border-radius: 9999px;
+  border: 1px solid var(--border-glass);
+  background: var(--bg-card-subtle);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.hint-chip:hover {
+  border-color: var(--border-hover);
+  color: var(--text-main);
+}
+.hint-chip.active {
+  border-color: var(--accent-teal);
+  background: var(--accent-teal-soft);
+  color: var(--accent-teal);
+}
+
+/* Mileage preset km label */
+.preset-km {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+.btn-preset .preset-desc {
+  display: block;
+  font-size: 0.62rem;
+  color: var(--text-dimmed);
+  font-weight: 500;
+}
+.btn-preset.flex-1 {
+  text-align: center;
+  padding: 6px 8px;
+}
+
+/* Resale row */
+.resale-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.resale-unit {
+  font-weight: 700;
+}
+.resale-hints {
+  flex-wrap: wrap;
 }
 </style>
