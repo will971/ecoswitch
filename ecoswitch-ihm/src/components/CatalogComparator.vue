@@ -447,35 +447,39 @@ onMounted(() => {
       </div>
     </header>
 
-    <!-- ── 2. WORKFLOW STEPPER ──────────────────────────────────────────────── -->
-    <div class="workflow-tabs-nav">
+    <!-- ── 2. WORKFLOW STEPPER SEGMENTÉ (DESIGN HARMONIEUX SANS TRONCATURE) ── -->
+    <nav class="workflow-stepper-track" aria-label="Étapes du comparateur">
       <button 
-        class="workflow-step-btn" 
+        type="button"
+        class="stepper-tab" 
         :class="{ active: activeMobileView === 'config' }"
         @click="switchMobileTab('config')"
       >
-        <span class="step-num">1</span>
-        <span class="step-label">1. Véhicule Source</span>
+        <span class="stepper-pill-badge">1</span>
+        <span class="stepper-tab-text">Référence</span>
       </button>
 
       <button 
-        class="workflow-step-btn" 
+        type="button"
+        class="stepper-tab" 
         :class="{ active: activeMobileView === 'showroom' }"
         @click="switchMobileTab('showroom')"
       >
-        <span class="step-num">2</span>
-        <span class="step-label">2. Showroom ({{ selectedTargetIds.length }})</span>
+        <span class="stepper-pill-badge">2</span>
+        <span class="stepper-tab-text">Showroom</span>
+        <span v-if="selectedTargetIds.length > 0" class="stepper-counter-dot">{{ selectedTargetIds.length }}</span>
       </button>
 
       <button 
-        class="workflow-step-btn" 
+        type="button"
+        class="stepper-tab" 
         :class="{ active: activeMobileView === 'results', disabled: !result }"
         @click="result && switchMobileTab('results')"
       >
-        <span class="step-num">3</span>
-        <span class="step-label">3. Tableau de Bord</span>
+        <span class="stepper-pill-badge">3</span>
+        <span class="stepper-tab-text">Résultats</span>
       </button>
-    </div>
+    </nav>
 
     <!-- ── 3. MAIN DUAL / TRIPLE PANE CONTENT ──────────────────────────────── -->
     <div class="luxury-main-grid">
@@ -1294,51 +1298,92 @@ onMounted(() => {
   filter: drop-shadow(0 10px 20px rgba(0,0,0,0.15));
 }
 
-/* ── 2. WORKFLOW STEPPER TABS ─────────────────────────────────────────── */
-.workflow-tabs-nav {
+/* ── 2. WORKFLOW STEPPER SEGMENTED TRACK ─────────────────────────────── */
+.workflow-stepper-track {
   display: none;
-  gap: 8px;
 }
+
 @media (max-width: 1024px) {
-  .workflow-tabs-nav {
-    display: flex;
-    overflow-x: auto;
-    padding-bottom: 4px;
+  .workflow-stepper-track {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    padding: 4px;
+    background: var(--bg-card-subtle);
+    border: 1px solid var(--border-glass);
+    border-radius: 12px;
+    width: 100%;
+    box-sizing: border-box;
   }
 }
-.workflow-step-btn {
+
+.stepper-tab {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  border-radius: var(--radius-full);
-  background: var(--bg-card);
-  border: 1px solid var(--border-glass);
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 6px;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
   color: var(--text-muted);
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  min-width: 0;
+  overflow: hidden;
 }
-.workflow-step-btn.active {
-  background: var(--accent-teal-soft);
+.stepper-tab:hover {
+  color: var(--text-main);
+}
+.stepper-tab.active {
+  background: var(--bg-card);
   color: var(--accent-teal);
-  border-color: var(--accent-teal);
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
 }
-.workflow-step-btn.disabled {
+.stepper-tab.disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
-.step-num {
+
+.stepper-pill-badge {
   width: 18px;
   height: 18px;
+  min-width: 18px;
   border-radius: 9999px;
-  background: rgba(0,0,0,0.06);
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text-dimmed);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   font-weight: 800;
+}
+[data-theme="dark"] .stepper-pill-badge {
+  background: rgba(255, 255, 255, 0.08);
+}
+.stepper-tab.active .stepper-pill-badge {
+  background: var(--accent-teal);
+  color: #ffffff;
+}
+
+.stepper-tab-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stepper-counter-dot {
+  padding: 1px 5px;
+  border-radius: 9999px;
+  background: var(--accent-teal);
+  color: #ffffff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1;
 }
 .workflow-step-btn.active .step-num {
   background: var(--accent-teal);
@@ -2483,34 +2528,34 @@ onMounted(() => {
     display: none !important;
   }
 
-  /* Stepper Sticky Navigation sous le header mobile (56px) */
-  .workflow-tabs-nav {
+  /* Stepper Sticky Segmented Navigation sous le header mobile (56px) */
+  .workflow-stepper-track {
+    display: grid;
     position: sticky;
     top: 56px;
     z-index: 85;
-    background: var(--bg-app, #F5F5F7);
-    background: linear-gradient(180deg, var(--bg-card) 0%, rgba(var(--bg-card-rgb, 255, 255, 255), 0.92) 100%);
+    background: var(--bg-card);
+    background: linear-gradient(180deg, var(--bg-card) 0%, rgba(var(--bg-card-rgb, 255, 255, 255), 0.94) 100%);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    padding: 8px 10px;
-    margin: -8px -12px 10px -12px;
-    width: calc(100% + 24px);
+    padding: 5px;
+    margin: -4px 0 10px 0;
+    width: 100%;
     box-sizing: border-box;
-    border-bottom: 1px solid var(--border-glass);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+    border: 1px solid var(--border-glass);
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
   }
-  [data-theme="dark"] .workflow-tabs-nav {
-    background: linear-gradient(180deg, rgba(22, 22, 24, 0.98) 0%, rgba(16, 16, 18, 0.92) 100%);
+  [data-theme="dark"] .workflow-stepper-track {
+    background: linear-gradient(180deg, rgba(22, 22, 24, 0.98) 0%, rgba(16, 16, 18, 0.94) 100%);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   }
 
-  .workflow-step-btn {
-    padding: 8px 10px;
-    font-size: 0.72rem;
-    font-weight: 700;
-    flex: 1;
-    min-width: 100px;
-    justify-content: center;
-    border-radius: var(--radius-md);
+  .stepper-tab {
+    padding: 7px 4px;
+    font-size: 0.74rem;
+    gap: 5px;
+    border-radius: 8px;
   }
 
   .step-num {
