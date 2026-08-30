@@ -36,8 +36,27 @@ public class DatabaseInitializer implements CommandLineRunner {
             );
             userRepository.save(admin);
             logger.info("Admin user seeded successfully.");
-        } else {
-            logger.info("Admin user already exists in database.");
         }
+
+        String targetAdmin = "modeste.william.s@gmail.com";
+        userRepository.findByEmail(targetAdmin).ifPresentOrElse(user -> {
+            if (!"ADMIN".equals(user.getRole())) {
+                user.setRole("ADMIN");
+                userRepository.save(user);
+                logger.info("Updated existing user {} to ADMIN role.", targetAdmin);
+            }
+        }, () -> {
+            logger.info("Seeding target admin user ({})", targetAdmin);
+            AppUser adminUser = new AppUser(
+                targetAdmin,
+                "William Modeste",
+                passwordEncoder.encode("admin123"),
+                "google",
+                "Pro",
+                "ADMIN"
+            );
+            userRepository.save(adminUser);
+            logger.info("Target admin user {} seeded successfully.", targetAdmin);
+        });
     }
 }

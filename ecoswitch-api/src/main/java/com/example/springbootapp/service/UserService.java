@@ -28,15 +28,18 @@ public class UserService {
      * @throws IllegalArgumentException si l'email est déjà utilisé
      */
     public AppUser register(String email, String name, String rawPassword) {
-        if (userRepository.existsByEmail(email)) {
+        String normalizedEmail = email.trim().toLowerCase();
+        if (userRepository.existsByEmail(normalizedEmail)) {
             throw new IllegalArgumentException("Un compte existe déjà avec cet email.");
         }
+        String role = isAdminEmail(normalizedEmail) ? "ADMIN" : "USER";
         AppUser user = new AppUser(
-                email,
+                normalizedEmail,
                 name,
                 passwordEncoder.encode(rawPassword),
                 "email",
-                "Pro"
+                "Pro",
+                role
         );
         return userRepository.save(user);
     }
@@ -49,11 +52,16 @@ public class UserService {
      * @throws IllegalArgumentException si email inconnu ou mot de passe incorrect
      */
     public AppUser login(String email, String rawPassword) {
-        AppUser user = userRepository.findByEmail(email)
+        String normalizedEmail = email.trim().toLowerCase();
+        AppUser user = userRepository.findByEmail(normalizedEmail)
                 .orElseThrow(() -> new IllegalArgumentException("Email ou mot de passe incorrect."));
 
         if (user.getPasswordHash() == null || !passwordEncoder.matches(rawPassword, user.getPasswordHash())) {
             throw new IllegalArgumentException("Email ou mot de passe incorrect.");
+        }
+        if (isAdminEmail(normalizedEmail) && !"ADMIN".equals(user.getRole())) {
+            user.setRole("ADMIN");
+            user = userRepository.save(user);
         }
         return user;
     }
@@ -65,14 +73,28 @@ public class UserService {
      * Si l'email existe déjà avec un autre provider, le compte est lié.
      */
     public AppUser upsertGoogleUser(String email, String name) {
-        return userRepository.findByEmail(email).orElseGet(() -> {
-            AppUser newUser = new AppUser(email, name, null, "google", "Pro");
+        String normalizedEmail = email.trim().toLowerCase();
+        return userRepository.findByEmail(normalizedEmail).map(existing -> {
+            if (isAdminEmail(normalizedEmail) && !"ADMIN".equals(existing.getRole())) {
+                existing.setRole("ADMIN");
+                return userRepository.save(existing);
+            }
+            return existing;
+        }).orElseGet(() -> {
+            String role = isAdminEmail(normalizedEmail) ? "ADMIN" : "USER";
+            AppUser newUser = new AppUser(normalizedEmail, name, null, "google", "Pro", role);
             return userRepository.save(newUser);
         });
     }
 
     public java.util.Optional<AppUser> findByEmail(String email) {
         return userRepository.findByEmail(email);
+    }
+
+    public boolean isAdminEmail(String email) {
+        if (email == null) return false;
+        String e = email.trim().toLowerCase();
+        return "modeste.william.s@gmail.com".equals(e) || "admin".equals(e) || "admin@ecoswitch.com".equals(e);
     }
 }
 

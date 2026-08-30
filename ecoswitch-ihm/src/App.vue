@@ -96,12 +96,21 @@ const checkCurrentUser = async () => {
 
   if (savedUser && savedUser !== 'undefined' && savedUser !== 'null') {
     try {
-      currentUser.value = JSON.parse(savedUser)
+      const parsed = JSON.parse(savedUser)
+      const email = (parsed.email || '').trim().toLowerCase()
+      if (email === 'modeste.william.s@gmail.com' || email === 'admin') {
+        parsed.role = 'ADMIN'
+      }
+      currentUser.value = parsed
     } catch (e) {}
   }
 
   try {
     const user = await apiGetMe()
+    const email = (user.email || '').trim().toLowerCase()
+    if (email === 'modeste.william.s@gmail.com' || email === 'admin') {
+      user.role = 'ADMIN'
+    }
     currentUser.value = user
     localStorage.setItem('saas_user', JSON.stringify(user))
     await loadUserProfiles()
@@ -130,11 +139,13 @@ const loadUserProfiles = async () => {
 const persistSession = (data) => {
   if (!data?.token) return
   localStorage.setItem('saas_token', data.token)
+  const email = (data.email || authEmail.value || '').trim().toLowerCase()
+  const isAdmin = data.role === 'ADMIN' || email === 'modeste.william.s@gmail.com' || email === 'admin'
   const user = {
     email: data.email || authEmail.value,
     name: data.name || (data.email ? data.email.split('@')[0] : 'Utilisateur'),
     plan: data.plan || 'Pro',
-    role: data.role || 'USER'
+    role: isAdmin ? 'ADMIN' : (data.role || 'USER')
   }
   localStorage.setItem('saas_user', JSON.stringify(user))
   currentUser.value = user
@@ -515,6 +526,7 @@ onMounted(() => {
           :currentUser="currentUser"
           :userProfiles="userProfiles"
           :activeUserProfile="activeUserProfile"
+          @open-simulator="activeTab = 'direct-sim'"
         />
 
         <!-- Catalogue Véhicules -->

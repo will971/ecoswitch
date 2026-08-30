@@ -14,9 +14,16 @@ import com.example.springbootapp.controller.comparison.ComparisonController.Dire
 import com.example.springbootapp.controller.comparison.ComparisonController.ProfitabilityComparisonRequest;
 import com.example.springbootapp.controller.comparison.ComparisonController.ProfitabilityComparisonResponse;
 import com.example.springbootapp.controller.comparison.ComparisonController.VehicleProfitability;
+import com.example.springbootapp.model.entity.Brand;
+import com.example.springbootapp.model.entity.Finition;
+import com.example.springbootapp.model.entity.FinitionMotorisation;
+import com.example.springbootapp.model.entity.Motorisation;
+import com.example.springbootapp.model.entity.VehicleModel;
 import com.example.springbootapp.model.entity.Vehicule;
+import com.example.springbootapp.repository.FinitionMotorisationRepository;
 import com.example.springbootapp.service.CostCalculationService;
 import com.example.springbootapp.service.VehiculeService;
+import java.util.Optional;
 
 @Component
 public class ComparisonBusiness {
@@ -24,17 +31,21 @@ public class ComparisonBusiness {
     private static final int DEFAULT_MAX_YEARS = 15;
 
     private final VehiculeService vehiculeService;
+    private final FinitionMotorisationRepository finitionMotorisationRepository;
     private final CostCalculationService costCalculationService;
 
-    public ComparisonBusiness(VehiculeService vehiculeService, CostCalculationService costCalculationService) {
+    public ComparisonBusiness(VehiculeService vehiculeService,
+                              FinitionMotorisationRepository finitionMotorisationRepository,
+                              CostCalculationService costCalculationService) {
         this.vehiculeService = vehiculeService;
+        this.finitionMotorisationRepository = finitionMotorisationRepository;
         this.costCalculationService = costCalculationService;
     }
 
     public ProfitabilityComparisonResponse compareProfitability(ProfitabilityComparisonRequest request) {
         validateRequest(request);
 
-        Vehicule currentVehicle = vehiculeService.findById(request.currentVehicleId());
+        Vehicule currentVehicle = resolveVehicle(request.currentVehicleId());
         Integer requestedMaxYears = request.maxYears();
         int maxYears = requestedMaxYears == null ? DEFAULT_MAX_YEARS : requestedMaxYears;
         List<VehicleProfitability> alternatives = new ArrayList<>();
@@ -43,7 +54,7 @@ public class ComparisonBusiness {
             if (targetVehicleId.equals(request.currentVehicleId())) {
                 continue;
             }
-            Vehicule targetVehicle = vehiculeService.findById(targetVehicleId);
+            Vehicule targetVehicle = resolveVehicle(targetVehicleId);
             double currentAnnualCost = costCalculationService.calculateAnnualCost(
                     currentVehicle,
                     costCalculationService.resolveFuelPrice(currentVehicle, request.fuelPricesByType()));
@@ -102,7 +113,7 @@ public class ComparisonBusiness {
         List<VehicleProfitability> alternatives = new ArrayList<>();
 
         for (Long targetVehicleId : request.targetVehicleIds()) {
-            Vehicule targetVehicle = vehiculeService.findById(targetVehicleId);
+            Vehicule targetVehicle = resolveVehicle(targetVehicleId);
             double currentAnnualCost = costCalculationService.calculateAnnualCost(
                     currentVehicle,
                     costCalculationService.resolveFuelPrice(currentVehicle, request.fuelPricesByType()));
@@ -223,7 +234,7 @@ public class ComparisonBusiness {
         double monthlySavings = currentMonthlyTotalCost - targetMonthlyTotalCost;
 
         // Recommendations
-        List<Vehicule> catalog = vehiculeService.findAll();
+        List<Vehicule> catalog = getAllVehicles();
         List<VehicleProfitability> recommendations = new ArrayList<>();
 
         for (Vehicule catalogVehicle : catalog) {
@@ -347,5 +358,59 @@ public class ComparisonBusiness {
     private Integer breakEvenSortingValue(VehicleProfitability item) {
         Integer breakEvenYear = item.breakEvenYear();
         return breakEvenYear == null ? Integer.MAX_VALUE : breakEvenYear;
+    }
+
+    private Vehicule resolveVehicle(Long id) {
+        if (id == null) return null;
+        Optional<FinitionMotorisation> opt = finitionMotorisationRepository.findById(id);
+        if (opt.isPresent()) {
+            FinitionMotorisation fm = opt.get();
+            Motorisation m = fm.getMotorisation();
+            Finition f = fm.getFinition();
+            VehicleModel model = m.getModel();
+            Brand brand = model.getBrand();
+
+            Vehicule v = new Vehicule();
+            v.setId(fm.getId());
+            v.setName(brand.getName() + " " + model.getName() + " " + m.getName() + " " + f.getName());
+            v.setBrand(brand.getName());
+            v.setModel(model.getName());
+            v.setVersion(m.getName() + " - " + f.getName());
+            v.setFuelType(m.getFuelType());
+            v.setConsumption(m.getConsumptionWltp());
+            v.setPurchasePrice(fm.getPurchasePrice());
+            v.setInsuranceCost(fm.getDefaultInsuranceCost() != null ? fm.getDefaultInsuranceCost() : 650.0);
+            v.setMaintenanceCost(fm.getDefaultMaintenanceCost() != null ? fm.getDefaultMaintenanceCost() : 250.0);
+            v.setResaleValue(fm.getEstimatedResaleValue() != null ? fm.getEstimatedResaleValue() : 0.0);
+            v.setUrl(f.getImageUrl() != null ? f.getImageUrl() : model.getImageUrl());
+            return v;
+        }
+        return vehiculeService.findById(id);
+    }
+
+    private List<Vehicule> getAllVehicles() {
+        List<Vehicule> list = new ArrayList<>(vehiculeService.findAll());
+        for (FinitionMotorisation fm : finitionMotorisationRepository.findAll()) {
+            Motorisation m = fm.getMotorisation();
+            Finition f = fm.getFinition();
+            VehicleModel model = m.getModel();
+            Brand brand = model.getBrand();
+
+            Vehicule v = new Vehicule();
+            v.setId(fm.getId());
+            v.setName(brand.getName() + " " + model.getName() + " " + m.getName() + " " + f.getName());
+            v.setBrand(brand.getName());
+            v.setModel(model.getName());
+            v.setVersion(m.getName() + " - " + f.getName());
+            v.setFuelType(m.getFuelType());
+            v.setConsumption(m.getConsumptionWltp());
+            v.setPurchasePrice(fm.getPurchasePrice());
+            v.setInsuranceCost(fm.getDefaultInsuranceCost() != null ? fm.getDefaultInsuranceCost() : 650.0);
+            v.setMaintenanceCost(fm.getDefaultMaintenanceCost() != null ? fm.getDefaultMaintenanceCost() : 250.0);
+            v.setResaleValue(fm.getEstimatedResaleValue() != null ? fm.getEstimatedResaleValue() : 0.0);
+            v.setUrl(f.getImageUrl() != null ? f.getImageUrl() : model.getImageUrl());
+            list.add(v);
+        }
+        return list;
     }
 }

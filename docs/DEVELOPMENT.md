@@ -86,13 +86,46 @@ Vous y trouverez tous les schémas de requêtes et de réponses pour les contrô
 
 ---
 
-## 5. Peuplement de la Base de Données (Seeding)
+## 5. Peuplement du Catalogue & Seeding
 
-Au démarrage du backend, l'application initialise sa base de données à l'aide de trois sources complémentaires de données définies dans [AdemeService.java](../ecoswitch-api/src/main/java/com/example/springbootapp/service/AdemeService.java) et [VehiculeSeedLoader.java](../ecoswitch-api/src/main/java/com/example/springbootapp/service/VehiculeSeedLoader.java) :
+### A. Script de Peuplement du Catalogue (`scripts/seed_catalog.py`)
+Un script Python autonome permet de peupler l'intégralité du catalogue relationnel (20 constructeurs majeurs, 61 modèles, silhouettes vectorielles, 99 motorisations avec consommations WLTP certifiées, 133 finitions et 138 variantes tarifées Comptant / LOA / LLD).
 
-1.  **Données Historiques (`vehicules-seed.csv`)** : Fichier local contenant des véhicules d'anciennes générations (années 2000 à 2015) avec des codes de génération détaillés (ex: BMW E46, Clio II) permettant d'alimenter les profils de véhicules actuels des utilisateurs.
-2.  **Base de Données ADEME (`ademe-car-labelling.csv`)** : Un extrait officiel du jeu de données ADEME (Car Labelling 2022/2023) contenant environ 10 000 versions de véhicules neufs avec leurs consommations WLTP réelles et leurs types d'énergie associés.
-3.  **JSON Distant (Optionnel)** : Chargement de véhicules de référence via une URL GitHub paramétrée sous la clé `app.seed.vehicles-url` dans `application.yaml`.
+Ce script prend en charge le ciblage d'environnements :
+
+*   **Environnement Local** (par défaut - `http://localhost:8080`) :
+    ```bash
+    python3 scripts/seed_catalog.py
+    # ou
+    python3 scripts/seed_catalog.py local
+    # ou via Makefile :
+    make seed-local
+    ```
+
+*   **Environnement de Production** (`https://ecoswitch-api.up.railway.app`) :
+    ```bash
+    python3 scripts/seed_catalog.py prod
+    # ou via Makefile :
+    make seed-prod
+    ```
+
+*   **Environnement Personnalisé (URL Directe)** :
+    ```bash
+    python3 scripts/seed_catalog.py --url https://mon-serveur-api.com
+    ```
+
+*   **Tests automatisés du script** :
+    ```bash
+    python3 scripts/test_seed_catalog.py
+    # ou
+    make test-scripts
+    ```
+
+### B. Sources Historiques & ADEME
+Au démarrage du backend, l'application peut également initialiser des données complémentaires via [AdemeService.java](../ecoswitch-api/src/main/java/com/example/springbootapp/service/AdemeService.java) et [VehiculeSeedLoader.java](../ecoswitch-api/src/main/java/com/example/springbootapp/service/VehiculeSeedLoader.java) :
+
+1.  **Données Historiques (`vehicules-seed.csv`)** : Fichier local contenant des véhicules d'anciennes générations (années 2000 à 2015) pour les profils de garage des utilisateurs.
+2.  **Base de Données ADEME (`ademe-car-labelling.csv`)** : Extrait officiel ADEME (Car Labelling).
 
 ---
 

@@ -1,6 +1,7 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { CheckCircle2, AlertCircle, Wrench, Search, Car, Sparkles } from '@lucide/vue'
+import { ref, computed } from 'vue'
+import { CheckCircle2, AlertCircle, Wrench, Search, Car, Sparkles, SlidersHorizontal } from '@lucide/vue'
+import CatalogCascadeSelector from '@/components/common/CatalogCascadeSelector.vue'
 
 const props = defineProps({
   vehicle: {
@@ -32,32 +33,13 @@ const emit = defineEmits([
   'annual-mileage-change'
 ])
 
-// ADEME select states
-const brands = ref([])
-const models = ref([])
-const versions = ref([])
-const selectedBrand = ref('')
-const selectedModel = ref('')
-const selectedVersion = ref(null)
-
-const showSuggestions = ref(false)
-const suggestions = ref([])
+const showCascadeSelector = ref(true)
+const showCustomInputs = ref(false)
 
 const localRepairCost = computed({
   get: () => props.immediateRepairCost,
   set: (val) => emit('update:immediateRepairCost', val)
 })
-
-const filterSuggestions = () => {
-  const query = props.vehicle.name.trim().toLowerCase()
-  if (!query) {
-    suggestions.value = []
-    return
-  }
-  suggestions.value = props.catalogVehicles
-    .filter(v => v.name.toLowerCase().includes(query))
-    .slice(0, 5)
-}
 
 const getDefaultInsuranceCost = (fuelType) => {
   switch (fuelType) {
@@ -77,13 +59,16 @@ const getDefaultMaintenanceCost = (fuelType) => {
   }
 }
 
-const selectSuggestion = (v) => {
-  props.vehicle.name = v.name
+const handleVariantSelected = (v) => {
+  props.vehicle.name = `${v.brand} ${v.model} ${v.version}`
+  props.vehicle.brand = v.brand
+  props.vehicle.model = v.model
+  props.vehicle.version = v.version
   props.vehicle.fuelType = v.fuelType
   props.vehicle.consumption = v.consumption
-  if (v.annualMileage) props.vehicle.annualMileage = v.annualMileage
   props.vehicle.insuranceCost = v.insuranceCost || getDefaultInsuranceCost(v.fuelType)
   props.vehicle.maintenanceCost = v.maintenanceCost || getDefaultMaintenanceCost(v.fuelType)
+  
   if (props.type === 'current' && v.resaleValue !== undefined) {
     props.vehicle.resaleValue = v.resaleValue
   }
@@ -91,21 +76,7 @@ const selectSuggestion = (v) => {
     props.vehicle.purchasePrice = v.purchasePrice
   }
 
-  suggestions.value = []
-  showSuggestions.value = false
-
   emit('suggestion-selected', props.vehicle)
-}
-
-const closeSuggestionsWithDelay = () => {
-  setTimeout(() => {
-    showSuggestions.value = false
-  }, 200)
-}
-
-const onNameFocus = () => {
-  showSuggestions.value = true
-  filterSuggestions()
 }
 
 const formatFuelType = (type) => {
@@ -123,158 +94,68 @@ const onMileageInput = () => {
     emit('annual-mileage-change', props.vehicle.annualMileage)
   }
 }
-
-// ADEME Service fetchers
-const fetchBrands = async () => {
-  try {
-    const res = await fetch('/api/v1/ademe/brands')
-    if (res.ok) {
-      brands.value = await res.json()
-    }
-  } catch (err) {
-    console.error('Erreur chargement marques ADEME:', err)
-  }
-}
-
-const fetchModels = async () => {
-  models.value = []
-  versions.value = []
-  selectedModel.value = ''
-  selectedVersion.value = null
-  
-  if (!selectedBrand.value) return
-
-  try {
-    const res = await fetch(`/api/v1/ademe/models?brand=${encodeURIComponent(selectedBrand.value)}`)
-    if (res.ok) {
-      models.value = await res.json()
-    }
-  } catch (err) {
-    console.error('Erreur chargement modèles ADEME:', err)
-  }
-}
-
-const fetchVersions = async () => {
-  versions.value = []
-  selectedVersion.value = null
-  
-  if (!selectedBrand.value || !selectedModel.value) return
-
-  try {
-    const res = await fetch(`/api/v1/ademe/versions?brand=${encodeURIComponent(selectedBrand.value)}&model=${encodeURIComponent(selectedModel.value)}`)
-    if (res.ok) {
-      versions.value = await res.json()
-    }
-  } catch (err) {
-    console.error('Erreur chargement versions ADEME:', err)
-  }
-}
-
-const onVersionChange = () => {
-  if (!selectedVersion.value) return
-
-  const v = selectedVersion.value
-  props.vehicle.name = `${v.brand} ${v.model} ${v.version}`
-  props.vehicle.fuelType = v.fuelType
-  props.vehicle.consumption = v.consumption
-  
-  if (v.annualMileage) props.vehicle.annualMileage = v.annualMileage
-  props.vehicle.insuranceCost = v.insuranceCost || getDefaultInsuranceCost(v.fuelType)
-  props.vehicle.maintenanceCost = v.maintenanceCost || getDefaultMaintenanceCost(v.fuelType)
-  
-  if (props.type === 'current' && v.resaleValue !== undefined) {
-    props.vehicle.resaleValue = v.resaleValue
-  }
-  if (props.type === 'target' && v.purchasePrice !== undefined) {
-    props.vehicle.purchasePrice = v.purchasePrice
-  }
-
-  emit('suggestion-selected', props.vehicle)
-}
-
-onMounted(() => {
-  fetchBrands()
-})
 </script>
 
 <template>
   <div class="vehicle-form-block card-glass p-4 mb-4">
     
-    <!-- Sélecteur ADEME Rapide -->
-    <div class="ademe-quick-box mb-3.5 p-3 rounded-xl border-glass bg-card-subtle">
-      <label class="form-label text-xxs uppercase mb-2 block font-bold text-teal flex items-center gap-1">
-        <Sparkles size="13" />
-        <span>Remplissage automatique ADEME (Marque / Modèle / Version)</span>
-      </label>
-      <div class="grid-3-fields gap-2">
-        <div class="form-group mb-0">
-          <select v-model="selectedBrand" class="form-control form-select text-xs" @change="fetchModels">
-            <option value="">1. Marque</option>
-            <option v-for="b in brands" :key="b" :value="b">{{ b }}</option>
-          </select>
-        </div>
-        <div class="form-group mb-0">
-          <select v-model="selectedModel" :disabled="!selectedBrand" class="form-control form-select text-xs" @change="fetchVersions">
-            <option value="">2. Modèle</option>
-            <option v-for="m in models" :key="m" :value="m">{{ m }}</option>
-          </select>
-        </div>
-        <div class="form-group mb-0">
-          <select v-model="selectedVersion" :disabled="!selectedModel" class="form-control form-select text-xs" @change="onVersionChange">
-            <option :value="null">3. Version / Moteur</option>
-            <option v-for="v in versions" :key="v.version" :value="v">{{ v.version }}</option>
-          </select>
-        </div>
+    <!-- Sélecteur Relationnel en Cascade -->
+    <div class="catalog-cascade-box mb-4 p-3.5 rounded-2xl border-glass bg-card-subtle">
+      <CatalogCascadeSelector
+        :label="type === 'current' ? 'Sélectionnez votre véhicule actuel' : 'Sélectionnez votre futur véhicule'"
+        :initial-brand="vehicle.brand || ''"
+        :initial-model="vehicle.model || ''"
+        @select-variant="handleVariantSelected"
+      />
+    </div>
+
+    <!-- Toggle d'ajustement / personnalisation des champs -->
+    <div class="flex items-center justify-between py-2 border-t border-glass mb-3">
+      <div class="flex items-center space-x-1.5 text-xs text-dimmed font-medium">
+        <SlidersHorizontal size="13" class="text-teal" />
+        <span>Détails & Personnalisation libre</span>
       </div>
+      <button
+        type="button"
+        @click="showCustomInputs = !showCustomInputs"
+        class="text-xs text-teal font-semibold hover:underline"
+      >
+        {{ showCustomInputs ? 'Masquer les détails' : 'Afficher / Ajuster les détails' }}
+      </button>
     </div>
 
     <!-- Nom du modèle -->
-    <div class="form-group relative mb-3">
-      <label class="form-label text-xs">Nom du modèle</label>
+    <div class="form-group mb-3">
+      <label class="form-label text-xs">Libellé du véhicule</label>
       <input
         v-model="vehicle.name"
         type="text"
-        class="form-control text-xs"
-        :placeholder="type === 'current' ? 'ex: Peugeot 208 II PureTech 100' : 'ex: Tesla Model 3 RWD'"
+        class="form-control text-xs font-semibold"
+        :placeholder="type === 'current' ? 'ex: Peugeot 208 PureTech 100' : 'ex: Tesla Model 3 RWD'"
         required 
-        @input="filterSuggestions" 
-        @focus="onNameFocus" 
-        @blur="closeSuggestionsWithDelay"
       />
-      
-      <div v-if="showSuggestions && suggestions.length > 0" class="autocomplete-dropdown card-glass">
-        <div v-for="v in suggestions" :key="v.id" class="suggestion-item" @mousedown="selectSuggestion(v)">
-          <div class="suggestion-info">
-            <span class="suggestion-name text-main">{{ v.name }}</span>
-            <span class="suggestion-meta text-muted">
-              {{ formatFuelType(v.fuelType) }} &middot; {{ v.consumption }} {{ v.fuelType === 'ELECTRIC' ? 'kWh' : 'L' }}/100km
-            </span>
-          </div>
-          <span class="badge badge-teal badge-small">Base</span>
-        </div>
-      </div>
     </div>
 
-    <!-- Type d'énergie & Consommation -->
+    <!-- Champs principaux : Énergie, Consommation et Prix/Reprise -->
     <div class="grid-2-fields gap-3 mb-3">
       <div class="form-group mb-0">
         <label class="form-label text-xs">Type d'énergie</label>
         <select v-model="vehicle.fuelType" class="form-control form-select text-xs">
           <option value="" disabled>Sélectionnez une énergie</option>
+          <option value="ELECTRIC">Électrique</option>
+          <option value="HYBRID">Hybride</option>
           <option value="PETROL">Essence</option>
           <option value="DIESEL">Diesel</option>
-          <option value="HYBRID">Hybride</option>
-          <option value="ELECTRIC">Électrique</option>
         </select>
       </div>
       <div class="form-group mb-0">
         <label class="form-label text-xs">Consommation ({{ vehicle.fuelType === 'ELECTRIC' ? 'kWh' : 'L' }}/100km)</label>
-        <input v-model.number="vehicle.consumption" type="number" step="0.1" class="form-control text-xs" placeholder="ex: 5.5" required />
+        <input v-model.number="vehicle.consumption" type="number" step="0.1" class="form-control text-xs font-semibold" placeholder="ex: 15.5" required />
       </div>
     </div>
 
     <!-- Mode Avancé : Assurance, Entretien et Reprise/Prix -->
-    <div v-if="isAdvanced" class="grid-3-fields gap-2 mb-3">
+    <div v-if="isAdvanced || showCustomInputs" class="grid-3-fields gap-2 mb-3">
       <div class="form-group mb-0">
         <label class="form-label text-xxs">Assurance (€/an)</label>
         <input v-model.number="vehicle.insuranceCost" type="number" class="form-control text-xs" required />
@@ -324,40 +205,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.autocomplete-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  z-index: 50;
-  max-height: 180px;
-  overflow-y: auto;
-  border-radius: 12px;
-  margin-top: 4px;
-}
-
-.suggestion-item {
-  padding: 8px 12px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-}
-.suggestion-item:hover {
-  background: hsla(var(--accent-teal) / 0.15);
-}
-
-.suggestion-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.suggestion-name {
-  font-weight: 700;
-  font-size: 0.8rem;
-}
-.suggestion-meta {
-  font-size: 0.72rem;
+.catalog-cascade-box {
+  background: hsla(var(--bg-card-subtle));
 }
 </style>

@@ -73,9 +73,11 @@ public class AdminSecurityConfig {
                 // Auth et routes publiques
                 .requestMatchers("/api/v1/auth/**").permitAll()
                 .requestMatchers("/api/v1/vehicules/**",
+                                 "/api/v1/catalog/**",
+                                 "/api/v1/uploads/**",
+                                 "/uploads/**",
                                  "/api/v1/comparisons/**",
-                                 "/api/v1/immatriculation/**",
-                                 "/api/v1/ademe/**").permitAll()
+                                 "/api/v1/immatriculation/**").permitAll()
                 .requestMatchers("/h2-console/**").permitAll()
                 // Simulations — JWT obligatoire
                 .requestMatchers("/api/v1/simulations/**").authenticated()

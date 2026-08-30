@@ -34,9 +34,8 @@ app:
     log-directory: logs
     username: ${APP_ADMIN_USERNAME:admin}
     password: ${APP_ADMIN_PASSWORD:admin}
-  seed:
-    vehicles-file: classpath:data/vehicules-seed.csv
-    vehicles-url: https://raw.githubusercontent.com/williamsmodeste/antigravity-auto-db/main/vehicles.json
+  upload:
+    dir: uploads
   security:
     cors:
       allowed-origins: ${CORS_ALLOWED_ORIGINS:*}

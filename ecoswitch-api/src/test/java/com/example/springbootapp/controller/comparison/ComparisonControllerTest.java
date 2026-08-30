@@ -15,11 +15,14 @@ import org.mockito.Mockito;
 import com.example.springbootapp.service.AiAdvisorService;
 import com.example.springbootapp.business.comparison.ComparisonBusiness;
 
+import com.example.springbootapp.repository.FinitionMotorisationRepository;
+
 class ComparisonControllerTest {
 
 	private final VehiculeService vehiculeService = Mockito.mock(VehiculeService.class);
+	private final FinitionMotorisationRepository finitionMotorisationRepository = Mockito.mock(FinitionMotorisationRepository.class);
 	private final CostCalculationService costCalculationService = new CostCalculationService();
-	private final ComparisonBusiness comparisonBusiness = new ComparisonBusiness(vehiculeService, costCalculationService);
+	private final ComparisonBusiness comparisonBusiness = new ComparisonBusiness(vehiculeService, finitionMotorisationRepository, costCalculationService);
 	private final AiAdvisorService aiAdvisorService = Mockito.mock(AiAdvisorService.class);
 	private final ComparisonController comparisonController = new ComparisonController(comparisonBusiness, aiAdvisorService);
 

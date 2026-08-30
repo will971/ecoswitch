@@ -1,7 +1,8 @@
 <script setup>
-import { ref, watch, computed, onMounted } from 'vue'
-import { X, Save, Car, Fuel, Zap, AlertCircle, Plus, Star, Search, Trash2, Sparkles } from '@lucide/vue'
+import { ref, watch, computed } from 'vue'
+import { X, Save, Car, Fuel, Zap, AlertCircle, Plus, Star, Trash2 } from '@lucide/vue'
 import { apiCreateUserVehicleProfile, apiUpdateUserVehicleProfile, apiDeleteUserVehicleProfile } from '../utils/api.js'
+import CatalogCascadeSelector from '@/components/common/CatalogCascadeSelector.vue'
 
 const props = defineProps({
   show: Boolean,
@@ -18,14 +19,6 @@ const error = ref(null)
 const successMsg = ref(null)
 
 const activeProfileId = ref('new') // 'new' ou ID du profil
-
-// ADEME States
-const brands = ref([])
-const models = ref([])
-const versions = ref([])
-const selectedBrand = ref('')
-const selectedModel = ref('')
-const selectedVersion = ref(null)
 
 const defaultForm = {
   name: '',
@@ -46,12 +39,6 @@ const form = ref({ ...defaultForm })
 // Synchroniser form quand activeProfileId change ou quand profiles change
 watch(() => [props.show, activeProfileId.value, props.profiles], () => {
   if (props.show) {
-    selectedBrand.value = ''
-    selectedModel.value = ''
-    selectedVersion.value = null
-    models.value = []
-    versions.value = []
-
     if (activeProfileId.value === 'new') {
       const inheritedPrices = props.profiles.length > 0 ? {
         petrolPrice: props.profiles[props.profiles.length - 1].petrolPrice,
@@ -72,9 +59,6 @@ watch(() => props.show, (newVal) => {
   if (newVal) {
     error.value = null
     successMsg.value = null
-    selectedBrand.value = ''
-    selectedModel.value = ''
-    selectedVersion.value = null
     if (props.profiles.length > 0) {
       const defaultP = props.profiles.find(p => p.default) || props.profiles[props.profiles.length - 1]
       activeProfileId.value = defaultP.id
@@ -84,65 +68,24 @@ watch(() => props.show, (newVal) => {
   }
 })
 
-// ADEME methods
-const fetchBrands = async () => {
-  try {
-    const res = await fetch('/api/v1/ademe/brands')
-    if (res.ok) {
-      brands.value = await res.json()
-    }
-  } catch (err) {
-    console.error('Erreur ADEME marques:', err)
-  }
-}
-
-const fetchModels = async () => {
-  models.value = []
-  versions.value = []
-  selectedModel.value = ''
-  selectedVersion.value = null
-  if (!selectedBrand.value) return
-  try {
-    const res = await fetch(`/api/v1/ademe/models?brand=${encodeURIComponent(selectedBrand.value)}`)
-    if (res.ok) {
-      models.value = await res.json()
-    }
-  } catch (err) {
-    console.error('Erreur ADEME modèles:', err)
-  }
-}
-
-const fetchVersions = async () => {
-  versions.value = []
-  selectedVersion.value = null
-  if (!selectedBrand.value || !selectedModel.value) return
-  try {
-    const res = await fetch(`/api/v1/ademe/versions?brand=${encodeURIComponent(selectedBrand.value)}&model=${encodeURIComponent(selectedModel.value)}`)
-    if (res.ok) {
-      versions.value = await res.json()
-    }
-  } catch (err) {
-    console.error('Erreur ADEME versions:', err)
-  }
-}
-
-const onVersionChange = () => {
-  if (!selectedVersion.value) return
-  const v = selectedVersion.value
+const onCascadeVariantSelected = (v) => {
   form.value.name = `${v.brand} ${v.model} ${v.version}`
   form.value.fuelType = v.fuelType
   form.value.consumption = v.consumption
-  
-  if (v.annualMileage) form.value.annualMileage = v.annualMileage
   form.value.insuranceCost = v.insuranceCost || 600
   form.value.maintenanceCost = v.maintenanceCost || 400
   if (v.resaleValue) form.value.resaleValue = v.resaleValue
-  
-  successMsg.value = `Données ADEME chargées : ${form.value.name}`
-  setTimeout(() => successMsg.value = null, 3000)
+
+  successMsg.value = `Véhicule configuré depuis le catalogue : ${form.value.name}`
+  setTimeout(() => successMsg.value = null, 3500)
 }
 
 const saveProfile = async () => {
+  if (!form.value.name || !form.value.name.trim()) {
+    error.value = "Le nom du véhicule est obligatoire."
+    return
+  }
+
   loading.value = true
   error.value = null
   successMsg.value = null
@@ -186,15 +129,11 @@ const deleteProfile = async () => {
     loading.value = false
   }
 }
-
-onMounted(() => {
-  fetchBrands()
-})
 </script>
 
 <template>
   <div v-if="show" class="auth-modal-overlay flex-center">
-    <div class="card-glass auth-modal-card p-4 relative w-100 max-w-2xl animation-fadeIn">
+    <div class="card-glass auth-modal-card p-4 relative w-100 max-w-2xl animation-fadeIn max-h-[90vh] overflow-y-auto">
       <button class="icon-btn-close absolute top-4 right-4" @click="emit('close')">
         <X size="18" />
       </button>
@@ -205,7 +144,7 @@ onMounted(() => {
         </div>
         <div>
           <h3 class="text-main font-heading text-md font-bold m-0">Mon Garage Virtuel</h3>
-          <p class="text-muted text-xxs m-0">Gérez vos véhicules enregistrés pour pré-remplir les simulateurs</p>
+          <p class="text-muted text-xxs m-0">Gérez vos véhicules enregistrés pour pré-remplir instantanément les simulateurs</p>
         </div>
       </div>
       
@@ -239,32 +178,12 @@ onMounted(() => {
         <span>{{ successMsg }}</span>
       </div>
 
-      <!-- Remplissage ADEME si nouveau véhicule -->
-      <div v-if="activeProfileId === 'new'" class="p-3 mb-3.5 rounded-xl border-glass bg-card-subtle">
-        <label class="form-label text-xxs uppercase mb-2 font-bold text-teal flex items-center gap-1">
-          <Sparkles size="13" />
-          <span>Pré-remplissage ADEME automatique</span>
-        </label>
-        <div class="grid-3-fields gap-2">
-          <div class="form-group mb-0">
-            <select v-model="selectedBrand" class="form-control form-select text-xs" @change="fetchModels">
-              <option value="">Marque</option>
-              <option v-for="b in brands" :key="b" :value="b">{{ b }}</option>
-            </select>
-          </div>
-          <div class="form-group mb-0">
-            <select v-model="selectedModel" :disabled="!selectedBrand" class="form-control form-select text-xs" @change="fetchVersions">
-              <option value="">Modèle</option>
-              <option v-for="m in models" :key="m" :value="m">{{ m }}</option>
-            </select>
-          </div>
-          <div class="form-group mb-0">
-            <select v-model="selectedVersion" :disabled="!selectedModel" class="form-control form-select text-xs" @change="onVersionChange">
-              <option :value="null">Version</option>
-              <option v-for="v in versions" :key="v.version" :value="v">{{ v.version }}</option>
-            </select>
-          </div>
-        </div>
+      <!-- Sélection via Catalogue si Nouveau véhicule -->
+      <div v-if="activeProfileId === 'new'" class="p-3.5 mb-4 rounded-2xl border-glass bg-card-subtle">
+        <CatalogCascadeSelector
+          label="Pré-remplissage depuis le catalogue officiel"
+          @select-variant="onCascadeVariantSelected"
+        />
       </div>
 
       <div class="profile-grid">
@@ -280,21 +199,21 @@ onMounted(() => {
           
           <div class="form-group mb-2.5">
             <label class="form-label text-xxs">Nom du modèle</label>
-            <input v-model="form.name" type="text" class="form-control text-xs" placeholder="ex: Renault Clio V" required />
+            <input v-model="form.name" type="text" class="form-control text-xs font-semibold" placeholder="ex: Renault Megane E-Tech" required />
           </div>
           <div class="form-group mb-2.5">
             <label class="form-label text-xxs">Énergie</label>
             <select v-model="form.fuelType" class="form-control form-select text-xs">
+              <option value="ELECTRIC">Électrique</option>
+              <option value="HYBRID">Hybride</option>
               <option value="PETROL">Essence</option>
               <option value="DIESEL">Diesel</option>
-              <option value="HYBRID">Hybride</option>
-              <option value="ELECTRIC">Électrique</option>
             </select>
           </div>
           <div class="grid-2-fields mb-2.5">
             <div class="form-group mb-0">
-              <label class="form-label text-xxs">Conso (L/100km)</label>
-              <input v-model.number="form.consumption" type="number" step="0.1" class="form-control text-xs" required />
+              <label class="form-label text-xxs">Conso ({{ form.fuelType === 'ELECTRIC' ? 'kWh' : 'L' }}/100km)</label>
+              <input v-model.number="form.consumption" type="number" step="0.1" class="form-control text-xs font-semibold" required />
             </div>
             <div class="form-group mb-0">
               <label class="form-label text-xxs">Km annuel (km/an)</label>

@@ -1,15 +1,22 @@
 package com.example.springbootapp.business.vehicule;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.example.springbootapp.model.dto.BrandDto;
+import com.example.springbootapp.model.dto.VehicleModelDto;
+import com.example.springbootapp.model.dto.FinitionMotorisationDto;
 import com.example.springbootapp.model.entity.AppUser;
 import com.example.springbootapp.model.entity.Vehicule;
+import com.example.springbootapp.service.CatalogService;
 import com.example.springbootapp.service.UserService;
 import com.example.springbootapp.service.VehiculeService;
 
@@ -18,10 +25,12 @@ public class VehiculeBusiness {
 
     private final VehiculeService vehiculeService;
     private final UserService userService;
+    private final CatalogService catalogService;
 
-    public VehiculeBusiness(VehiculeService vehiculeService, UserService userService) {
+    public VehiculeBusiness(VehiculeService vehiculeService, UserService userService, CatalogService catalogService) {
         this.vehiculeService = vehiculeService;
         this.userService = userService;
+        this.catalogService = catalogService;
     }
 
     public Vehicule create(Vehicule vehicule, String email) {
@@ -104,36 +113,76 @@ public class VehiculeBusiness {
     }
 
     public List<String> getCatalogBrands() {
-        return vehiculeService.findAll().stream()
-                .map(Vehicule::getBrand)
-                .filter(b -> b != null && !b.isBlank())
-                .distinct()
-                .sorted()
-                .toList();
+        Set<String> brands = new LinkedHashSet<>();
+        // 1. From CatalogService
+        for (BrandDto b : catalogService.getAllBrands()) {
+            if (b.name() != null && !b.name().isBlank()) {
+                brands.add(b.name());
+            }
+        }
+        // 2. From Vehicule table
+        for (Vehicule v : vehiculeService.findAll()) {
+            if (v.getBrand() != null && !v.getBrand().isBlank()) {
+                brands.add(v.getBrand());
+            }
+        }
+        return brands.stream().sorted(String.CASE_INSENSITIVE_ORDER).toList();
     }
 
     public List<String> getCatalogModels(String brand) {
-        return vehiculeService.findAll().stream()
-                .filter(v -> brand.equalsIgnoreCase(v.getBrand()))
-                .map(v -> {
-                    if (v.getGeneration() != null && !v.getGeneration().isBlank()) {
-                        return v.getModel() + " (" + v.getGeneration() + ")";
-                    }
-                    return v.getModel();
-                })
-                .filter(m -> m != null && !m.isBlank())
-                .distinct()
-                .sorted()
-                .toList();
+        Set<String> models = new LinkedHashSet<>();
+        // 1. From CatalogService
+        for (BrandDto b : catalogService.getAllBrands()) {
+            if (brand.equalsIgnoreCase(b.name())) {
+                for (VehicleModelDto m : catalogService.getModels(b.id())) {
+                    models.add(m.name());
+                }
+            }
+        }
+        // 2. From Vehicule table
+        for (Vehicule v : vehiculeService.findAll()) {
+            if (brand.equalsIgnoreCase(v.getBrand()) && v.getModel() != null && !v.getModel().isBlank()) {
+                if (v.getGeneration() != null && !v.getGeneration().isBlank()) {
+                    models.add(v.getModel() + " (" + v.getGeneration() + ")");
+                } else {
+                    models.add(v.getModel());
+                }
+            }
+        }
+        return models.stream().sorted(String.CASE_INSENSITIVE_ORDER).toList();
     }
 
     public List<Map<String, String>> getCatalogVersions(String brand, String model) {
         String cleanModel = model.split("\\(")[0].trim();
-        return vehiculeService.findAll().stream()
-                .filter(v -> brand.equalsIgnoreCase(v.getBrand()) && cleanModel.equalsIgnoreCase(v.getModel()))
-                .map(v -> Map.of("version", v.getVersion()))
-                .distinct()
-                .sorted((a, b) -> a.get("version").compareTo(b.get("version")))
-                .toList();
+        List<Map<String, String>> versions = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+
+        // 1. From CatalogService variants
+        for (BrandDto b : catalogService.getAllBrands()) {
+            if (brand.equalsIgnoreCase(b.name())) {
+                for (VehicleModelDto m : catalogService.getModels(b.id())) {
+                    if (cleanModel.equalsIgnoreCase(m.name())) {
+                        for (FinitionMotorisationDto v : catalogService.getVariants(m.id(), null, null)) {
+                            String fullVersion = v.motorisationName() + " - " + v.finitionName();
+                            if (seen.add(fullVersion)) {
+                                versions.add(Map.of("version", fullVersion));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. From Vehicule table
+        for (Vehicule v : vehiculeService.findAll()) {
+            if (brand.equalsIgnoreCase(v.getBrand()) && cleanModel.equalsIgnoreCase(v.getModel()) && v.getVersion() != null) {
+                if (seen.add(v.getVersion())) {
+                    versions.add(Map.of("version", v.getVersion()));
+                }
+            }
+        }
+
+        versions.sort(Comparator.comparing(a -> a.get("version")));
+        return versions;
     }
 }

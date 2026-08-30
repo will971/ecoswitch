@@ -1,3 +1,4 @@
+import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import istanbul from 'vite-plugin-istanbul'
@@ -13,6 +14,11 @@ export default defineConfig({
       requireEnv: true
     })
   ],
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url))
+    }
+  },
   build: {
     target: 'es2022',
     chunkSizeWarningLimit: 600,
@@ -30,10 +36,6 @@ export default defineConfig({
     }
   },
   server: {
-    // Vite 8 has two security layers for the dev server:
-    // 1. cors: controls Access-Control-Allow-Origin headers (for ES module loading)
-    // 2. allowedHosts: validates the HTTP Host header (prevents DNS rebinding attacks)
-    // Safari triggers BOTH checks, so both must be explicitly configured for local dev.
     cors: true,
     allowedHosts: true,
     proxy: {
@@ -41,9 +43,12 @@ export default defineConfig({
         target: 'http://127.0.0.1:8080',
         changeOrigin: true,
         secure: false,
+      },
+      '/uploads': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: true,
+        secure: false,
       }
     }
   }
 })
-
-

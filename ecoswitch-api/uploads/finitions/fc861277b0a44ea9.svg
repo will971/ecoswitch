@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 160">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#18181b"/>
+      <stop offset="100%" stop-color="#27272a"/>
+    </linearGradient>
+    <linearGradient id="bodyGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0284c7"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+  </defs>
+  <rect width="300" height="160" rx="14" fill="url(#bgGrad)"/>
+  <line x1="15" y1="125" x2="285" y2="125" stroke="#3f3f46" stroke-width="1.5" stroke-dasharray="6,6"/>
+  
+  <!-- Silhouette Carrosserie -->
+  <path d="M 45 118 C 50 92, 75 68, 105 62 L 180 62 C 215 65, 245 88, 255 118 Z" fill="url(#bodyGrad)" opacity="0.95"/>
+  <path d="M 110 66 L 170 66 C 192 68, 205 80, 210 94 L 98 94 C 102 82, 106 70, 110 66 Z" fill="#09090b" opacity="0.85"/>
+  
+  <!-- Roues Stylisées -->
+  <circle cx="85" cy="118" r="17" fill="#09090b" stroke="#71717a" stroke-width="3.5"/>
+  <circle cx="85" cy="118" r="7" fill="#d4d4d8"/>
+  <circle cx="220" cy="118" r="17" fill="#09090b" stroke="#71717a" stroke-width="3.5"/>
+  <circle cx="220" cy="118" r="7" fill="#d4d4d8"/>
+
+  <!-- Badge Modèle -->
+  <rect x="14" y="12" width="110" height="20" rx="5" fill="#0f172a"/>
+  <text x="69" y="26" font-family="-apple-system, BlinkMacSystemFont, Arial, sans-serif" font-size="10" font-weight="900" fill="#ffffff" text-anchor="middle">BYD Seal Desig</text>
+  
+  <!-- Badge Énergie -->
+  <rect x="212" y="12" width="74" height="20" rx="10" fill="rgba(0, 0, 0, 0.4)" stroke="#34d399" stroke-width="1"/>
+  <text x="249" y="26" font-family="sans-serif" font-size="9" font-weight="700" fill="#34d399" text-anchor="middle">⚡ 100% ÉLEC</text>
+  
+  <text x="150" y="148" font-family="sans-serif" font-size="10" font-weight="600" fill="#a1a1aa" text-anchor="middle">BYD Seal Design • Berline</text>
+</svg>

@@ -36,3 +36,12 @@ dev-ihm:
 build-ihm:
 	cd ecoswitch-ihm && npm install && npm run build
 
+seed-local:
+	python3 scripts/seed_catalog.py local
+
+seed-prod:
+	python3 scripts/seed_catalog.py prod
+
+test-scripts:
+	python3 scripts/test_seed_catalog.py
+
