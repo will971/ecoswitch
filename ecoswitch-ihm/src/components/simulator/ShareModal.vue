@@ -30,7 +30,9 @@ const formatCurrency = (val) => {
 }
 
 const getReportText = () => {
-  let text = `⚡ Bilan de transition EcoSwitch : ${props.currentVehicle.name} ➡️ ${props.targetVehicle.name}\n\n`
+  const currentLabel = props.currentVehicle?.name?.trim() || 'Mon véhicule'
+  const targetLabel  = props.targetVehicle?.name?.trim()  || 'Véhicule cible'
+  let text = `⚡ Bilan de transition EcoSwitch : ${currentLabel} ➡️ ${targetLabel}\n\n`
   
   if (props.result.breakEvenYear) {
     text += `✅ Changement amorti en ${props.result.breakEvenYear} an${props.result.breakEvenYear > 1 ? 's' : ''} !\n`

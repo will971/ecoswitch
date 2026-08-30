@@ -55,6 +55,10 @@ const props = defineProps({
 
 const annualMileage = computed(() => props.currentVehicle.annualMileage || props.targetVehicle.annualMileage || 15000)
 
+// Labels d'affichage avec fallback
+const currentVehicleLabel = computed(() => props.currentVehicle?.name?.trim() || 'Votre véhicule')
+const targetVehicleLabel  = computed(() => props.targetVehicle?.name?.trim()  || 'Véhicule cible')
+
 const formatCurrency = (val) => {
   return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val || 0)
 }
@@ -177,7 +181,7 @@ const faqItems = [
         {{ aiData.financialAdvice }}
       </p>
       <p v-else class="narrative-text text-main m-0">
-        Passer de votre <strong>{{ currentVehicle.name }}</strong> à la <strong>{{ targetVehicle.name }}</strong> vous permet de réduire directement vos dépenses d'énergie de <strong>{{ formatCurrency(result.annualSavings) }}/an</strong>.
+        Passer de votre <strong>{{ currentVehicleLabel }}</strong> à la <strong>{{ targetVehicleLabel }}</strong> vous permet de réduire directement vos dépenses d'énergie de <strong>{{ formatCurrency(result.annualSavings) }}/an</strong>.
       </p>
     </div>
 

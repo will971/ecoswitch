@@ -85,6 +85,10 @@ const saveNote = ref('')
 const showDetailedTables = ref(false)
 const saveSuccessToast = ref(false)
 
+// Labels d'affichage : fallback sur "Votre véhicule" si le nom n'est pas renseigné
+const currentVehicleLabel = computed(() => props.currentVehicle?.name?.trim() || 'Votre véhicule')
+const targetVehicleLabel  = computed(() => props.targetVehicle?.name?.trim()  || 'Véhicule cible')
+
 // Calculs du budget mensuel
 const currentMonthlyUsage = computed(() => (props.result?.currentAnnualCost || 0) / 12.0)
 const targetMonthlyUsage = computed(() => (props.result?.targetAnnualCost || 0) / 12.0)
@@ -144,8 +148,8 @@ const exportToCSV = () => {
   const encodedUri = encodeURI(csvContent)
   const link = document.createElement("a")
   link.setAttribute("href", encodedUri)
-  const currentName = props.currentVehicle.name.replace(/\s+/g, '_')
-  const targetName = props.targetVehicle.name.replace(/\s+/g, '_')
+  const currentName = currentVehicleLabel.value.replace(/\s+/g, '_')
+  const targetName  = targetVehicleLabel.value.replace(/\s+/g, '_')
   link.setAttribute("download", `Bilan_EcoSwitch_${currentName}_vs_${targetName}.csv`)
   document.body.appendChild(link)
   link.click()
@@ -171,7 +175,7 @@ const confirmSave = async () => {
     result:            { ...props.result },
     note:              saveNote.value
   }
-  const simName = `${props.currentVehicle.name} ➔ ${props.targetVehicle.name}`
+  const simName = `${currentVehicleLabel.value} ➔ ${targetVehicleLabel.value}`
 
   try {
     await apiSaveSimulation(simName, simData)
@@ -243,7 +247,7 @@ const handleLoadAlternative = (rec) => {
             {{ result.breakEvenYear ? 'Rentable' : 'Long terme' }}
           </span>
           <span class="text-xxs font-bold uppercase text-dimmed">
-            {{ currentVehicle.name }} ➔ {{ targetVehicle.name }}
+            {{ currentVehicleLabel }} ➔ {{ targetVehicleLabel }}
           </span>
         </div>
         
@@ -280,7 +284,7 @@ const handleLoadAlternative = (rec) => {
         <!-- Budget Actuel -->
         <div class="bento-card">
           <span class="badge badge-amber badge-small mb-2">Actuel</span>
-          <div class="text-xs font-bold text-main truncate">{{ currentVehicle.name }}</div>
+          <div class="text-xs font-bold text-main truncate">{{ currentVehicleLabel }}</div>
           <div class="metric-value font-heading text-rose mt-1">{{ formatCurrency(currentMonthlyTotal) }}<span class="metric-unit">/mois</span></div>
           
           <div class="card-divider my-2.5"></div>
