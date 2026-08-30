@@ -1121,7 +1121,7 @@ onMounted(() => {
   }
 
   .app-main {
-    padding: 16px 14px 84px 14px;
+    padding: 10px 12px 84px 12px;
     overflow-x: hidden;
   }
 

@@ -2546,8 +2546,8 @@ onMounted(() => {
     background: linear-gradient(180deg, var(--bg-app) 0%, rgba(var(--bg-app-rgb, 245, 245, 247), 0.98) 100%);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    padding: 8px 0 10px 0;
-    margin: -16px 0 4px 0;
+    padding: 4px 0 10px 0;
+    margin: -10px 0 8px 0;
     width: 100%;
     box-sizing: border-box;
   }
@@ -2567,6 +2567,8 @@ onMounted(() => {
     width: 100%;
     box-sizing: border-box;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    user-select: none;
+    -webkit-user-select: none;
   }
 
   .stepper-tab {
@@ -2574,19 +2576,24 @@ onMounted(() => {
     font-size: 0.74rem;
     gap: 5px;
     border-radius: 8px;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
   }
 
-  .step-num {
-    width: 18px;
-    height: 18px;
-    font-size: 0.68rem;
+  .stepper-tab-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    user-select: none;
+    -webkit-user-select: none;
   }
 
   /* Panels Mobile */
   .luxury-panel {
-    padding: 12px 10px;
+    padding: 16px 12px;
     border-radius: var(--radius-lg);
-    gap: 10px;
+    gap: 12px;
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
@@ -2605,9 +2612,10 @@ onMounted(() => {
   .panel-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 10px;
+    gap: 6px;
     width: 100%;
     box-sizing: border-box;
+    margin-bottom: 4px;
   }
 
   .header-actions {
