@@ -26,11 +26,10 @@ import {
   ExternalLink,
   Flame,
   Leaf,
-  Filter,
-  CheckCheck
+  Filter
 } from '@lucide/vue'
 import vehicleEcoSavingsImg from '../assets/vehicle_eco_savings.png'
-import { apiGetCatalogVariants } from '../utils/api.js'
+import { apiGetCatalogVariants, apiCompareCustomProfitability } from '../utils/api.js'
 
 const props = defineProps({
   currentUser: Object,
@@ -341,24 +340,13 @@ const compare = async () => {
   }
 
   try {
-    const response = await fetch('/api/v1/comparisons/profitability/custom', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        currentVehicle: currentVehicleData,
-        targetVehicleIds: selectedTargetIds.value,
-        fuelPricesByType: fuelPrices.value,
-        maxYears: maxYears.value,
-        immediateRepairCost: immediateRepairCost.value
-      })
+    result.value = await apiCompareCustomProfitability({
+      currentVehicle: currentVehicleData,
+      targetVehicleIds: selectedTargetIds.value,
+      fuelPricesByType: fuelPrices.value,
+      maxYears: maxYears.value,
+      immediateRepairCost: immediateRepairCost.value
     })
-
-    if (!response.ok) {
-      const errData = await response.json()
-      throw new Error(errData.error || 'Erreur lors du calcul de rentabilité.')
-    }
-
-    result.value = await response.json()
     activeMobileView.value = 'results'
   } catch (err) {
     error.value = err.message

@@ -4,7 +4,8 @@
  * Chaque requête vers /api/v1/* inclut automatiquement le header Authorization: Bearer <token>.
  */
 
-const BASE_URL = '/api/v1'
+const RAW_API_URL = (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL)) || ''
+const BASE_URL = RAW_API_URL ? `${RAW_API_URL.replace(/\/$/, '')}/api/v1` : '/api/v1'
 
 /** Récupère le token JWT stocké après connexion */
 function getToken() {
@@ -24,7 +25,7 @@ function getToken() {
 }
 
 /**
- * Fetch avec JWT automatique.
+ * Fetch avec JWT automatique et gestion de timeout.
  * @param {string} path       - chemin relatif ex: '/simulations'
  * @param {RequestInit} options - options fetch standard
  * @returns {Promise<Response>}
@@ -42,7 +43,25 @@ async function apiFetch(path, options = {}) {
     ...(options.headers || {})
   }
 
-  return fetch(`${BASE_URL}${path}`, { ...options, headers })
+  const timeoutMs = options.timeout || 30000
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+  try {
+    const response = await fetch(`${BASE_URL}${path}`, {
+      ...options,
+      headers,
+      signal: options.signal || controller.signal
+    })
+    return response
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error("Le serveur met trop de temps à répondre (Délai d'attente dépassé).")
+    }
+    throw err
+  } finally {
+    clearTimeout(timeoutId)
+  }
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────
@@ -357,4 +376,16 @@ export async function apiUploadImage(file, folder = 'general') {
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || "Erreur lors du téléversement de l'image.")
   return data.url // e.g. "/uploads/brands/..."
+}
+
+// ── Comparateur Flotte Custom ──────────────────────────────────────────────
+
+export async function apiCompareCustomProfitability(payload) {
+  const res = await apiFetch('/comparisons/profitability/custom', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || 'Erreur lors du calcul de rentabilité.')
+  return data
 }

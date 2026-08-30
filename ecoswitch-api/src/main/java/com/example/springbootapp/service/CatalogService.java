@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -55,13 +56,17 @@ public class CatalogService {
 
     @Transactional(readOnly = true)
     public List<BrandDto> getAllBrands() {
-        return brandRepository.findAll().stream()
+        List<Brand> brands = brandRepository.findAll();
+        Map<Long, Long> modelCountByBrand = modelRepository.findAll().stream()
+                .collect(Collectors.groupingBy(m -> m.getBrand().getId(), Collectors.counting()));
+
+        return brands.stream()
                 .sorted(Comparator.comparing(Brand::getName, String.CASE_INSENSITIVE_ORDER))
                 .map(b -> new BrandDto(
                         b.getId(),
                         b.getName(),
                         b.getLogoUrl(),
-                        b.getModels() != null ? b.getModels().size() : 0
+                        modelCountByBrand.getOrDefault(b.getId(), 0L).intValue()
                 ))
                 .collect(Collectors.toList());
     }
@@ -112,10 +117,25 @@ public class CatalogService {
     public List<VehicleModelDto> getModels(Long brandId) {
         List<VehicleModel> models = brandId != null
                 ? modelRepository.findByBrandIdOrderByNameAsc(brandId)
-                : modelRepository.findAll().stream().sorted(Comparator.comparing(VehicleModel::getName)).toList();
+                : modelRepository.findAll().stream().sorted(Comparator.comparing(VehicleModel::getName, String.CASE_INSENSITIVE_ORDER)).toList();
+
+        Map<Long, Long> motCountByModel = motorisationRepository.findAll().stream()
+                .collect(Collectors.groupingBy(m -> m.getModel().getId(), Collectors.counting()));
+        Map<Long, Long> finCountByModel = finitionRepository.findAll().stream()
+                .collect(Collectors.groupingBy(f -> f.getModel().getId(), Collectors.counting()));
 
         return models.stream()
-                .map(this::toModelDto)
+                .map(m -> new VehicleModelDto(
+                        m.getId(),
+                        m.getBrand().getId(),
+                        m.getBrand().getName(),
+                        m.getBrand().getLogoUrl(),
+                        m.getName(),
+                        m.getImageUrl(),
+                        m.getCategory(),
+                        motCountByModel.getOrDefault(m.getId(), 0L).intValue(),
+                        finCountByModel.getOrDefault(m.getId(), 0L).intValue()
+                ))
                 .collect(Collectors.toList());
     }
 
@@ -276,13 +296,13 @@ public class CatalogService {
     public List<FinitionMotorisationDto> getVariants(Long modelId, Long motorisationId, Long finitionId) {
         List<FinitionMotorisation> list;
         if (motorisationId != null) {
-            list = variantRepository.findByMotorisationId(motorisationId);
+            list = variantRepository.findByMotorisationIdWithDetails(motorisationId);
         } else if (finitionId != null) {
-            list = variantRepository.findByFinitionId(finitionId);
+            list = variantRepository.findByFinitionIdWithDetails(finitionId);
         } else if (modelId != null) {
-            list = variantRepository.findByModelId(modelId);
+            list = variantRepository.findByModelIdWithDetails(modelId);
         } else {
-            list = variantRepository.findAll();
+            list = variantRepository.findAllWithDetails();
         }
 
         return list.stream()
@@ -355,27 +375,47 @@ public class CatalogService {
 
     @Transactional(readOnly = true)
     public List<CatalogHierarchyDto> getFullHierarchy() {
+        // 1. Charger toutes les marques (1 seule requête SQL)
         List<Brand> brands = brandRepository.findAll().stream()
                 .sorted(Comparator.comparing(Brand::getName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
 
+        // 2. Charger tous les modèles et les grouper par marque (1 requête SQL)
+        Map<Long, List<VehicleModel>> modelsByBrand = modelRepository.findAll().stream()
+                .sorted(Comparator.comparing(VehicleModel::getName, String.CASE_INSENSITIVE_ORDER))
+                .collect(Collectors.groupingBy(m -> m.getBrand().getId()));
+
+        // 3. Charger toutes les finitions et les grouper par modèle (1 requête SQL)
+        Map<Long, List<Finition>> finitionsByModel = finitionRepository.findAll().stream()
+                .sorted(Comparator.comparing(Finition::getName, String.CASE_INSENSITIVE_ORDER))
+                .collect(Collectors.groupingBy(f -> f.getModel().getId()));
+
+        // 4. Charger toutes les motorisations et les grouper par modèle (1 requête SQL)
+        Map<Long, List<Motorisation>> motorisationsByModel = motorisationRepository.findAll().stream()
+                .sorted(Comparator.comparing(Motorisation::getName, String.CASE_INSENSITIVE_ORDER))
+                .collect(Collectors.groupingBy(m -> m.getModel().getId()));
+
+        // 5. Charger toutes les variantes avec JOIN FETCH et les grouper par motorisation (1 requête SQL)
+        Map<Long, List<FinitionMotorisation>> variantsByMotorisation = variantRepository.findAllWithDetails().stream()
+                .collect(Collectors.groupingBy(v -> v.getMotorisation().getId()));
+
         List<CatalogHierarchyDto> result = new ArrayList<>();
 
         for (Brand b : brands) {
-            List<VehicleModel> models = modelRepository.findByBrandIdOrderByNameAsc(b.getId());
+            List<VehicleModel> models = modelsByBrand.getOrDefault(b.getId(), List.of());
             List<CatalogHierarchyDto.ModelHierarchyDto> modelDtos = new ArrayList<>();
 
             for (VehicleModel m : models) {
-                List<Finition> finitions = finitionRepository.findByModelIdOrderByNameAsc(m.getId());
+                List<Finition> finitions = finitionsByModel.getOrDefault(m.getId(), List.of());
                 List<CatalogHierarchyDto.FinitionHierarchyDto> finitionDtos = finitions.stream()
                         .map(f -> new CatalogHierarchyDto.FinitionHierarchyDto(f.getId(), f.getName(), f.getImageUrl()))
                         .toList();
 
-                List<Motorisation> motorisations = motorisationRepository.findByModelIdOrderByNameAsc(m.getId());
+                List<Motorisation> motorisations = motorisationsByModel.getOrDefault(m.getId(), List.of());
                 List<CatalogHierarchyDto.MotorisationHierarchyDto> motorisationDtos = new ArrayList<>();
 
                 for (Motorisation mot : motorisations) {
-                    List<FinitionMotorisation> variants = variantRepository.findByMotorisationId(mot.getId());
+                    List<FinitionMotorisation> variants = variantsByMotorisation.getOrDefault(mot.getId(), List.of());
                     List<CatalogHierarchyDto.VariantPriceDto> priceDtos = variants.stream()
                             .map(fm -> new CatalogHierarchyDto.VariantPriceDto(
                                     fm.getId(),
