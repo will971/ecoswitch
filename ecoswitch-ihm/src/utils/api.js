@@ -4,8 +4,21 @@
  * Chaque requête vers /api/v1/* inclut automatiquement le header Authorization: Bearer <token>.
  */
 
-const RAW_API_URL = (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL)) || ''
-const BASE_URL = RAW_API_URL ? `${RAW_API_URL.replace(/\/$/, '')}/api/v1` : '/api/v1'
+function getApiBaseUrl() {
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    if (import.meta.env.VITE_API_URL) return `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/api/v1`
+    if (import.meta.env.VITE_API_BASE_URL) return `${import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '')}/api/v1`
+  }
+  if (typeof window !== 'undefined' && window.location) {
+    const host = window.location.hostname || ''
+    if (host.includes('railway.app') && !host.includes('api')) {
+      return 'https://ecoswitch-api.up.railway.app/api/v1'
+    }
+  }
+  return '/api/v1'
+}
+
+const BASE_URL = getApiBaseUrl()
 
 /** Récupère le token JWT stocké après connexion */
 function getToken() {
