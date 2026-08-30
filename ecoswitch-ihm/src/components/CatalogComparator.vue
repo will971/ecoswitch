@@ -320,6 +320,12 @@ const selectAllProfitable = () => {
   selectedTargetIds.value = ids
 }
 
+const quickCompareProfitable = async () => {
+  onlyProfitableFilter.value = true
+  selectedTargetIds.value = profitableVehicles.value.map(v => v.id)
+  await compare()
+}
+
 const clearAllSelection = () => {
   selectedTargetIds.value = []
 }
@@ -699,16 +705,29 @@ onMounted(() => {
           </div>
           
           <div class="header-actions">
-            <!-- Bouton Cocher les modèles rentables -->
+            <!-- Bouton 1-clic direct pour lancer l'arbitrage immédiatement -->
             <button 
               v-if="profitableCount > 0"
               type="button" 
               class="luxury-profitable-quick-btn" 
-              @click="selectAllProfitable"
-              title="Cocher automatiquement tous les modèles dont le retour sur investissement est inférieur à l'horizon"
+              @click="quickCompareProfitable"
+              title="Comparer immédiatement les modèles rentables en 1 clic"
             >
-              <Sparkles size="13" class="text-gold" />
-              <span>Cocher les {{ profitableCount }} rentables</span>
+              <Sparkles size="14" class="text-gold" />
+              <span>⚡ Comparer les {{ profitableCount }} rentables (1-clic)</span>
+              <ArrowRight size="14" />
+            </button>
+
+            <!-- Bouton Lancer quand des cibles sont sélectionnées -->
+            <button 
+              v-if="selectedTargetIds.length > 0"
+              type="button" 
+              class="luxury-cta-btn-header" 
+              @click="compare"
+            >
+              <Zap size="13" />
+              <span>Comparer ({{ selectedTargetIds.length }})</span>
+              <ArrowRight size="13" />
             </button>
 
             <button 
@@ -1156,6 +1175,46 @@ onMounted(() => {
         </div>
       </section>
     </div>
+
+    <!-- ── 4. BARRE D'ACTION FLOTTANTE FIXE MOBILE (TÉLÉPORTÉE POUR VISIBILITÉ 100% GARANTIE) ── -->
+    <Teleport to="body">
+      <div 
+        v-if="activeMobileView === 'showroom'" 
+        class="showroom-mobile-floating-bar"
+      >
+        <div class="smfb-content">
+          <div class="smfb-left">
+            <span class="smfb-badge">{{ selectedTargetIds.length }}</span>
+            <span class="smfb-text">sélectionné{{ selectedTargetIds.length > 1 ? 's' : '' }}</span>
+          </div>
+
+          <div class="smfb-actions">
+            <button 
+              v-if="selectedTargetIds.length === 0 && profitableCount > 0"
+              type="button" 
+              class="smfb-quick-btn" 
+              @click="quickCompareProfitable"
+            >
+              <Sparkles size="14" />
+              <span>Top {{ profitableCount }} rentables</span>
+            </button>
+
+            <button 
+              :disabled="calculating || selectedTargetIds.length === 0" 
+              class="smfb-cta-btn" 
+              @click="compare"
+            >
+              <span v-if="calculating" class="spinner"><Zap size="15" /></span>
+              <span v-else class="flex items-center gap-1.5">
+                <Zap size="15" />
+                <span>Comparer ({{ selectedTargetIds.length }})</span>
+                <ArrowRight size="15" />
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -1607,22 +1666,47 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 .luxury-profitable-quick-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(16, 124, 65, 0.15));
-  border: 1px solid rgba(245, 158, 11, 0.4);
+  gap: 8px;
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: var(--radius-sm);
-  padding: 5px 12px;
-  color: var(--text-main);
-  font-size: 0.72rem;
+  padding: 8px 14px;
+  font-size: 0.78rem;
   font-weight: 800;
   cursor: pointer;
+  box-shadow: 0 3px 10px rgba(16, 185, 129, 0.35);
   transition: all 0.2s ease;
-  box-shadow: 0 1px 4px rgba(245, 158, 11, 0.1);
 }
 .luxury-profitable-quick-btn:hover {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(16, 124, 65, 0.25));
+  background: linear-gradient(135deg, #047857 0%, #059669 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(16, 185, 129, 0.45);
+}
+.luxury-profitable-quick-btn:active {
+  transform: scale(0.98);
+}
+
+.luxury-cta-btn-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--text-main);
+  color: var(--text-inverse);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 8px 14px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: var(--shadow-sm);
+}
+.luxury-cta-btn-header:hover {
+  background: var(--accent-teal);
+  color: #ffffff;
   transform: translateY(-1px);
 }
 
@@ -1633,7 +1717,7 @@ onMounted(() => {
   background: transparent;
   border: 1px solid var(--border-glass);
   border-radius: var(--radius-sm);
-  padding: 5px 10px;
+  padding: 7px 12px;
   color: var(--text-muted);
   font-size: 0.72rem;
   font-weight: 700;
@@ -2405,9 +2489,19 @@ onMounted(() => {
   }
 }
 
+/* Barre Flottante Fixe Téléportée (Par défaut masquée sur Desktop) */
+.showroom-mobile-floating-bar {
+  display: none;
+}
+
 @media (max-width: 900px) {
   .luxury-comparator-root {
-    gap: 14px;
+    gap: 12px;
+  }
+
+  /* Masquer le hero éditorial lourd sur mobile pour libérer 100% de l'espace */
+  .luxury-hero-banner {
+    display: none !important;
   }
 
   /* Stepper Sticky Navigation sous le header mobile (56px) */
@@ -2429,31 +2523,31 @@ onMounted(() => {
   }
 
   .workflow-step-btn {
-    padding: 8px 12px;
-    font-size: 0.74rem;
+    padding: 8px 10px;
+    font-size: 0.72rem;
     font-weight: 700;
     flex: 1;
-    min-width: 130px;
+    min-width: 110px;
     justify-content: center;
     border-radius: var(--radius-md);
   }
 
   .step-num {
-    width: 20px;
-    height: 20px;
-    font-size: 0.7rem;
+    width: 18px;
+    height: 18px;
+    font-size: 0.68rem;
   }
 
   /* Panels Mobile */
   .luxury-panel {
-    padding: 16px 14px;
+    padding: 14px 12px;
     border-radius: var(--radius-lg);
-    gap: 14px;
+    gap: 12px;
   }
 
   .showroom-panel {
     min-height: auto;
-    padding-bottom: 120px; /* Espace pour la barre flottante fixe */
+    padding-bottom: 130px; /* Espace impératif pour la barre flottante fixe */
   }
 
   .panel-header {
@@ -2473,11 +2567,18 @@ onMounted(() => {
   .luxury-profitable-quick-btn {
     width: 100%;
     justify-content: center;
-    padding: 8px 12px;
-    font-size: 0.76rem;
+    padding: 10px 14px;
+    font-size: 0.8rem;
   }
 
-  /* Showroom Grid : Format Liste Horizontale Compacte sur Mobile */
+  .luxury-cta-btn-header {
+    width: 100%;
+    justify-content: center;
+    padding: 9px 14px;
+    font-size: 0.78rem;
+  }
+
+  /* Showroom Grid : Format Liste Horizontale Compacte sur Mobile (Anti-débordement) */
   .showroom-vehicles-grid {
     display: flex;
     flex-direction: column;
@@ -2492,8 +2593,11 @@ onMounted(() => {
     flex-direction: row;
     align-items: center;
     padding: 8px 10px;
-    gap: 10px;
-    min-height: 80px;
+    gap: 8px;
+    min-height: 76px;
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
     background: var(--bg-card);
     border: 1px solid var(--border-glass);
     border-radius: var(--radius-md);
@@ -2508,9 +2612,11 @@ onMounted(() => {
   }
 
   .svc-thumb-box {
-    width: 68px;
-    min-width: 68px;
-    height: 56px;
+    width: 60px;
+    min-width: 60px;
+    max-width: 60px;
+    height: 50px;
+    flex-shrink: 0;
     position: relative;
     display: flex;
     align-items: center;
@@ -2526,6 +2632,9 @@ onMounted(() => {
     border: none;
     background: transparent;
     border-radius: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   .svc-vehicle-img {
     width: 92%;
@@ -2537,8 +2646,8 @@ onMounted(() => {
     bottom: 2px;
     left: 2px;
     top: auto;
-    width: 14px;
-    height: 14px;
+    width: 13px;
+    height: 13px;
     padding: 1px;
     border-radius: 3px;
     background: var(--bg-card);
@@ -2546,8 +2655,9 @@ onMounted(() => {
   }
 
   .svc-info-box {
-    flex: 1;
+    flex: 1 1 auto;
     min-width: 0;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
     gap: 2px;
@@ -2557,11 +2667,14 @@ onMounted(() => {
     justify-content: space-between;
     align-items: baseline;
     gap: 4px;
+    min-width: 0;
+    overflow: hidden;
   }
   .svc-title-left {
     display: flex;
     align-items: baseline;
     gap: 4px;
+    min-width: 0;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
@@ -2573,13 +2686,16 @@ onMounted(() => {
     text-transform: uppercase;
   }
   .svc-name {
-    font-size: 0.85rem;
+    font-size: 0.84rem;
     font-weight: 800;
     color: var(--text-main);
     margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .svc-finition {
-    font-size: 0.65rem;
+    font-size: 0.64rem;
     color: var(--text-dimmed);
     font-weight: 600;
   }
@@ -2589,13 +2705,17 @@ onMounted(() => {
     border-radius: 3px;
     background: var(--bg-card-subtle);
     color: var(--text-dimmed);
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .svc-roi-indicator {
     margin: 1px 0;
+    min-width: 0;
+    overflow: hidden;
   }
   .roi-chip-tag {
-    font-size: 0.62rem;
+    font-size: 0.6rem;
     font-weight: 800;
     padding: 1px 5px;
     border-radius: 3px;
@@ -2604,6 +2724,9 @@ onMounted(() => {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
   }
 
   .svc-tech-row {
@@ -2611,8 +2734,10 @@ onMounted(() => {
     justify-content: space-between;
     align-items: center;
     gap: 4px;
-    font-size: 0.62rem;
+    font-size: 0.6rem;
     color: var(--text-muted);
+    min-width: 0;
+    overflow: hidden;
   }
   .svc-powertrain {
     white-space: nowrap;
@@ -2623,10 +2748,11 @@ onMounted(() => {
   }
 
   .svc-action-box {
+    flex-shrink: 0;
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    justify-content: space-between;
+    justify-content: center;
     min-width: 68px;
     gap: 4px;
     border-top: none;
@@ -2637,16 +2763,18 @@ onMounted(() => {
     text-align: right;
   }
   .svc-price-main {
-    font-size: 0.85rem;
+    font-size: 0.84rem;
     font-weight: 800;
     color: var(--text-main);
     line-height: 1.1;
+    white-space: nowrap;
   }
   .svc-price-sub {
-    font-size: 0.58rem;
+    font-size: 0.56rem;
     color: var(--accent-cyan);
     font-weight: 600;
     line-height: 1.1;
+    white-space: nowrap;
   }
 
   .svc-check-circle {
@@ -2666,58 +2794,112 @@ onMounted(() => {
     color: #fff;
   }
 
-  /* Barre d'Action Flottante Fixe en bas sur Mobile */
-  .showroom-bottom-bar {
+  /* ── BARRE D'ACTION FLOTTANTE FIXE MOBILE TÉLÉPORTÉE DANS LE BODY ── */
+  .showroom-mobile-floating-bar {
+    display: block;
     position: fixed;
-    bottom: 60px; /* Au-dessus de la bottom nav bar (60px) */
+    bottom: 60px; /* Ancrée au millimètre au-dessus de la nav mobile */
     left: 0;
     right: 0;
-    z-index: 88;
+    z-index: 99999;
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom)) 14px;
     background: var(--bg-card);
     background: linear-gradient(180deg, rgba(var(--bg-card-rgb, 255, 255, 255), 0.98), var(--bg-card));
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     border-top: 1px solid var(--border-glass);
-    padding: 10px 16px;
-    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.2);
+  }
+  [data-theme="dark"] .showroom-mobile-floating-bar {
+    background: linear-gradient(180deg, rgba(22, 22, 26, 0.98), #121214);
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.6);
+  }
+
+  .smfb-content {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 12px;
-  }
-  [data-theme="dark"] .showroom-bottom-bar {
-    background: linear-gradient(180deg, rgba(24, 24, 28, 0.98), #121214);
-    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.5);
+    gap: 10px;
+    max-width: 500px;
+    margin: 0 auto;
   }
 
-  .selection-counter {
+  .smfb-left {
     display: flex;
     align-items: center;
     gap: 6px;
     white-space: nowrap;
   }
 
-  .count-badge {
-    font-size: 0.78rem;
-    padding: 2px 8px;
-    background: var(--accent-teal);
-    color: #fff;
+  .smfb-badge {
+    min-width: 22px;
+    height: 22px;
     border-radius: 9999px;
+    background: var(--accent-teal);
+    color: #ffffff;
     font-weight: 800;
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 5px;
   }
 
-  .count-text {
+  .smfb-text {
     font-size: 0.72rem;
     font-weight: 700;
     color: var(--text-muted);
   }
 
-  .showroom-bottom-bar .luxury-cta-btn {
+  .smfb-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     flex: 1;
-    max-width: 260px;
-    padding: 10px 14px;
-    font-size: 0.78rem;
+    justify-content: flex-end;
+  }
+
+  .smfb-quick-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(16, 124, 65, 0.15));
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    color: var(--text-main);
+    font-size: 0.7rem;
+    font-weight: 800;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .smfb-cta-btn {
+    display: flex;
+    align-items: center;
     justify-content: center;
+    gap: 6px;
+    padding: 9px 14px;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+    color: #ffffff;
+    border: none;
+    font-size: 0.78rem;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 3px 10px rgba(16, 185, 129, 0.35);
+    white-space: nowrap;
+    transition: all 0.15s ease;
+  }
+  .smfb-cta-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background: var(--bg-card-subtle);
+    color: var(--text-dimmed);
+    box-shadow: none;
+  }
+  .smfb-cta-btn:not(:disabled):active {
+    transform: scale(0.98);
   }
 
   /* Podium 1 colonne */
@@ -2775,31 +2957,6 @@ onMounted(() => {
 }
 
 @media (max-width: 640px) {
-  /* Hero Mobile */
-  .luxury-hero-banner {
-    padding: 14px 12px;
-    border-radius: var(--radius-md);
-  }
-
-  .hero-luxury-title {
-    font-size: 1.15rem;
-    line-height: 1.25;
-  }
-
-  .hero-luxury-subtitle {
-    font-size: 0.72rem;
-    margin-bottom: 8px;
-  }
-
-  .hero-specs-row {
-    gap: 5px;
-  }
-
-  .spec-tag {
-    font-size: 0.62rem;
-    padding: 2px 6px;
-  }
-
   /* Stepper ultra-compact */
   .workflow-tabs-nav {
     padding: 6px 6px;
@@ -2809,8 +2966,8 @@ onMounted(() => {
 
   .workflow-step-btn {
     padding: 6px 6px;
-    min-width: 90px;
-    font-size: 0.66rem;
+    min-width: 85px;
+    font-size: 0.65rem;
     gap: 4px;
   }
 
