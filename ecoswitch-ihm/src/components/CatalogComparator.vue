@@ -693,41 +693,32 @@ onMounted(() => {
 
       <!-- ── SECTION B : SHOWROOM ET SÉLECTION DES ALTERNATIVES ────────────── -->
       <section class="luxury-panel showroom-panel" :class="{ 'mobile-active': activeMobileView === 'showroom' }">
+        
+        <!-- En-tête épuré du Showroom -->
         <div class="panel-header">
           <div class="panel-title-wrapper">
             <span class="panel-icon-badge">2</span>
             <div>
               <h2 class="panel-title">Showroom des Véhicules Cibles</h2>
               <p class="panel-subtitle">
-                {{ profitableCount }} modèle{{ profitableCount > 1 ? 's sont' : ' est' }} rentable{{ profitableCount > 1 ? 's' : '' }} sous l'horizon de {{ maxYears }} ans
+                <span v-if="profitableCount > 0" class="text-emerald font-bold">✦ {{ profitableCount }} modèle{{ profitableCount > 1 ? 's rentables' : ' rentable' }}</span>
+                <span v-else class="text-muted">Aucun modèle rentable sous {{ maxYears }} ans</span>
+                <span class="mx-1 opacity-40">·</span>
+                <span>{{ filteredVehicles.length }} disponible{{ filteredVehicles.length > 1 ? 's' : '' }}</span>
               </p>
             </div>
           </div>
           
           <div class="header-actions">
-            <!-- Bouton 1-clic direct pour lancer l'arbitrage immédiatement -->
             <button 
               v-if="profitableCount > 0"
               type="button" 
               class="luxury-profitable-quick-btn" 
-              @click="quickCompareProfitable"
-              title="Comparer immédiatement les modèles rentables en 1 clic"
+              @click="selectAllProfitable"
+              title="Cocher automatiquement tous les modèles rentables"
             >
-              <Sparkles size="14" class="text-gold" />
-              <span>⚡ Comparer les {{ profitableCount }} rentables (1-clic)</span>
-              <ArrowRight size="14" />
-            </button>
-
-            <!-- Bouton Lancer quand des cibles sont sélectionnées -->
-            <button 
-              v-if="selectedTargetIds.length > 0"
-              type="button" 
-              class="luxury-cta-btn-header" 
-              @click="compare"
-            >
-              <Zap size="13" />
-              <span>Comparer ({{ selectedTargetIds.length }})</span>
-              <ArrowRight size="13" />
+              <Sparkles size="13" class="text-gold" />
+              <span>Cocher les {{ profitableCount }} rentables</span>
             </button>
 
             <button 
@@ -746,35 +737,34 @@ onMounted(() => {
               class="luxury-ghost-btn text-rose" 
               @click="clearAllSelection"
             >
-              Effacer
+              Effacer ({{ selectedTargetIds.length }})
             </button>
           </div>
         </div>
 
-        <!-- Barre de recherche & Filtres énergies -->
+        <!-- Filtres unifiés et compacts -->
         <div class="showroom-filters-wrapper">
+          <!-- Barre de recherche -->
           <div class="search-luxury-bar">
             <Search size="14" class="search-luxury-icon" />
             <input 
               v-model="searchQuery" 
               type="text" 
               class="search-luxury-input" 
-              placeholder="Rechercher une marque, un modèle, une motorisation..."
+              placeholder="Rechercher une marque, un modèle..."
             />
             <button v-if="searchQuery" class="clear-search-btn" @click="searchQuery = ''">✕</button>
           </div>
 
-          <!-- Ligne de filtre intelligent avec Bascule "Rentables Uniquement" -->
+          <!-- Ligne de filtres rapides (Segmented Pills) -->
           <div class="filter-chips-row">
-            <!-- Filtre Rentables Uniquement -->
             <button 
               class="filter-pill pill-profitable" 
               :class="{ active: onlyProfitableFilter }"
               @click="onlyProfitableFilter = !onlyProfitableFilter"
             >
-              <Award size="13" />
-              <span>Rentables uniquement (≤ {{ maxYears }} ans)</span>
-              <span class="profitable-pill-badge">{{ profitableCount }}</span>
+              <Sparkles size="12" />
+              <span>Rentables ({{ profitableCount }})</span>
             </button>
 
             <button 
@@ -789,14 +779,14 @@ onMounted(() => {
               :class="{ active: selectedEnergyFilter === 'ELECTRIC' }"
               @click="selectedEnergyFilter = 'ELECTRIC'"
             >
-              ⚡ 100% Électrique
+              ⚡ 100% Élec
             </button>
             <button 
               class="filter-pill" 
               :class="{ active: selectedEnergyFilter === 'HYBRID' }"
               @click="selectedEnergyFilter = 'HYBRID'"
             >
-              🍃 Hybride Rechargeable
+              🍃 Hybride
             </button>
             <button 
               class="filter-pill" 
@@ -807,14 +797,14 @@ onMounted(() => {
             </button>
           </div>
 
-          <!-- Filtres Marques par Logos -->
+          <!-- Filtres Marques (Logos épurés) -->
           <div class="brands-pills-carousel">
             <button 
               class="brand-pill-item" 
               :class="{ active: selectedBrandFilter === 'ALL' }"
               @click="selectedBrandFilter = 'ALL'"
             >
-              Toutes les marques
+              Toutes marques
             </button>
             <button 
               v-for="b in availableBrands" 
@@ -839,7 +829,7 @@ onMounted(() => {
         <div v-else-if="filteredVehicles.length === 0" class="showroom-empty-state">
           <AlertCircle size="32" class="text-dimmed mb-2" />
           <p v-if="onlyProfitableFilter">
-            Aucun modèle n'est rentabilisé en moins de <strong>{{ maxYears }} ans</strong> avec vos paramètres de consommation actuels.
+            Aucun modèle n'est rentabilisé en moins de <strong>{{ maxYears }} ans</strong> avec vos paramètres actuels.
             <br />
             <span class="text-xxs text-muted mt-1 block">Essayez d'augmenter l'horizon de comparaison ou vos kilomètres annuels.</span>
           </p>
@@ -867,30 +857,33 @@ onMounted(() => {
                   class="svc-vehicle-img" 
                   @error="(e) => e.target.style.opacity = '0.3'"
                 />
-                <Car v-else size="28" class="text-dimmed opacity-40" />
+                <Car v-else size="26" class="text-dimmed opacity-40" />
               </div>
               <img v-if="v.brandLogoUrl" :src="v.brandLogoUrl" :alt="v.brand" class="svc-brand-mini-badge" />
             </div>
 
-            <!-- Bloc 2 : Titres, Badges ROI & Spécifications -->
+            <!-- Bloc 2 : Détails Véhicule (Hiérarchie typographique luxe) -->
             <div class="svc-info-box">
+              <!-- Ligne 1 : Nom du modèle en évidence (Sans troncature agressive) -->
               <div class="svc-title-row">
-                <div class="svc-title-left">
-                  <span class="svc-brand-label">{{ v.brand }}</span>
-                  <h3 class="svc-name">{{ v.model }}</h3>
-                  <span class="svc-finition">{{ v.finitionName }}</span>
-                </div>
-                <span class="svc-category-badge hide-on-mobile">{{ v.category }}</span>
+                <h3 class="svc-name">{{ v.brand }} {{ v.model }}</h3>
               </div>
 
-              <!-- Badge Rentabilité Instantané -->
+              <!-- Ligne 2 : Finition & Motorisation -->
+              <div class="svc-subtitle-row">
+                <span v-if="v.finitionName" class="svc-finition">{{ v.finitionName }}</span>
+                <span v-if="v.finitionName" class="svc-dot-sep">·</span>
+                <span class="svc-powertrain">{{ v.motorisationName || (v.fuelType === 'ELECTRIC' ? '100% Électrique' : 'Hybride') }}</span>
+              </div>
+
+              <!-- Ligne 3 : Badge ROI / Rentabilité -->
               <div class="svc-roi-indicator">
                 <span 
                   v-if="getVehicleMetrics(v).isProfitable" 
                   class="roi-chip-tag tag-rentable"
                 >
                   <Sparkles size="10" />
-                  Rentable en {{ getVehicleMetrics(v).breakEvenYears.toFixed(1) }} ans
+                  Rentable en {{ getVehicleMetrics(v).breakEvenYears.toFixed(1) }} ans (+{{ formatCurrency(getVehicleMetrics(v).annualSavings) }}/an)
                 </span>
                 <span 
                   v-else-if="getVehicleMetrics(v).annualSavings > 0" 
@@ -902,17 +895,8 @@ onMounted(() => {
                   v-else 
                   class="roi-chip-tag tag-neutral"
                 >
-                  Non avantageux
+                  Surcoût à {{ maxYears }} ans
                 </span>
-              </div>
-
-              <!-- Motorisation & Badges Énergie -->
-              <div class="svc-tech-row">
-                <span class="spec-chip" :class="v.fuelType === 'ELECTRIC' ? 'chip-electric' : 'chip-hybrid'">
-                  {{ v.fuelType === 'ELECTRIC' ? '⚡ Élec' : '🍃 Hyb' }}
-                </span>
-                <span class="svc-powertrain">{{ v.motorisationName }}</span>
-                <span v-if="v.powerHp" class="spec-chip chip-neutral hide-on-mobile">{{ v.powerHp }} ch</span>
               </div>
             </div>
 
@@ -920,7 +904,7 @@ onMounted(() => {
             <div class="svc-action-box">
               <div class="svc-pricing">
                 <div class="svc-price-main">{{ formatCurrency(v.purchasePrice) }}</div>
-                <div v-if="v.monthlyLoa" class="svc-price-sub">{{ formatCurrency(v.monthlyLoa) }}/m</div>
+                <div v-if="v.monthlyLoa" class="svc-price-sub">dès {{ formatCurrency(v.monthlyLoa) }}/m</div>
               </div>
               
               <div class="svc-check-circle" :class="{ checked: selectedTargetIds.includes(v.id) }">
@@ -930,8 +914,8 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- Barre d'Action Flottante / Lancement Calcul -->
-        <div class="showroom-bottom-bar">
+        <!-- Barre d'Action Desktop classique -->
+        <div class="showroom-bottom-bar hide-on-mobile">
           <div class="selection-counter">
             <span class="count-badge">{{ selectedTargetIds.length }}</span>
             <span class="count-text">modèle{{ selectedTargetIds.length > 1 ? 's' : '' }} sélectionné{{ selectedTargetIds.length > 1 ? 's' : '' }}</span>
@@ -1975,29 +1959,15 @@ onMounted(() => {
   flex-direction: column;
   gap: 4px;
   flex: 1;
+  min-width: 0;
 }
 .svc-title-row {
   display: flex;
-  justify-content: space-between;
   align-items: baseline;
-  gap: 6px;
-}
-.svc-title-left {
-  display: flex;
-  align-items: baseline;
-  gap: 5px;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.svc-brand-label {
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: var(--text-dimmed);
-  text-transform: uppercase;
+  min-width: 0;
 }
 .svc-name {
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   font-weight: 800;
   color: var(--text-main);
   margin: 0;
@@ -2005,23 +1975,29 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.svc-finition {
+.svc-subtitle-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   font-size: 0.68rem;
   color: var(--text-dimmed);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.svc-finition {
   font-weight: 600;
 }
-.svc-category-badge {
-  font-size: 0.6rem;
-  padding: 1px 5px;
-  border-radius: 4px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-glass);
-  color: var(--text-dimmed);
-  white-space: nowrap;
+.svc-dot-sep {
+  opacity: 0.4;
+}
+.svc-powertrain {
+  color: var(--text-muted);
 }
 
 .svc-roi-indicator {
   margin: 1px 0;
+  min-width: 0;
 }
 .roi-chip-tag {
   display: inline-flex;
@@ -2031,7 +2007,11 @@ onMounted(() => {
   font-weight: 800;
   padding: 2px 6px;
   border-radius: 4px;
-  width: 100%;
+  width: auto;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .tag-rentable {
   background: rgba(16, 124, 65, 0.15);
@@ -2047,48 +2027,6 @@ onMounted(() => {
   background: var(--bg-card);
   color: var(--text-dimmed);
   border: 1px solid var(--border-glass);
-}
-
-.svc-tech-row {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.svc-powertrain {
-  font-size: 0.68rem;
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.svc-specs-tags {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-.spec-chip {
-  font-size: 0.62rem;
-  font-weight: 700;
-  padding: 1px 5px;
-  border-radius: 4px;
-}
-.chip-electric {
-  background: rgba(16, 124, 65, 0.15);
-  color: var(--accent-teal);
-}
-.chip-hybrid {
-  background: rgba(2, 132, 199, 0.15);
-  color: var(--accent-cyan);
-}
-.chip-neutral {
-  background: var(--bg-card);
-  border: 1px solid var(--border-glass);
-  color: var(--text-dimmed);
-}
-.chip-wltp {
-  background: var(--bg-card);
-  border: 1px solid var(--border-glass);
-  color: var(--text-muted);
 }
 
 .svc-action-box {
@@ -2631,7 +2569,7 @@ onMounted(() => {
     font-size: 0.76rem;
   }
 
-  /* Showroom Grid : Format Liste Horizontale Compacte sur Mobile (Anti-débordement) */
+  /* Showroom Grid : Format Liste Horizontale Spacieuse et Aérée sur Mobile */
   .showroom-vehicles-grid {
     display: flex;
     flex-direction: column;
@@ -2648,9 +2586,9 @@ onMounted(() => {
     display: flex;
     flex-direction: row;
     align-items: center;
-    padding: 8px 8px;
-    gap: 6px;
-    min-height: 70px;
+    padding: 10px 10px;
+    gap: 8px;
+    min-height: 72px;
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
@@ -2669,14 +2607,15 @@ onMounted(() => {
   }
   .showroom-vehicle-card.selected {
     border-color: var(--accent-teal);
-    background: linear-gradient(90deg, rgba(16, 124, 65, 0.08), var(--bg-card));
+    background: linear-gradient(90deg, rgba(16, 124, 65, 0.09) 0%, var(--bg-card) 100%);
+    box-shadow: 0 0 0 1px var(--accent-teal);
   }
 
   .svc-thumb-box {
-    width: 52px;
-    min-width: 52px;
-    max-width: 52px;
-    height: 44px;
+    width: 56px;
+    min-width: 56px;
+    max-width: 56px;
+    height: 48px;
     flex-shrink: 0;
     position: relative;
     display: flex;
@@ -2684,7 +2623,7 @@ onMounted(() => {
     justify-content: center;
     background: var(--bg-card-subtle);
     border: 1px solid var(--border-glass);
-    border-radius: 6px;
+    border-radius: 8px;
     overflow: hidden;
   }
   .svc-image-container {
@@ -2725,52 +2664,52 @@ onMounted(() => {
   }
   .svc-title-row {
     display: flex;
-    justify-content: space-between;
     align-items: baseline;
-    gap: 4px;
     min-width: 0;
     overflow: hidden;
-  }
-  .svc-title-left {
-    display: flex;
-    align-items: baseline;
-    gap: 4px;
-    min-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-  .svc-brand-label {
-    font-size: 0.62rem;
-    font-weight: 700;
-    color: var(--text-dimmed);
-    text-transform: uppercase;
   }
   .svc-name {
-    font-size: 0.82rem;
+    font-size: 0.88rem;
     font-weight: 800;
     color: var(--text-main);
     margin: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    letter-spacing: -0.01em;
+  }
+  .svc-subtitle-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.64rem;
+    color: var(--text-dimmed);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .svc-finition {
-    font-size: 0.62rem;
-    color: var(--text-dimmed);
     font-weight: 600;
+  }
+  .svc-dot-sep {
+    opacity: 0.4;
+  }
+  .svc-powertrain {
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .svc-roi-indicator {
-    margin: 1px 0;
+    margin: 2px 0 0 0;
     min-width: 0;
     overflow: hidden;
   }
   .roi-chip-tag {
-    font-size: 0.6rem;
+    font-size: 0.62rem;
     font-weight: 800;
-    padding: 1px 5px;
-    border-radius: 3px;
+    padding: 2px 6px;
+    border-radius: 4px;
     width: auto;
     max-width: 100%;
     white-space: nowrap;
@@ -2781,33 +2720,14 @@ onMounted(() => {
     gap: 3px;
   }
 
-  .svc-tech-row {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 0.6rem;
-    color: var(--text-muted);
-    min-width: 0;
-    overflow: hidden;
-  }
-  .svc-powertrain {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-size: 0.6rem;
-    flex: 1;
-    min-width: 0;
-  }
-
   .svc-action-box {
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
     align-items: flex-end;
     justify-content: center;
-    min-width: 64px;
-    max-width: 68px;
-    gap: 2px;
+    min-width: 66px;
+    gap: 3px;
     border-top: none;
     padding-top: 0;
     margin-top: 0;
@@ -2816,14 +2736,14 @@ onMounted(() => {
     text-align: right;
   }
   .svc-price-main {
-    font-size: 0.82rem;
+    font-size: 0.86rem;
     font-weight: 800;
     color: var(--text-main);
     line-height: 1.1;
     white-space: nowrap;
   }
   .svc-price-sub {
-    font-size: 0.54rem;
+    font-size: 0.56rem;
     color: var(--accent-cyan);
     font-weight: 600;
     line-height: 1.1;
@@ -2840,6 +2760,7 @@ onMounted(() => {
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: all 0.15s ease;
   }
   .svc-check-circle.checked {
     background: var(--accent-teal);
@@ -2847,32 +2768,32 @@ onMounted(() => {
     color: #fff;
   }
 
-  /* ── BARRE D'ACTION FLOTTANTE FIXE MOBILE TÉLÉPORTÉE DANS LE BODY ── */
+  /* ── BARRE D'ACTION FLOTTANTE FIXE MOBILE TÉLÉPORTÉE ── */
   .showroom-mobile-floating-bar {
     display: block;
     position: fixed;
-    bottom: 60px; /* Ancrée au millimètre au-dessus de la nav mobile */
-    left: 0;
-    right: 0;
+    bottom: 66px; /* Ancrée au-dessus de la nav bar mobile (60px + 6px float) */
+    left: 12px;
+    right: 12px;
     z-index: 99999;
-    padding: 10px 14px calc(10px + env(safe-area-inset-bottom)) 14px;
-    background: var(--bg-card);
-    background: linear-gradient(180deg, rgba(var(--bg-card-rgb, 255, 255, 255), 0.98), var(--bg-card));
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-top: 1px solid var(--border-glass);
-    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.2);
+    padding: 8px 12px calc(8px + env(safe-area-inset-bottom)) 12px;
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-full, 9999px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
   }
   [data-theme="dark"] .showroom-mobile-floating-bar {
-    background: linear-gradient(180deg, rgba(22, 22, 26, 0.98), #121214);
-    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.6);
+    background: rgba(22, 22, 26, 0.96);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.55);
   }
 
   .smfb-content {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     max-width: 500px;
     margin: 0 auto;
   }
@@ -2882,6 +2803,7 @@ onMounted(() => {
     align-items: center;
     gap: 6px;
     white-space: nowrap;
+    padding-left: 4px;
   }
 
   .smfb-badge {
@@ -2901,13 +2823,13 @@ onMounted(() => {
   .smfb-text {
     font-size: 0.72rem;
     font-weight: 700;
-    color: var(--text-muted);
+    color: var(--text-main);
   }
 
   .smfb-actions {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     flex: 1;
     justify-content: flex-end;
   }
@@ -2916,8 +2838,8 @@ onMounted(() => {
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 8px 10px;
-    border-radius: var(--radius-sm);
+    padding: 7px 10px;
+    border-radius: var(--radius-full, 9999px);
     background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(16, 124, 65, 0.15));
     border: 1px solid rgba(245, 158, 11, 0.4);
     color: var(--text-main);
@@ -2932,8 +2854,8 @@ onMounted(() => {
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 9px 14px;
-    border-radius: var(--radius-sm);
+    padding: 8px 16px;
+    border-radius: var(--radius-full, 9999px);
     background: linear-gradient(135deg, #059669 0%, #10b981 100%);
     color: #ffffff;
     border: none;
