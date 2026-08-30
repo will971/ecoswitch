@@ -20,6 +20,7 @@ import {
   CreditCard,
   ShieldCheck
 } from '@lucide/vue'
+import { apiGetCatalogVariants } from '../../utils/api.js'
 
 const props = defineProps({
   currentVehicle: {
@@ -79,7 +80,10 @@ const emit = defineEmits([
 // Étape active (1: Actuel, 2: Logement & Aides, 3: Cible & Budget)
 const currentStep = ref(1)
 
-// Modèles courants du parc français (pour l'étape 1)
+// Variantes dynamiques chargées depuis le catalogue officiel
+const catalogVariants = ref([])
+
+// Modèles courants du parc français (Fallback)
 const popularCurrentCars = [
   {
     name: 'Peugeot 208 II PureTech 100',
@@ -163,7 +167,7 @@ const popularCurrentCars = [
   }
 ]
 
-// Modèles cibles recommandés pour l'étape 3
+// Modèles cibles recommandés pour l'étape 3 (Fallback)
 const popularTargetCars = [
   {
     name: 'Tesla Model 3 Highland (2024)',
@@ -247,6 +251,108 @@ const popularTargetCars = [
   }
 ]
 
+// Construction dynamique des véhicules actuels issus du catalogue avec photos
+const dynamicCurrentCars = computed(() => {
+  if (!catalogVariants.value || catalogVariants.value.length === 0) {
+    return popularCurrentCars
+  }
+
+  const desiredCurrent = [
+    { brand: 'Peugeot', model: '208', fuel: 'HYBRID', tag: 'Hybride', resale: 12800 },
+    { brand: 'Renault', model: 'Clio', fuel: 'HYBRID', tag: 'Hybride', resale: 12500 },
+    { brand: 'Citroën', model: 'C3', tag: 'Électrique / Éco', resale: 11000 },
+    { brand: 'Dacia', model: 'Duster', tag: 'Hybride / SUV', resale: 14200 },
+    { brand: 'Volkswagen', model: 'Golf', tag: 'Hybride', resale: 16500 },
+    { brand: 'Toyota', model: 'Yaris', tag: 'Hybride', resale: 13000 },
+    { brand: 'Fiat', model: 'Panda', tag: 'Micro-Hybride', resale: 8500 },
+    { brand: 'Peugeot', model: '2008', tag: 'SUV Hybride', resale: 15000 }
+  ]
+
+  const results = []
+  const usedIds = new Set()
+
+  for (const item of desiredCurrent) {
+    const v = catalogVariants.value.find(c => 
+      c.brandName?.toLowerCase().includes(item.brand.toLowerCase()) &&
+      c.modelName?.toLowerCase().includes(item.model.toLowerCase()) &&
+      (item.fuel ? c.fuelType === item.fuel : true) &&
+      !usedIds.has(c.id)
+    )
+
+    if (v) {
+      usedIds.add(v.id)
+      results.push({
+        id: v.id,
+        name: `${v.brandName} ${v.modelName} ${v.motorisationName || ''}`.trim(),
+        brand: v.brandName,
+        model: v.modelName,
+        fuelType: v.fuelType,
+        consumption: v.consumptionWltp || 5.5,
+        insuranceCost: v.defaultInsuranceCost || 580,
+        maintenanceCost: v.defaultMaintenanceCost || 440,
+        resaleValue: v.estimatedResaleValue || item.resale,
+        imageUrl: v.finitionImageUrl || v.imageUrl || v.modelImageUrl,
+        brandLogoUrl: v.brandLogoUrl,
+        tag: item.tag || (v.fuelType === 'DIESEL' ? 'Diesel' : (v.fuelType === 'HYBRID' ? 'Hybride' : 'Essence'))
+      })
+    }
+  }
+
+  return results.length >= 4 ? results : popularCurrentCars
+})
+
+// Construction dynamique des véhicules cibles issus du catalogue avec photos
+const dynamicTargetCars = computed(() => {
+  if (!catalogVariants.value || catalogVariants.value.length === 0) {
+    return popularTargetCars
+  }
+
+  const desiredTargets = [
+    { brand: 'Tesla', model: 'Model 3', badge: 'Best-Seller Élec' },
+    { brand: 'Renault', model: 'Megane', badge: 'Made in France' },
+    { brand: 'Peugeot', model: '208', fuel: 'ELECTRIC', badge: 'Citadine Élec' },
+    { brand: 'MG', model: '4', badge: 'Rapport Q/P' },
+    { brand: 'Tesla', model: 'Model Y', badge: 'SUV Familial' },
+    { brand: 'Dacia', model: 'Spring', badge: 'Ultra Éco' },
+    { brand: 'BYD', model: 'Dolphin', badge: 'Compacte Élec' },
+    { brand: 'Fiat', model: '500', fuel: 'ELECTRIC', badge: 'Citadine Éco' }
+  ]
+
+  const results = []
+  const usedIds = new Set()
+
+  for (const item of desiredTargets) {
+    const v = catalogVariants.value.find(c => 
+      c.brandName?.toLowerCase().includes(item.brand.toLowerCase()) &&
+      c.modelName?.toLowerCase().includes(item.model.toLowerCase()) &&
+      (item.fuel ? c.fuelType === item.fuel : (c.fuelType === 'ELECTRIC' || c.fuelType === 'HYBRID')) &&
+      !usedIds.has(c.id)
+    )
+
+    if (v) {
+      usedIds.add(v.id)
+      results.push({
+        id: v.id,
+        name: `${v.brandName} ${v.modelName} ${v.motorisationName || ''}`.trim(),
+        brand: v.brandName,
+        model: v.modelName,
+        fuelType: v.fuelType,
+        consumption: v.consumptionWltp || 15.0,
+        purchasePrice: v.purchasePrice || 35000,
+        monthlyLoa: v.monthlyLoa,
+        monthlyLld: v.monthlyLld,
+        insuranceCost: v.defaultInsuranceCost || 780,
+        maintenanceCost: v.defaultMaintenanceCost || 240,
+        imageUrl: v.finitionImageUrl || v.imageUrl || v.modelImageUrl,
+        brandLogoUrl: v.brandLogoUrl,
+        badge: item.badge || (v.fuelType === 'ELECTRIC' ? '100% Élec' : 'Hybride')
+      })
+    }
+  }
+
+  return results.length >= 4 ? results : popularTargetCars
+})
+
 // Profils de recharge pour l'étape 2
 const chargingProfiles = [
   {
@@ -283,7 +389,16 @@ const selectedIncomeTier = ref('standard')
 const showCustomIncome = ref(false)
 const showTaxHelp = ref(false)
 
-onMounted(() => {
+onMounted(async () => {
+  try {
+    const data = await apiGetCatalogVariants()
+    if (data && data.length > 0) {
+      catalogVariants.value = data
+    }
+  } catch (e) {
+    console.warn('Impossible de charger les variantes du catalogue pour le wizard', e)
+  }
+
   if (!props.currentVehicle.annualMileage) {
     props.currentVehicle.annualMileage = 15000
     props.targetVehicle.annualMileage = 15000
@@ -298,21 +413,27 @@ onMounted(() => {
 
 const selectCurrentCar = (car) => {
   props.currentVehicle.name = car.name
+  props.currentVehicle.brand = car.brand || ''
+  props.currentVehicle.model = car.model || ''
   props.currentVehicle.fuelType = car.fuelType
   props.currentVehicle.consumption = car.consumption
-  props.currentVehicle.insuranceCost = car.insuranceCost
-  props.currentVehicle.maintenanceCost = car.maintenanceCost
-  props.currentVehicle.resaleValue = car.resaleValue
+  props.currentVehicle.insuranceCost = car.insuranceCost || 580
+  props.currentVehicle.maintenanceCost = car.maintenanceCost || 440
+  props.currentVehicle.resaleValue = car.resaleValue || 8000
+  props.currentVehicle.imageUrl = car.imageUrl || null
   showCurrentCustom.value = false
 }
 
 const selectTargetCar = (car) => {
   props.targetVehicle.name = car.name
+  props.targetVehicle.brand = car.brand || ''
+  props.targetVehicle.model = car.model || ''
   props.targetVehicle.fuelType = car.fuelType
   props.targetVehicle.consumption = car.consumption
-  props.targetVehicle.purchasePrice = car.purchasePrice
-  props.targetVehicle.insuranceCost = car.insuranceCost
-  props.targetVehicle.maintenanceCost = car.maintenanceCost
+  props.targetVehicle.purchasePrice = car.purchasePrice || 35000
+  props.targetVehicle.insuranceCost = car.insuranceCost || 780
+  props.targetVehicle.maintenanceCost = car.maintenanceCost || 240
+  props.targetVehicle.imageUrl = car.imageUrl || null
   props.targetVehicle.annualMileage = props.currentVehicle.annualMileage || 15000
   showTargetCustom.value = false
 }
@@ -465,26 +586,44 @@ const formatFuelBadge = (fuelType) => {
         </p>
       </div>
 
-      <!-- Grille des voitures actuelles populaires -->
+      <!-- Grille des voitures actuelles populaires issues du catalogue -->
       <div class="cars-grid mb-4">
         <div
-          v-for="car in popularCurrentCars"
-          :key="car.name"
-          class="car-card"
+          v-for="car in dynamicCurrentCars"
+          :key="car.id || car.name"
+          class="wizard-car-card"
           :class="{ selected: currentVehicle.name === car.name }"
           @click="selectCurrentCar(car)"
         >
-          <div class="car-card-top flex-between mb-1.5">
-            <span class="badge badge-small" :class="car.fuelType === 'DIESEL' ? 'badge-amber' : car.fuelType === 'HYBRID' ? 'badge-cyan' : 'badge-teal'">
-              {{ car.tag }}
-            </span>
-            <div v-if="currentVehicle.name === car.name" class="check-circle flex-center">
-              <Check size="12" />
-            </div>
+          <!-- Vignette miniature du modèle (gauche) -->
+          <div class="car-thumbnail-box">
+            <img
+              v-if="car.imageUrl"
+              :src="car.imageUrl"
+              :alt="car.name"
+              class="car-thumbnail-img"
+              @error="(e) => e.target.style.display = 'none'"
+            />
+            <span v-else class="car-thumbnail-fallback">🚗</span>
           </div>
-          <div class="car-card-name text-main">{{ car.name }}</div>
-          <div class="car-card-meta text-xxs text-dimmed mt-1">
-            {{ car.consumption }} L/100km &middot; Reprise ~{{ formatCurrency(car.resaleValue) }}
+
+          <!-- Contenu texte (droite) -->
+          <div class="car-content-box">
+            <div class="car-header-row flex-between">
+              <div class="flex items-center gap-1.5">
+                <img v-if="car.brandLogoUrl" :src="car.brandLogoUrl" class="brand-mini-logo" />
+                <span class="badge badge-small" :class="car.fuelType === 'DIESEL' ? 'badge-amber' : car.fuelType === 'HYBRID' ? 'badge-cyan' : 'badge-teal'">
+                  {{ car.tag }}
+                </span>
+              </div>
+              <div v-if="currentVehicle.name === car.name" class="check-circle flex-center">
+                <Check size="11" />
+              </div>
+            </div>
+            <div class="car-card-name text-main">{{ car.name }}</div>
+            <div class="car-card-meta text-xxs text-dimmed">
+              {{ car.consumption }} L/100km &middot; Reprise ~{{ formatCurrency(car.resaleValue) }}
+            </div>
           </div>
         </div>
       </div>
@@ -801,26 +940,44 @@ const formatFuelBadge = (fuelType) => {
         </p>
       </div>
 
-      <!-- Grille des voitures cibles populaires -->
+      <!-- Grille des voitures cibles populaires issues du catalogue -->
       <div class="cars-grid mb-4">
         <div
-          v-for="car in popularTargetCars"
-          :key="car.name"
-          class="car-card"
+          v-for="car in dynamicTargetCars"
+          :key="car.id || car.name"
+          class="wizard-car-card"
           :class="{ selected: targetVehicle.name === car.name }"
           @click="selectTargetCar(car)"
         >
-          <div class="car-card-top flex-between mb-1.5">
-            <span class="badge badge-small" :class="car.fuelType === 'ELECTRIC' ? 'badge-teal' : 'badge-cyan'">
-              {{ car.badge }}
-            </span>
-            <div v-if="targetVehicle.name === car.name" class="check-circle flex-center">
-              <Check size="12" />
-            </div>
+          <!-- Vignette miniature du modèle (gauche) -->
+          <div class="car-thumbnail-box">
+            <img
+              v-if="car.imageUrl"
+              :src="car.imageUrl"
+              :alt="car.name"
+              class="car-thumbnail-img"
+              @error="(e) => e.target.style.display = 'none'"
+            />
+            <span v-else class="car-thumbnail-fallback">⚡</span>
           </div>
-          <div class="car-card-name text-main">{{ car.name }}</div>
-          <div class="car-card-meta text-xxs text-dimmed mt-1">
-            {{ formatCurrency(car.purchasePrice) }} &middot; {{ car.consumption }} {{ car.fuelType === 'ELECTRIC' ? 'kWh' : 'L' }}/100km
+
+          <!-- Contenu texte (droite) -->
+          <div class="car-content-box">
+            <div class="car-header-row flex-between">
+              <div class="flex items-center gap-1.5">
+                <img v-if="car.brandLogoUrl" :src="car.brandLogoUrl" class="brand-mini-logo" />
+                <span class="badge badge-small" :class="car.fuelType === 'ELECTRIC' ? 'badge-teal' : 'badge-cyan'">
+                  {{ car.badge }}
+                </span>
+              </div>
+              <div v-if="targetVehicle.name === car.name" class="check-circle flex-center">
+                <Check size="11" />
+              </div>
+            </div>
+            <div class="car-card-name text-main">{{ car.name }}</div>
+            <div class="car-card-meta text-xxs text-dimmed">
+              <strong class="text-teal">{{ formatCurrency(car.purchasePrice) }}</strong> &middot; {{ car.consumption }} {{ car.fuelType === 'ELECTRIC' ? 'kWh' : 'L' }}/100km
+            </div>
           </div>
         </div>
       </div>
@@ -1044,46 +1201,92 @@ const formatFuelBadge = (fuelType) => {
   background: var(--accent-teal);
 }
 
-/* Cars Grid */
+/* Cars Grid with Thumbnails */
 .cars-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
 }
-@media (max-width: 992px) {
-  .cars-grid { grid-template-columns: repeat(2, 1fr); }
-}
-@media (max-width: 540px) {
-  .cars-grid { grid-template-columns: 1fr; }
+@media (max-width: 640px) {
+  .cars-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
-.car-card {
+.wizard-car-card {
   background: var(--bg-card);
   border: 1px solid var(--border-glass);
   border-radius: var(--radius-md);
-  padding: 12px;
+  padding: 8px 10px;
   cursor: pointer;
   transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   position: relative;
 }
-.car-card:hover {
+.wizard-car-card:hover {
   border-color: var(--border-hover);
-  transform: translateY(-2px);
+  transform: translateY(-1px);
 }
-.car-card.selected {
+.wizard-car-card.selected {
   border-color: var(--accent-teal);
   background: var(--accent-teal-soft);
+  box-shadow: 0 0 0 1px var(--accent-teal);
 }
 
+.car-thumbnail-box {
+  width: 64px;
+  height: 44px;
+  border-radius: 6px;
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-glass);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.car-thumbnail-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.car-thumbnail-fallback {
+  font-size: 1.3rem;
+}
+
+.car-content-box {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.car-header-row {
+  margin-bottom: 1px;
+}
+.brand-mini-logo {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+}
 .car-card-name {
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 700;
-  line-height: 1.3;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.car-card-meta {
+  font-size: 0.68rem;
+  color: var(--text-dimmed);
 }
 
 .check-circle {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: var(--accent-teal);
   color: #fff;
@@ -1220,5 +1423,38 @@ const formatFuelBadge = (fuelType) => {
 }
 .dropdown-item:hover {
   background: var(--accent-teal-soft);
+}
+
+@media (max-width: 640px) {
+  .express-wizard {
+    padding: 14px 10px !important;
+  }
+  .wizard-header .flex-between {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .wizard-title {
+    font-size: 1.05rem;
+  }
+  .btn-text-expert {
+    width: 100%;
+    justify-content: center;
+    padding: 6px 10px;
+    background: var(--bg-card-subtle);
+    border-radius: 8px;
+    border: 1px solid var(--border-glass);
+  }
+  .step-text {
+    font-size: 0.7rem;
+  }
+  .step-num {
+    width: 22px;
+    height: 22px;
+    font-size: 0.68rem;
+  }
+  .stepper-track {
+    padding: 0;
+  }
 }
 </style>
