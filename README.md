@@ -65,7 +65,9 @@ make down
 | `make dev-ihm` | Installe les dépendances et lance le front en local sur le port `5173` |
 | `make test-api` | Exécute l'ensemble des tests automatisés JUnit du backend |
 | `make seed-local` | Peuple le catalogue relationnel sur l'API locale (`http://localhost:8080`) |
-| `make seed-prod` | Peuple le catalogue relationnel sur l'API de production (`https://ecoswitch-api.up.railway.app`) |
+| `make seed-local-reset` | Nettoie la base locale et réinjecte l'intégralité du catalogue |
+| `make seed-prod` | Peuple/met à jour le catalogue sur l'API de production (`https://ecoswitch-api.up.railway.app`) |
+| `make seed-prod-reset` | Nettoie la base de production et réinjecte proprement tous les logos et photos |
 | `make test-scripts` | Exécute la suite de tests unitaires du script de seed |
 | `make build` | Reconstruit uniquement les images Docker |
 | `make logs` | Affiche en continu les logs des conteneurs Docker |

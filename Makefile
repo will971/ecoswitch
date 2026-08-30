@@ -39,9 +39,16 @@ build-ihm:
 seed-local:
 	python3 scripts/seed_catalog.py local
 
+seed-local-reset:
+	python3 scripts/seed_catalog.py local --reset
+
 seed-prod:
 	python3 scripts/seed_catalog.py prod
 
+seed-prod-reset:
+	python3 scripts/seed_catalog.py prod --reset
+
 test-scripts:
 	python3 scripts/test_seed_catalog.py
+
 
