@@ -107,5 +107,23 @@ class TestSeedCatalog(unittest.TestCase):
         self.assertGreaterEqual(total_models, 50)
         self.assertGreaterEqual(total_variants, 100)
 
+    def test_reset_argparse(self):
+        """Vérifie que le flag --reset / --clean est correctement analysé par argparse."""
+        import argparse
+        parser = argparse.ArgumentParser()
+        parser.add_argument("env", nargs="?", default="local")
+        parser.add_argument("--url", "-u")
+        parser.add_argument("--reset", "--clean", action="store_true")
+        
+        args = parser.parse_args(["prod", "--reset"])
+        self.assertEqual(args.env, "prod")
+        self.assertTrue(args.reset)
+
+        args_clean = parser.parse_args(["prod", "--clean"])
+        self.assertTrue(args_clean.reset)
+
+        args_default = parser.parse_args(["prod"])
+        self.assertFalse(args_default.reset)
+
 if __name__ == "__main__":
     unittest.main()

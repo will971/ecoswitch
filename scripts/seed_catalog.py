@@ -335,6 +335,39 @@ def api_get(endpoint, params=None):
         err_msg = e.read().decode("utf-8")
         print(f"[HTTP {e.code}] Error on {url}: {err_msg}", file=sys.stderr)
         raise
+    
+def api_put(endpoint, data=None, params=None):
+    url = f"{API_BASE}{endpoint}"
+    if params:
+        query_string = urllib.parse.urlencode(params)
+        url += f"?{query_string}"
+    
+    headers = {"Content-Type": "application/json"}
+    body = json.dumps(data).encode("utf-8") if data is not None else b"{}"
+    
+    req = urllib.request.Request(url, data=body, headers=headers, method="PUT")
+    try:
+        with urllib.request.urlopen(req) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        err_msg = e.read().decode("utf-8")
+        print(f"[HTTP {e.code}] Error on {url}: {err_msg}", file=sys.stderr)
+        raise
+
+def api_delete(endpoint, params=None):
+    url = f"{API_BASE}{endpoint}"
+    if params:
+        query_string = urllib.parse.urlencode(params)
+        url += f"?{query_string}"
+    
+    req = urllib.request.Request(url, method="DELETE")
+    try:
+        with urllib.request.urlopen(req) as resp:
+            return resp.status
+    except urllib.error.HTTPError as e:
+        err_msg = e.read().decode("utf-8")
+        print(f"[HTTP {e.code}] Error on DELETE {url}: {err_msg}", file=sys.stderr)
+        raise
 
 CATALOG_DATA = [
     # 1. RENAULT
@@ -1264,9 +1297,27 @@ CATALOG_DATA = [
     }
 ]
 
-def seed_catalog(target_url=None):
+def clear_catalog(target_url=None):
     if target_url:
         configure_api_endpoints(target_url)
+
+    print(f"[*] Nettoyage complet du catalogue sur {API_BASE}...")
+    try:
+        brands = api_get("/brands")
+        print(f"[*] {len(brands)} marques trouvées. Suppression en cours (avec cascade)...")
+        for b in brands:
+            api_delete(f"/brands/{b['id']}")
+            print(f"    [-] Marque #{b['id']} '{b['name']}' et ses modèles/variantes supprimés.")
+        print("[✓] Catalogue nettoyé avec succès.\n")
+    except Exception as e:
+        print(f"[!] Erreur lors du nettoyage : {e}")
+
+def seed_catalog(target_url=None, reset=False):
+    if target_url:
+        configure_api_endpoints(target_url)
+
+    if reset:
+        clear_catalog(target_url)
 
     print(f"[*] Seeding catalog on {API_BASE} with authentic SVGs and accurate models...")
     print(f"[*] Upload endpoint: {API_UPLOAD_URL}")
@@ -1298,7 +1349,11 @@ def seed_catalog(target_url=None):
                 print(f"[!] Could not create or find brand: {brand_name}")
                 continue
             brand_id = brand_obj["id"]
-            print(f"[*] Found existing Brand #{brand_id}: {brand_name}")
+            try:
+                api_put(f"/brands/{brand_id}", {"name": brand_name, "logoUrl": uploaded_logo})
+                print(f"[*] Updated existing Brand #{brand_id}: {brand_name} with logo -> {uploaded_logo}")
+            except Exception:
+                print(f"[*] Found existing Brand #{brand_id}: {brand_name}")
         
         # 3. Modèles
         for model_data in brand_data.get("models", []):
@@ -1327,7 +1382,11 @@ def seed_catalog(target_url=None):
                     print(f"    -> [!] Could not create/find model: {model_name}")
                     continue
                 model_id = model_obj["id"]
-                print(f"    -> [*] Found existing Model #{model_id}: {model_name}")
+                try:
+                    api_put(f"/models/{model_id}", {"name": model_name, "imageUrl": uploaded_model_img, "category": model_cat})
+                    print(f"    -> [*] Updated existing Model #{model_id}: {model_name} with image -> {uploaded_model_img}")
+                except Exception:
+                    print(f"    -> [*] Found existing Model #{model_id}: {model_name}")
             
             # 4. Motorisations
             mot_id_map = {}
@@ -1366,7 +1425,13 @@ def seed_catalog(target_url=None):
                     fin_list = api_get("/finitions", params={"modelId": model_id})
                     fin_obj = next((f for f in fin_list if f["name"].lower() == fin_name.lower()), None)
                     if fin_obj:
-                        fin_id_map[fin_name] = fin_obj["id"]
+                        fin_id = fin_obj["id"]
+                        fin_id_map[fin_name] = fin_id
+                        try:
+                            api_put(f"/finitions/{fin_id}", fin_payload)
+                            print(f"        [*] Updated existing Finition #{fin_id}: {fin_name} with image -> {uploaded_fin_img}")
+                        except Exception:
+                            print(f"        [*] Found existing Finition #{fin_id}: {fin_name}")
             
             # 6. Variantes tarifées
             for var_data in model_data.get("variants", []):
@@ -1408,7 +1473,7 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(
         description="EcoSwitch Automotive Catalog Seeder",
-        epilog="Exemples:\n  python3 scripts/seed_catalog.py\n  python3 scripts/seed_catalog.py prod\n  python3 scripts/seed_catalog.py --url https://ecoswitch-api.up.railway.app",
+        epilog="Exemples:\n  python3 scripts/seed_catalog.py\n  python3 scripts/seed_catalog.py prod\n  python3 scripts/seed_catalog.py prod --reset\n  python3 scripts/seed_catalog.py --url https://ecoswitch-api.up.railway.app",
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
@@ -1422,6 +1487,12 @@ def main():
         "-u",
         help="URL de base directe de l'API (écrase l'argument env)"
     )
+    parser.add_argument(
+        "--reset",
+        "--clean",
+        action="store_true",
+        help="Nettoie et supprime toutes les données existantes du catalogue avant de réinjecter"
+    )
     args = parser.parse_args()
 
     target_url = args.url if args.url else resolve_target_url(args.env)
@@ -1430,8 +1501,10 @@ def main():
     print(f"[*] EcoSwitch Catalog Seeder")
     print(f"[*] Environnement cible : {env_name}")
     print(f"[*] URL de l'API        : {target_url}")
+    if args.reset:
+        print(f"[*] Mode               : RESET & SEED")
     print("=" * 60)
-    seed_catalog(target_url)
+    seed_catalog(target_url, reset=args.reset)
 
 if __name__ == "__main__":
     main()
