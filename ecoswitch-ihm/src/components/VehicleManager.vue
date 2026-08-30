@@ -41,7 +41,10 @@
       <!-- PANE 1 : LISTE DES CONSTRUCTEURS / MARQUES (Gauche) -->
       <aside class="brands-sidebar-card card-glass">
         <div class="sidebar-header">
-          <span class="sidebar-title">Constructeurs ({{ hierarchy.length }})</span>
+          <div class="flex items-center gap-2">
+            <span class="sidebar-title">Constructeurs ({{ hierarchy.length }})</span>
+            <span class="scroll-hint-pill hide-on-desktop">Glisser ➔</span>
+          </div>
           <button
             v-if="isAdmin"
             class="link-action-btn"
@@ -88,7 +91,7 @@
             </div>
 
             <div class="brand-row-right">
-              <span class="models-count-pill">{{ b.models?.length || 0 }} mod.</span>
+              <span class="models-count-pill">{{ b.models?.length || 0 }}</span>
               <div v-if="isAdmin" class="row-hover-actions" @click.stop>
                 <button class="action-btn-mini" @click="openEditBrandModal(b)" title="Modifier la marque">✎</button>
                 <button class="action-btn-mini btn-danger" @click="deleteBrand(b)" title="Supprimer la marque">🗑</button>
@@ -1885,13 +1888,29 @@ onMounted(() => {
     width: 100%;
     box-sizing: border-box;
   }
+  .scroll-hint-pill {
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: var(--accent-teal);
+    background: var(--accent-teal-soft);
+    padding: 1px 6px;
+    border-radius: 9999px;
+    border: 1px solid rgba(16, 124, 65, 0.25);
+    white-space: nowrap;
+    animation: pulseHint 2s infinite ease-in-out;
+  }
+  @keyframes pulseHint {
+    0%, 100% { opacity: 0.85; transform: translateX(0); }
+    50% { opacity: 1; transform: translateX(2px); }
+  }
+
   .brands-items-list {
     display: flex;
     flex-direction: row;
     overflow-x: auto;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
-    gap: 6px;
+    gap: 5px;
     padding: 2px 0 6px 0;
     width: 100%;
     max-width: 100%;
@@ -1903,22 +1922,25 @@ onMounted(() => {
   }
   .brand-row-item {
     flex-shrink: 0;
-    padding: 5px 10px;
+    padding: 4px 8px;
     border-radius: 9999px;
-    gap: 6px;
+    gap: 5px;
   }
   .brand-logo-box {
-    width: 20px;
-    height: 20px;
-    border-radius: 4px;
+    width: 18px;
+    height: 18px;
+    border-radius: 3px;
+    padding: 1px;
   }
   .brand-name-text {
-    font-size: 0.75rem;
+    font-size: 0.72rem;
+    font-weight: 700;
     white-space: nowrap;
   }
   .models-count-pill {
-    font-size: 0.6rem;
-    padding: 1px 5px;
+    font-size: 0.58rem;
+    padding: 1px 4px;
+    border-radius: 9999px;
   }
 
   /* PANE 2 : Sélecteur de Modèles Horizontal */
