@@ -447,39 +447,41 @@ onMounted(() => {
       </div>
     </header>
 
-    <!-- ── 2. WORKFLOW STEPPER SEGMENTÉ (DESIGN HARMONIEUX SANS TRONCATURE) ── -->
-    <nav class="workflow-stepper-track" aria-label="Étapes du comparateur">
-      <button 
-        type="button"
-        class="stepper-tab" 
-        :class="{ active: activeMobileView === 'config' }"
-        @click="switchMobileTab('config')"
-      >
-        <span class="stepper-pill-badge">1</span>
-        <span class="stepper-tab-text">Référence</span>
-      </button>
+    <!-- ── 2. WORKFLOW STEPPER SEGMENTÉ (CONTENEUR STICKY PARFAITEMENT POSITIONNÉ) ── -->
+    <div class="stepper-sticky-container">
+      <nav class="workflow-stepper-track" aria-label="Étapes du comparateur">
+        <button 
+          type="button"
+          class="stepper-tab" 
+          :class="{ active: activeMobileView === 'config' }"
+          @click="switchMobileTab('config')"
+        >
+          <span class="stepper-pill-badge">1</span>
+          <span class="stepper-tab-text">Référence</span>
+        </button>
 
-      <button 
-        type="button"
-        class="stepper-tab" 
-        :class="{ active: activeMobileView === 'showroom' }"
-        @click="switchMobileTab('showroom')"
-      >
-        <span class="stepper-pill-badge">2</span>
-        <span class="stepper-tab-text">Showroom</span>
-        <span v-if="selectedTargetIds.length > 0" class="stepper-counter-dot">{{ selectedTargetIds.length }}</span>
-      </button>
+        <button 
+          type="button"
+          class="stepper-tab" 
+          :class="{ active: activeMobileView === 'showroom' }"
+          @click="switchMobileTab('showroom')"
+        >
+          <span class="stepper-pill-badge">2</span>
+          <span class="stepper-tab-text">Showroom</span>
+          <span v-if="selectedTargetIds.length > 0" class="stepper-counter-dot">{{ selectedTargetIds.length }}</span>
+        </button>
 
-      <button 
-        type="button"
-        class="stepper-tab" 
-        :class="{ active: activeMobileView === 'results', disabled: !result }"
-        @click="result && switchMobileTab('results')"
-      >
-        <span class="stepper-pill-badge">3</span>
-        <span class="stepper-tab-text">Résultats</span>
-      </button>
-    </nav>
+        <button 
+          type="button"
+          class="stepper-tab" 
+          :class="{ active: activeMobileView === 'results', disabled: !result }"
+          @click="result && switchMobileTab('results')"
+        >
+          <span class="stepper-pill-badge">3</span>
+          <span class="stepper-tab-text">Résultats</span>
+        </button>
+      </nav>
+    </div>
 
     <!-- ── 3. MAIN DUAL / TRIPLE PANE CONTENT ──────────────────────────────── -->
     <div class="luxury-main-grid">
@@ -1299,11 +1301,17 @@ onMounted(() => {
 }
 
 /* ── 2. WORKFLOW STEPPER SEGMENTED TRACK ─────────────────────────────── */
-.workflow-stepper-track {
+.stepper-sticky-container {
   display: none;
 }
 
 @media (max-width: 1024px) {
+  .stepper-sticky-container {
+    display: block;
+    width: 100%;
+    margin-bottom: 12px;
+  }
+
   .workflow-stepper-track {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -2528,27 +2536,37 @@ onMounted(() => {
     display: none !important;
   }
 
-  /* Stepper Sticky Segmented Navigation sous le header mobile (56px) */
-  .workflow-stepper-track {
-    display: grid;
+  /* Conteneur Sticky Opaque et Flou parfaitement positionné sous le Header Mobile (56px) */
+  .stepper-sticky-container {
+    display: block;
     position: sticky;
     top: 56px;
     z-index: 85;
-    background: var(--bg-card);
-    background: linear-gradient(180deg, var(--bg-card) 0%, rgba(var(--bg-card-rgb, 255, 255, 255), 0.94) 100%);
+    background: var(--bg-app);
+    background: linear-gradient(180deg, var(--bg-app) 0%, rgba(var(--bg-app-rgb, 245, 245, 247), 0.98) 100%);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    padding: 5px;
-    margin: -4px 0 10px 0;
+    padding: 8px 0 10px 0;
+    margin: -16px 0 4px 0;
     width: 100%;
     box-sizing: border-box;
+  }
+  [data-theme="dark"] .stepper-sticky-container {
+    background: var(--bg-app, #0f0f11);
+    background: linear-gradient(180deg, #0f0f11 0%, rgba(15, 15, 17, 0.98) 100%);
+  }
+
+  .workflow-stepper-track {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    padding: 4px;
+    background: var(--bg-card);
     border: 1px solid var(--border-glass);
     border-radius: 12px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
-  }
-  [data-theme="dark"] .workflow-stepper-track {
-    background: linear-gradient(180deg, rgba(22, 22, 24, 0.98) 0%, rgba(16, 16, 18, 0.94) 100%);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    width: 100%;
+    box-sizing: border-box;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
   }
 
   .stepper-tab {
