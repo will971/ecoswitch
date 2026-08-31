@@ -1421,8 +1421,8 @@ onMounted(async () => {
 /* ── 3. MAIN PANE LAYOUT ──────────────────────────────────────────────── */
 .luxury-main-grid {
   display: grid;
-  grid-template-columns: 360px 1fr;
-  gap: 20px;
+  grid-template-columns: 300px 1fr;
+  gap: 16px;
   align-items: start;
   width: 100%;
   max-width: 100%;
@@ -1953,9 +1953,9 @@ onMounted(async () => {
 
 .showroom-vehicles-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 12px;
-  max-height: 480px;
+  grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
+  gap: 10px;
+  max-height: 640px;
   overflow-y: auto;
   padding-right: 4px;
   width: 100%;
@@ -1967,11 +1967,11 @@ onMounted(async () => {
 .showroom-vehicle-card {
   background: var(--bg-card-subtle);
   border: 1px solid var(--border-glass);
-  border-radius: var(--radius-lg);
-  padding: 12px;
+  border-radius: var(--radius-md);
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
