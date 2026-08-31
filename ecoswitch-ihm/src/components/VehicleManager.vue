@@ -1,37 +1,41 @@
 <template>
   <div class="catalog-manager-app">
-    <!-- Top Bar -->
+    <!-- Top Bar Épurée -->
     <div class="manager-header">
       <div class="header-titles">
         <h2 class="manager-main-title">
-          <span class="catalog-icon-badge">📁</span>
-          <span>Catalogue Automobile & Tarification</span>
-          <span v-if="isAdmin" class="admin-status-badge">🛡️ Mode Administrateur ({{ currentUser?.email }})</span>
-          <span v-else class="consultation-status-badge">👁️ Mode Consultation</span>
+          <span>Catalogue Constructeurs & Véhicules</span>
+          <span v-if="isAdmin" class="badge badge-teal badge-small">
+            <ShieldCheck size="12" class="mr-1 inline" /> Mode Gestionnaire ({{ currentUser?.email }})
+          </span>
+          <span v-else class="badge badge-subtle badge-small">
+            <Eye size="12" class="mr-1 inline" /> Consultation
+          </span>
         </h2>
         <p class="manager-subtitle hide-on-mobile">
-          Administration relationnelle des constructeurs, modèles, motorisations certifiées WLTP, finitions et barèmes de prix (Achat, LOA, LLD).
+          Base relationnelle des constructeurs, modèles, motorisations WLTP, finitions et barèmes tarifaires (Achat comptant, LOA, LLD).
         </p>
       </div>
 
       <div class="header-actions">
         <button
           v-if="isAdmin"
-          class="btn btn-primary btn-small"
+          class="btn btn-primary btn-small flex items-center gap-1.5 font-semibold"
           @click="openAddBrandModal"
         >
-          <span>+ Nouvelle Marque</span>
+          <Plus size="14" />
+          <span>Nouvelle Marque</span>
         </button>
       </div>
     </div>
 
     <!-- Alert Notifications -->
     <div v-if="successMsg" class="catalog-toast toast-success animation-fadeIn">
-      <span>✓</span>
+      <Check size="15" />
       <span>{{ successMsg }}</span>
     </div>
     <div v-if="error" class="catalog-toast toast-error animation-fadeIn">
-      <span>⚠️</span>
+      <AlertTriangle size="15" />
       <span>{{ error }}</span>
       <button @click="error = null" class="toast-close">✕</button>
     </div>
@@ -43,25 +47,27 @@
         <div class="sidebar-header">
           <div class="flex items-center gap-2">
             <span class="sidebar-title">Constructeurs ({{ hierarchy.length }})</span>
-            <span class="scroll-hint-pill hide-on-desktop">Glisser ➔</span>
           </div>
           <button
             v-if="isAdmin"
-            class="link-action-btn"
+            class="link-action-btn flex items-center gap-1"
             @click="openAddBrandModal"
           >
-            + Ajouter
+            <Plus size="12" /> Ajouter
           </button>
         </div>
 
         <!-- Search brand -->
         <div class="sidebar-search-box" v-if="hierarchy.length > 5">
-          <input
-            v-model="brandSearch"
-            type="text"
-            placeholder="Filtrer une marque..."
-            class="sidebar-search-input"
-          />
+          <div class="search-input-wrapper">
+            <Search size="13" class="search-icon" />
+            <input
+              v-model="brandSearch"
+              type="text"
+              placeholder="Filtrer une marque..."
+              class="sidebar-search-input"
+            />
+          </div>
         </div>
 
         <div v-if="loading && hierarchy.length === 0" class="sidebar-loading">
@@ -85,16 +91,20 @@
                   class="brand-logo-img"
                   @error="(e) => e.target.style.display = 'none'"
                 />
-                <span v-else class="fallback-emoji">🚗</span>
+                <Car v-else size="14" class="text-dimmed" />
               </div>
               <span class="brand-name-text">{{ b.name }}</span>
             </div>
 
             <div class="brand-row-right">
-              <span class="models-count-pill">{{ b.models?.length || 0 }}</span>
+              <span class="models-count-pill font-mono">{{ b.models?.length || 0 }}</span>
               <div v-if="isAdmin" class="row-hover-actions" @click.stop>
-                <button class="action-btn-mini" @click="openEditBrandModal(b)" title="Modifier la marque">✎</button>
-                <button class="action-btn-mini btn-danger" @click="deleteBrand(b)" title="Supprimer la marque">🗑</button>
+                <button class="action-btn-mini" @click="openEditBrandModal(b)" title="Modifier la marque">
+                  <Edit2 size="11" />
+                </button>
+                <button class="action-btn-mini btn-danger" @click="deleteBrand(b)" title="Supprimer la marque">
+                  <Trash2 size="11" />
+                </button>
               </div>
             </div>
           </div>
@@ -104,9 +114,9 @@
       <!-- PANE 2 : DÉTAIL DE LA MARQUE & MODÈLES (Droite) -->
       <main class="brand-detail-main">
         <div v-if="!activeBrand" class="card-glass empty-state-card">
-          <span class="empty-icon">🚗</span>
-          <h3>Sélectionnez une marque</h3>
-          <p>Choisissez un constructeur dans la colonne de gauche pour afficher ses modèles et motorisations.</p>
+          <Car size="36" class="text-dimmed mb-2" />
+          <h3 class="text-sm font-bold text-main">Sélectionnez un constructeur</h3>
+          <p class="text-xs text-muted">Choisissez une marque dans la colonne de gauche pour explorer sa gamme de modèles et motorisations.</p>
         </div>
 
         <div v-else class="space-y-main">
@@ -153,7 +163,7 @@
                     class="tab-img"
                     @error="(e) => e.target.style.display = 'none'"
                   />
-                  <span v-else>🚘</span>
+                  <Car v-else size="14" class="text-dimmed" />
                 </div>
                 <div class="tab-text-stack">
                   <span class="tab-model-name">{{ m.name }}</span>
@@ -175,7 +185,7 @@
                     :alt="activeModel.name"
                     class="hero-img"
                   />
-                  <span v-else class="hero-placeholder-icon">🚘</span>
+                  <Car v-else size="28" class="text-dimmed" />
                   <span class="hero-category-tag">{{ activeModel.category || 'Automobile' }}</span>
                 </div>
 
@@ -186,18 +196,18 @@
                   </div>
                   <h3 class="hero-model-title">{{ activeModel.name }}</h3>
                   <div class="hero-badges">
-                    <span class="badge badge-teal">{{ activeModel.motorisations?.length || 0 }} motorisations</span>
-                    <span class="badge badge-cyan">{{ activeModel.finitions?.length || 0 }} finitions</span>
+                    <span class="badge badge-teal badge-small">{{ activeModel.motorisations?.length || 0 }} motorisations</span>
+                    <span class="badge badge-cyan badge-small">{{ activeModel.finitions?.length || 0 }} finitions</span>
                   </div>
                 </div>
               </div>
 
               <div v-if="isAdmin" class="hero-actions">
-                <button class="btn btn-secondary btn-small" @click="openEditModelModal(activeModel)">
-                  ✎ Modifier modèle
+                <button class="btn btn-secondary btn-small flex items-center gap-1" @click="openEditModelModal(activeModel)">
+                  <Edit2 size="12" /> <span>Modifier</span>
                 </button>
                 <button class="btn btn-secondary btn-small btn-danger" @click="deleteModel(activeModel)" title="Supprimer">
-                  🗑
+                  <Trash2 size="12" />
                 </button>
               </div>
             </div>
@@ -205,15 +215,16 @@
             <!-- SECTION : FINITIONS DU MODÈLE -->
             <div class="finitions-section-block">
               <div class="section-title-bar">
-                <h4 class="section-title">
-                  <span>✨</span> Finitions disponibles ({{ activeModel.finitions?.length || 0 }})
+                <h4 class="section-title flex items-center gap-1.5">
+                  <Layers size="14" class="text-teal" />
+                  <span>Finitions disponibles ({{ activeModel.finitions?.length || 0 }})</span>
                 </h4>
                 <button
                   v-if="isAdmin"
-                  class="link-action-btn"
+                  class="link-action-btn flex items-center gap-1"
                   @click="openAddFinitionModal"
                 >
-                  + Ajouter une finition
+                  <Plus size="12" /> Ajouter
                 </button>
               </div>
 
@@ -235,14 +246,18 @@
                         :alt="fin.name"
                         class="finition-img"
                       />
-                      <span v-else>✨</span>
+                      <Sparkles v-else size="12" class="text-teal" />
                     </div>
                     <span class="finition-name">{{ fin.name }}</span>
                   </div>
 
                   <div v-if="isAdmin" class="finition-actions">
-                    <button class="action-btn-mini" @click="openEditFinitionModal(fin)">✎</button>
-                    <button class="action-btn-mini btn-danger" @click="deleteFinition(fin)">🗑</button>
+                    <button class="action-btn-mini" @click="openEditFinitionModal(fin)">
+                      <Edit2 size="10" />
+                    </button>
+                    <button class="action-btn-mini btn-danger" @click="deleteFinition(fin)">
+                      <Trash2 size="10" />
+                    </button>
                   </div>
                 </div>
               </div>
@@ -251,15 +266,16 @@
             <!-- SECTION : MOTORISATIONS & GRILLES TARIFAIRES -->
             <div class="motorisations-section-block">
               <div class="section-title-bar">
-                <h4 class="section-title">
-                  <span>⚡</span> Motorisations & Barèmes Tarifaires
+                <h4 class="section-title flex items-center gap-1.5">
+                  <Zap size="14" class="text-teal" />
+                  <span>Motorisations & Grilles Tarifaires</span>
                 </h4>
                 <button
                   v-if="isAdmin"
-                  class="btn btn-primary btn-small"
+                  class="btn btn-primary btn-small flex items-center gap-1"
                   @click="openAddMotorisationModal"
                 >
-                  + Nouvelle Motorisation
+                  <Plus size="12" /> Nouvelle Motorisation
                 </button>
               </div>
 
@@ -277,15 +293,15 @@
                   <!-- En-tête Motorisation -->
                   <div class="mot-header-bar">
                     <div class="mot-header-left">
-                      <span class="fuel-badge-tag" :class="getFuelBadgeClass(mot.fuelType)">
-                        {{ mot.fuelType === 'ELECTRIC' ? '⚡ Électrique' : (mot.fuelType === 'HYBRID' ? '🍃 Hybride' : mot.fuelType) }}
+                      <span class="badge badge-small" :class="mot.fuelType === 'ELECTRIC' ? 'badge-teal' : 'badge-cyan'">
+                        {{ mot.fuelType === 'ELECTRIC' ? '100% Électrique' : (mot.fuelType === 'HYBRID' ? 'Hybride' : mot.fuelType) }}
                       </span>
-                      <strong class="mot-name-label">{{ mot.name }}</strong>
-                      <span class="mot-wltp-badge">
-                        Conso WLTP : <strong>{{ mot.consumptionWltp }} {{ mot.fuelType === 'ELECTRIC' ? 'kWh' : 'L' }}/100km</strong>
+                      <strong class="mot-name-label text-xs font-bold text-main">{{ mot.name }}</strong>
+                      <span class="mot-wltp-badge font-mono text-xxs">
+                        WLTP : <strong>{{ mot.consumptionWltp }} {{ mot.fuelType === 'ELECTRIC' ? 'kWh' : 'L' }}/100km</strong>
                       </span>
-                      <span class="mot-specs-pill">
-                        {{ mot.powerHp }} ch {{ mot.batteryCapacityKwh ? `• ${mot.batteryCapacityKwh} kWh` : '' }} {{ mot.autonomieWltpKm ? `• ⚡ ${mot.autonomieWltpKm} km WLTP` : '' }}
+                      <span class="mot-specs-pill font-mono text-xxs">
+                        {{ mot.powerHp }} ch {{ mot.batteryCapacityKwh ? `· ${mot.batteryCapacityKwh} kWh` : '' }} {{ mot.autonomieWltpKm ? `· ${mot.autonomieWltpKm} km WLTP` : '' }}
                       </span>
                     </div>
 
@@ -298,8 +314,12 @@
                         + Associer Finition & Prix
                       </button>
                       <div v-if="isAdmin" class="mot-action-btns">
-                        <button class="action-btn-mini" @click="openEditMotorisationModal(mot)">✎</button>
-                        <button class="action-btn-mini btn-danger" @click="deleteMotorisation(mot)">🗑</button>
+                        <button class="action-btn-mini" @click="openEditMotorisationModal(mot)">
+                          <Edit2 size="10" />
+                        </button>
+                        <button class="action-btn-mini btn-danger" @click="deleteMotorisation(mot)">
+                          <Trash2 size="10" />
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -310,7 +330,7 @@
                       v-if="!getVariantsForMot(mot) || getVariantsForMot(mot).length === 0"
                       class="no-variants-label"
                     >
-                      Aucune finition tarifée associée à cette motorisation. Cliquez sur "+ Associer Finition & Prix" pour en ajouter.
+                      Aucune finition tarifée associée à cette motorisation.
                     </div>
 
                     <div v-else class="variants-cards-grid">
@@ -321,38 +341,42 @@
                       >
                         <div class="variant-top-bar">
                           <div class="variant-finition-name">
-                            <span class="sparkle-icon">✨</span>
-                            <strong>{{ p.finitionName }}</strong>
+                            <span class="text-xs font-bold text-main">{{ p.finitionName }}</span>
                           </div>
                           <div v-if="isAdmin" class="variant-admin-btns">
-                            <button class="action-btn-mini" @click="openEditVariantModal(mot.id, p)">✎</button>
-                            <button class="action-btn-mini btn-danger" @click="deleteVariant(p.variantId)">🗑</button>
+                            <button class="action-btn-mini" @click="openEditVariantModal(mot.id, p)">
+                              <Edit2 size="10" />
+                            </button>
+                            <button class="action-btn-mini btn-danger" @click="deleteVariant(p.variantId)">
+                              <Trash2 size="10" />
+                            </button>
                           </div>
                         </div>
 
                         <!-- Grille de Tarifs -->
                         <div class="variant-pricing-lines">
                           <div class="price-line">
-                            <span class="price-label">Achat Comptant</span>
-                            <strong class="price-value text-main">{{ formatCurrency(p.purchasePrice) }}</strong>
+                            <span class="price-label">Achat</span>
+                            <strong class="price-value text-main font-mono">{{ formatCurrency(p.purchasePrice) }}</strong>
                           </div>
                           <div v-if="p.monthlyLoa" class="price-line">
-                            <span class="price-label">Loyer LOA</span>
-                            <strong class="price-value text-cyan">{{ formatCurrency(p.monthlyLoa) }}/m</strong>
+                            <span class="price-label">LOA</span>
+                            <strong class="price-value text-cyan font-mono">{{ formatCurrency(p.monthlyLoa) }}/m</strong>
                           </div>
                           <div v-if="p.monthlyLld" class="price-line">
-                            <span class="price-label">Loyer LLD</span>
-                            <strong class="price-value text-teal">{{ formatCurrency(p.monthlyLld) }}/m</strong>
+                            <span class="price-label">LLD</span>
+                            <strong class="price-value text-teal font-mono">{{ formatCurrency(p.monthlyLld) }}/m</strong>
                           </div>
                         </div>
 
                         <!-- Bouton Simulation Express -->
                         <button
                           type="button"
-                          class="btn-simulate-variant"
+                          class="btn-simulate-variant flex items-center justify-center gap-1.5"
                           @click="openSimulatorWithVariant(activeBrand, activeModel, mot, p)"
                         >
-                          <span>⚡ Simuler cette configuration</span>
+                          <span>Simuler cette configuration</span>
+                          <ArrowRight size="13" />
                         </button>
                       </div>
                     </div>
@@ -384,8 +408,9 @@
             <label class="form-label">Logo officiel (Upload image ou URL)</label>
             <div class="upload-input-group">
               <input v-model="brandForm.logoUrl" type="text" class="form-control" placeholder="/uploads/brands/... ou https://..." />
-              <label class="btn btn-secondary btn-small cursor-pointer">
-                <span>📁 Uploader</span>
+              <label class="btn btn-secondary btn-small cursor-pointer flex items-center gap-1">
+                <UploadCloud size="12" />
+                <span>Uploader</span>
                 <input type="file" accept="image/*" class="hidden-file-input" @change="(e) => handleFileUpload(e, 'brand', 'brands')" />
               </label>
             </div>
@@ -434,8 +459,9 @@
             <label class="form-label">Photo / Visuel du véhicule (Upload ou URL)</label>
             <div class="upload-input-group">
               <input v-model="modelForm.imageUrl" type="text" class="form-control" placeholder="/uploads/models/... ou https://..." />
-              <label class="btn btn-secondary btn-small cursor-pointer">
-                <span>📁 Uploader</span>
+              <label class="btn btn-secondary btn-small cursor-pointer flex items-center gap-1">
+                <UploadCloud size="12" />
+                <span>Uploader</span>
                 <input type="file" accept="image/*" class="hidden-file-input" @change="(e) => handleFileUpload(e, 'model', 'models')" />
               </label>
             </div>
@@ -524,8 +550,9 @@
             <label class="form-label">Visuel de la finition (Upload ou URL)</label>
             <div class="upload-input-group">
               <input v-model="finitionForm.imageUrl" type="text" class="form-control" placeholder="/uploads/finitions/... ou https://..." />
-              <label class="btn btn-secondary btn-small cursor-pointer">
-                <span>📁 Uploader</span>
+              <label class="btn btn-secondary btn-small cursor-pointer flex items-center gap-1">
+                <UploadCloud size="12" />
+                <span>Uploader</span>
                 <input type="file" accept="image/*" class="hidden-file-input" @change="(e) => handleFileUpload(e, 'finition', 'finitions')" />
               </label>
             </div>
@@ -611,6 +638,23 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import {
+  Car,
+  Layers,
+  Sparkles,
+  Zap,
+  Leaf,
+  Plus,
+  Edit2,
+  Trash2,
+  ArrowRight,
+  ShieldCheck,
+  Eye,
+  Check,
+  AlertTriangle,
+  UploadCloud,
+  Search
+} from '@lucide/vue'
 import {
   apiGetCatalogHierarchy,
   apiCreateBrand,

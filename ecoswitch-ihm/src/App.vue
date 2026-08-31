@@ -711,54 +711,54 @@ onMounted(() => {
       @profiles-updated="loadUserProfiles"
     />
 
-    <!-- Modal Authentification Apple Style -->
+    <!-- Modal Authentification Apple Style Épuré -->
     <div v-if="authModalOpen" class="auth-modal-overlay flex-center">
-      <div class="card-glass auth-modal-card p-5 relative max-w-sm w-100 animation-fadeIn">
-        <button class="icon-btn-close absolute top-4 right-4" @click="authModalOpen = false">
+      <div class="auth-modal-card relative animation-fadeIn">
+        <button class="icon-btn-close absolute top-5 right-5" @click="authModalOpen = false">
           ✕
         </button>
 
-        <div class="text-center mb-4">
-          <div class="auth-icon-badge mx-auto mb-2 flex-center">
-            <User size="20" class="text-teal" />
+        <div class="mb-4 text-left">
+          <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xxs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/50 mb-2.5">
+            <User size="12" /> <span>Espace Personnel</span>
           </div>
-          <h3 class="text-main font-heading text-lg font-bold m-0">
-            {{ authMode === 'login' ? 'Connexion Espace Client' : 'Création de Compte' }}
+          <h3 class="text-main font-heading text-lg font-bold m-0 tracking-tight">
+            {{ authMode === 'login' ? 'Connexion à votre compte' : 'Création de votre compte' }}
           </h3>
           <p class="text-xs text-muted mt-1 m-0">
-            {{ authMode === 'login' ? 'Accédez à votre garage et simulations enregistrées' : 'Enregistrez vos véhicules et comparez en 1 clic' }}
+            {{ authMode === 'login' ? 'Retrouvez votre garage et vos simulations enregistrées.' : 'Sauvegardez vos bilans et comparez vos véhicules en un clic.' }}
           </p>
         </div>
 
-        <div v-if="authError" class="p-2.5 rounded-xl border-glass bg-card text-rose text-xs mb-3 text-center">
+        <div v-if="authError" class="p-2.5 rounded-lg border-glass bg-card text-rose text-xs mb-4">
           {{ authError }}
         </div>
 
         <!-- Google SSO Action (Bouton Officiel Google Identity Services) -->
         <div class="google-auth-section mb-2">
-          <div id="google-signin-btn" class="flex-center w-100" style="min-height: 44px;"></div>
+          <div id="google-signin-btn" class="flex-center w-100" style="min-height: 40px;"></div>
         </div>
 
-        <div class="auth-divider flex-center my-3">
+        <div class="auth-divider flex-center my-3.5">
           <span class="divider-line"></span>
-          <span class="divider-text text-xxs text-dimmed uppercase px-2">ou avec adresse email</span>
+          <span class="divider-text text-xxs text-dimmed uppercase px-3">ou par email</span>
           <span class="divider-line"></span>
         </div>
 
         <form @submit.prevent="authMode === 'login' ? handleLogin() : handleRegister()">
           <div class="form-group mb-3">
-            <label class="form-label text-xxs">Adresse Email</label>
+            <label class="form-label text-xxs font-semibold text-dimmed uppercase tracking-wider">Adresse Email</label>
             <input v-model="authEmail" type="email" class="form-control text-xs" placeholder="nom@exemple.com" required />
           </div>
 
           <div class="form-group mb-4">
-            <label class="form-label text-xxs">Mot de passe</label>
+            <label class="form-label text-xxs font-semibold text-dimmed uppercase tracking-wider">Mot de passe</label>
             <input v-model="authPassword" type="password" class="form-control text-xs" placeholder="••••••••" required />
           </div>
 
           <button type="submit" class="btn btn-primary w-100 py-2.5 text-xs font-bold mb-3" :disabled="authLoading">
             <span v-if="authLoading" class="spinner mr-2"></span>
-            <span>{{ authMode === 'login' ? 'Se connecter' : 'Créer mon compte' }}</span>
+            <span>{{ authMode === 'login' ? 'Se connecter' : 'Créer un compte' }}</span>
           </button>
         </form>
 
@@ -945,13 +945,14 @@ onMounted(() => {
 
 .auth-modal-card {
   width: 100%;
-  max-width: 420px;
+  max-width: 440px;
   background: var(--bg-card);
   border: 1px solid var(--border-glass);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
   position: relative;
   box-sizing: border-box;
+  padding: 32px 36px !important;
 }
 
 .icon-btn-close {
@@ -994,7 +995,8 @@ onMounted(() => {
 .auth-divider {
   display: flex;
   align-items: center;
-  margin: 1rem 0;
+  width: 100%;
+  position: relative;
 }
 .divider-line {
   flex: 1;
@@ -1002,8 +1004,10 @@ onMounted(() => {
   background: var(--border-glass);
 }
 .divider-text {
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.04em;
+  color: var(--text-dimmed);
+  background: var(--bg-card);
 }
 
 .btn-text-toggle {
