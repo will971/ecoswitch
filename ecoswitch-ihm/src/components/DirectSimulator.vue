@@ -2,6 +2,7 @@
 import { ref, watch, onMounted } from 'vue'
 import { Zap, ArrowRight, Sparkles, AlertCircle, Layers, SlidersHorizontal, CheckCircle2 } from '@lucide/vue'
 import vehicleEcoSavingsImg from '../assets/vehicle_eco_savings.png'
+import { apiGetCatalogVariants } from '../utils/api.js'
 
 // Import des sous-composants
 import ExpressWizard from './simulator/ExpressWizard.vue'
@@ -72,9 +73,25 @@ const catalogVehicles = ref([])
 
 const fetchCatalog = async () => {
   try {
-    const res = await fetch('/api/v1/vehicules')
-    if (res.ok) {
-      catalogVehicles.value = await res.json()
+    const data = await apiGetCatalogVariants()
+    if (data && data.length > 0) {
+      catalogVehicles.value = data.map(v => ({
+        id: v.id,
+        name: `${v.brandName} ${v.modelName} ${v.motorisationName || ''} (${v.finitionName || ''})`.trim(),
+        brand: v.brandName,
+        model: v.modelName,
+        version: `${v.motorisationName || ''} - ${v.finitionName || ''}`,
+        fuelType: v.fuelType,
+        consumption: v.consumptionWltp || 15.0,
+        purchasePrice: v.purchasePrice || 35000,
+        monthlyLoa: v.monthlyLoa,
+        monthlyLld: v.monthlyLld,
+        insuranceCost: v.defaultInsuranceCost || 650,
+        maintenanceCost: v.defaultMaintenanceCost || 250,
+        resaleValue: v.estimatedResaleValue || 0,
+        imageUrl: v.finitionImageUrl || v.imageUrl || v.modelImageUrl,
+        brandLogoUrl: v.brandLogoUrl
+      }))
     }
   } catch (err) {
     console.error("Erreur de chargement du catalogue pour autocompletion", err)
@@ -89,21 +106,48 @@ onMounted(async () => {
     applyUserProfile(props.userProfile)
   }
 
-  // Vérifier s'il y a un véhicule cible sélectionné depuis le catalogue
+  // Vérifier s'il y a un véhicule personnalisé sélectionné depuis le catalogue
+  const customTarget = localStorage.getItem('eco_custom_target_vehicle')
+  if (customTarget) {
+    try {
+      const v = JSON.parse(customTarget)
+      targetVehicle.value = {
+        name: v.name || `${v.brand || ''} ${v.model || ''}`.trim(),
+        brand: v.brand || '',
+        model: v.model || '',
+        fuelType: v.fuelType || 'ELECTRIC',
+        consumption: v.consumption || 15.0,
+        purchasePrice: v.purchasePrice || 35000,
+        insuranceCost: v.insuranceCost || 650,
+        maintenanceCost: v.maintenanceCost || 250,
+        resaleValue: v.resaleValue || 0,
+        annualMileage: v.annualMileage || currentVehicle.value.annualMileage || 15000,
+        imageUrl: v.imageUrl || null
+      }
+      if (v.monthlyLoa) {
+        isLeasing.value = true
+        customLeasingMonthlyPrice.value = v.monthlyLoa
+      } else if (v.monthlyLld) {
+        isLeasing.value = true
+        customLeasingMonthlyPrice.value = v.monthlyLld
+      }
+      localStorage.removeItem('eco_custom_target_vehicle')
+    } catch (e) {
+      console.error("Erreur parsing eco_custom_target_vehicle", e)
+    }
+  }
+
+  // Vérifier s'il y a un ID de véhicule cible (legacy)
   const targetId = localStorage.getItem('eco_target_vehicle_id')
   if (targetId) {
     const v = catalogVehicles.value.find(c => c.id === parseInt(targetId))
     if (v) {
       targetVehicle.value = { ...v }
+      if (v.monthlyLoa) {
+        isLeasing.value = true
+        customLeasingMonthlyPrice.value = v.monthlyLoa
+      }
       localStorage.removeItem('eco_target_vehicle_id')
-    } else {
-      fetch(`/api/v1/vehicules/${targetId}`)
-        .then(res => res.json())
-        .then(data => {
-          targetVehicle.value = { ...data }
-          localStorage.removeItem('eco_target_vehicle_id')
-        })
-        .catch(e => console.error(e))
     }
   }
 })

@@ -310,12 +310,12 @@ const dynamicTargetCars = computed(() => {
   const desiredTargets = [
     { brand: 'Tesla', model: 'Model 3', badge: 'Best-Seller Élec' },
     { brand: 'Renault', model: 'Megane', badge: 'Made in France' },
-    { brand: 'Peugeot', model: '208', fuel: 'ELECTRIC', badge: 'Citadine Élec' },
-    { brand: 'MG', model: '4', badge: 'Rapport Q/P' },
+    { brand: 'Peugeot', model: 'e-208', fuel: 'ELECTRIC', badge: 'Citadine Élec' },
+    { brand: 'MG', model: 'MG4', badge: 'Rapport Q/P' },
     { brand: 'Tesla', model: 'Model Y', badge: 'SUV Familial' },
     { brand: 'Dacia', model: 'Spring', badge: 'Ultra Éco' },
-    { brand: 'BYD', model: 'Dolphin', badge: 'Compacte Élec' },
-    { brand: 'Fiat', model: '500', fuel: 'ELECTRIC', badge: 'Citadine Éco' }
+    { brand: 'BYD', model: 'Atto 3', badge: 'SUV Électrique' },
+    { brand: 'Fiat', model: '500e', fuel: 'ELECTRIC', badge: 'Citadine Éco' }
   ]
 
   const results = []
@@ -346,6 +346,29 @@ const dynamicTargetCars = computed(() => {
         imageUrl: v.finitionImageUrl || v.imageUrl || v.modelImageUrl,
         brandLogoUrl: v.brandLogoUrl,
         badge: item.badge || (v.fuelType === 'ELECTRIC' ? '100% Élec' : 'Hybride')
+      })
+    }
+  }
+
+  // Si un véhicule cible est déjà sélectionné mais n'est pas dans la liste par défaut, l'ajouter en première position
+  if (props.targetVehicle && props.targetVehicle.name && props.targetVehicle.purchasePrice > 0) {
+    const isAlreadyIn = results.some(r => r.name.toLowerCase() === props.targetVehicle.name.toLowerCase())
+    if (!isAlreadyIn) {
+      results.unshift({
+        id: 'selected-target',
+        name: props.targetVehicle.name,
+        brand: props.targetVehicle.brand || '',
+        model: props.targetVehicle.model || '',
+        fuelType: props.targetVehicle.fuelType || 'ELECTRIC',
+        consumption: props.targetVehicle.consumption || 15.0,
+        purchasePrice: props.targetVehicle.purchasePrice || 35000,
+        monthlyLoa: props.targetVehicle.monthlyLoa || props.customLeasingMonthlyPrice,
+        monthlyLld: props.targetVehicle.monthlyLld,
+        insuranceCost: props.targetVehicle.insuranceCost || 780,
+        maintenanceCost: props.targetVehicle.maintenanceCost || 240,
+        imageUrl: props.targetVehicle.imageUrl || null,
+        brandLogoUrl: props.targetVehicle.brandLogoUrl || null,
+        badge: 'Sélectionné'
       })
     }
   }
@@ -457,6 +480,14 @@ onMounted(async () => {
   if (props.taxIncome && props.taxIncome <= 15400) {
     selectedIncomeTier.value = 'modest'
   }
+
+  // Si un véhicule cible a été pré-sélectionné depuis le catalogue, l'afficher directement
+  if (props.targetVehicle && props.targetVehicle.name && props.targetVehicle.purchasePrice > 0) {
+    if (props.targetVehicle.monthlyLoa) {
+      emit('update:isLeasing', true)
+      emit('update:customLeasingMonthlyPrice', props.targetVehicle.monthlyLoa)
+    }
+  }
 })
 
 const selectCurrentCar = (car) => {
@@ -483,19 +514,59 @@ const selectTargetCar = (car) => {
   props.targetVehicle.maintenanceCost = car.maintenanceCost || 240
   props.targetVehicle.imageUrl = car.imageUrl || null
   props.targetVehicle.annualMileage = props.currentVehicle.annualMileage || 15000
+
+  // Pré-renseigner le tarif LOA si disponible
+  if (car.monthlyLoa) {
+    emit('update:isLeasing', true)
+    emit('update:customLeasingMonthlyPrice', car.monthlyLoa)
+  } else if (car.monthlyLld) {
+    emit('update:isLeasing', true)
+    emit('update:customLeasingMonthlyPrice', car.monthlyLld)
+  }
+
   showTargetCustom.value = false
 }
 
 const currentSearchResults = computed(() => {
   if (!searchCurrentQuery.value || searchCurrentQuery.value.trim().length < 2) return []
   const q = searchCurrentQuery.value.toLowerCase()
-  return props.catalogVehicles.filter(v => v.name && v.name.toLowerCase().includes(q)).slice(0, 5)
+  const source = (catalogVariants.value && catalogVariants.value.length > 0)
+    ? catalogVariants.value.map(v => ({
+        id: v.id,
+        name: `${v.brandName} ${v.modelName} ${v.motorisationName || ''} (${v.finitionName || ''})`.trim(),
+        brand: v.brandName,
+        model: v.modelName,
+        fuelType: v.fuelType,
+        consumption: v.consumptionWltp || 5.5,
+        insuranceCost: v.defaultInsuranceCost || 580,
+        maintenanceCost: v.defaultMaintenanceCost || 440,
+        resaleValue: v.estimatedResaleValue || 8000,
+        imageUrl: v.finitionImageUrl || v.imageUrl || v.modelImageUrl
+      }))
+    : props.catalogVehicles
+  return source.filter(v => v.name && v.name.toLowerCase().includes(q)).slice(0, 10)
 })
 
 const targetSearchResults = computed(() => {
   if (!searchTargetQuery.value || searchTargetQuery.value.trim().length < 2) return []
   const q = searchTargetQuery.value.toLowerCase()
-  return props.catalogVehicles.filter(v => v.name && v.name.toLowerCase().includes(q)).slice(0, 5)
+  const source = (catalogVariants.value && catalogVariants.value.length > 0)
+    ? catalogVariants.value.map(v => ({
+        id: v.id,
+        name: `${v.brandName} ${v.modelName} ${v.motorisationName || ''} (${v.finitionName || ''})`.trim(),
+        brand: v.brandName,
+        model: v.modelName,
+        fuelType: v.fuelType,
+        consumption: v.consumptionWltp || 15.0,
+        purchasePrice: v.purchasePrice || 35000,
+        monthlyLoa: v.monthlyLoa,
+        monthlyLld: v.monthlyLld,
+        insuranceCost: v.defaultInsuranceCost || 780,
+        maintenanceCost: v.defaultMaintenanceCost || 240,
+        imageUrl: v.finitionImageUrl || v.imageUrl || v.modelImageUrl
+      }))
+    : props.catalogVehicles
+  return source.filter(v => v.name && v.name.toLowerCase().includes(q)).slice(0, 10)
 })
 
 const applyChargingProfile = (prof) => {

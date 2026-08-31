@@ -379,7 +379,7 @@ const openInSimulator = (targetVariantId) => {
   const found = vehicles.value.find(v => v.id === targetVariantId)
   if (found) {
     const simVehicle = {
-      name: `${found.brand} ${found.model}`,
+      name: found.fullName || `${found.brand} ${found.model}`,
       brand: found.brand,
       model: found.model,
       version: found.version,
@@ -391,6 +391,8 @@ const openInSimulator = (targetVariantId) => {
       insuranceCost: found.insuranceCost,
       maintenanceCost: found.maintenanceCost,
       resaleValue: found.resaleValue,
+      imageUrl: found.imageUrl,
+      brandLogoUrl: found.brandLogoUrl,
       annualMileage: activeReferenceVehicle.value.annualMileage || 15000
     }
     localStorage.setItem('eco_custom_target_vehicle', JSON.stringify(simVehicle))

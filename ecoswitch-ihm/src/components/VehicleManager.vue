@@ -1066,6 +1066,8 @@ const openSimulatorWithVariant = (brand, model, mot, price) => {
     insuranceCost: price.defaultInsuranceCost || 650,
     maintenanceCost: price.defaultMaintenanceCost || 250,
     resaleValue: price.estimatedResaleValue || 0,
+    imageUrl: price.finitionImageUrl || model.imageUrl,
+    brandLogoUrl: brand.logoUrl,
     annualMileage: 15000
   }
   localStorage.setItem('eco_custom_target_vehicle', JSON.stringify(simVehicle))
