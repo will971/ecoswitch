@@ -149,72 +149,70 @@ def upload_svg(svg_content: str, filename: str, folder: str = "brands") -> str:
     return upload_image_bytes(svg_content.encode("utf-8"), safe_fn, content_type="image/svg+xml", folder=folder)
 
 
-# Mapping des modeles vers les titres d'articles Wikipedia officiels avec photos
-WIKIPEDIA_MODEL_TITLES = {
-    "Megane E-Tech": "Renault Megane E-Tech Electric",
-    "Scenic E-Tech": "Renault Scenic",
-    "R5 E-Tech": "Renault 5 E-Tech",
-    "Clio E-Tech Hybrid": "Renault Clio",
-    "e-208": "Peugeot 208",
-    "e-2008": "Peugeot 2008",
-    "e-3008": "Peugeot 3008",
-    "Model 3": "Tesla Model 3",
-    "Model Y": "Tesla Model Y",
-    "Model S": "Tesla Model S",
-    "Spring": "Dacia Spring",
-    "Duster Hybrid": "Dacia Duster",
-    "Jogger Hybrid": "Dacia Jogger",
-    "Yaris Hybrid": "Toyota Yaris",
-    "Yaris Cross": "Toyota Yaris Cross",
-    "bZ4X": "Toyota bZ4X",
-    "ID.3": "Volkswagen ID.3",
-    "ID.4": "Volkswagen ID.4",
-    "Golf eHybrid": "Volkswagen Golf",
-    "e-C3": "Citroën C3",
-    "e-C4": "Citroën C4",
-    "C5 Aircross Hybrid": "Citroën C5 Aircross",
-    "Ioniq 5": "Hyundai Ioniq 5",
-    "Kona Electric": "Hyundai Kona",
-    "Tucson Hybrid": "Hyundai Tucson",
-    "EV6": "Kia EV6",
-    "EV9": "Kia EV9",
-    "Sportage PHEV": "Kia Sportage",
-    "iX1": "BMW iX1",
-    "i4": "BMW i4",
-    "iX3": "BMW iX3",
-    "EQA": "Mercedes-Benz EQA",
-    "EQB": "Mercedes-Benz EQB",
-    "EQC": "Mercedes-Benz EQC",
-    "Q4 e-tron": "Audi Q4 e-tron",
-    "e-tron GT": "Audi e-tron GT",
-    "A6 e-tron": "Audi A6 e-tron",
-    "MG4": "MG4 EV",
-    "MG ZS EV": "MG ZS (2017)",
-    "EX30": "Volvo EX30",
-    "XC40 Recharge": "Volvo XC40",
-    "Leaf": "Nissan Leaf",
-    "Ariya": "Nissan Ariya",
-    "Enyaq": "Škoda Enyaq",
-    "Octavia iV": "Škoda Octavia",
-    "Born": "Cupra Born",
-    "Formentor e-Hybrid": "Cupra Formentor",
-    "Atto 3": "BYD Yuan Plus",
-    "Seal": "BYD Seal",
-    "Mustang Mach-E": "Ford Mustang Mach-E",
-    "Explorer Electric": "Ford Explorer EV",
-    "500e": "Fiat New 500",
-    "Panda Hybrid": "Fiat Panda",
+# Mapping direct des URLs de vraies photos officielles (Wikimedia Commons / Wikipedia)
+DIRECT_MODEL_IMAGE_URLS = {
+    "Megane E-Tech": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Renault_M%C3%A9gane_E-Tech_IMG_4064.jpg/330px-Renault_M%C3%A9gane_E-Tech_IMG_4064.jpg",
+    "Scenic E-Tech": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/2019_Renault_Grand_Scenic_Iconic_TCE_1.3.jpg/330px-2019_Renault_Grand_Scenic_Iconic_TCE_1.3.jpg",
+    "R5 E-Tech": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Renault_5_E-Tech_Electric_DSC_7279.jpg/330px-Renault_5_E-Tech_Electric_DSC_7279.jpg",
+    "Clio E-Tech Hybrid": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Renault_Clio_%28V%2C_Facelift%29_%E2%80%93_f_02092025.jpg/330px-Renault_Clio_%28V%2C_Facelift%29_%E2%80%93_f_02092025.jpg",
+    "e-208": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c6/Peugeot_208_PureTech_130_EAT8_Allure_GT-Line_%28II%29_%E2%80%93_f_17102021.jpg/330px-Peugeot_208_PureTech_130_EAT8_Allure_GT-Line_%28II%29_%E2%80%93_f_17102021.jpg",
+    "e-2008": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f7/2023_Peugeot_2008_in_Vertigo_Blue%2C_front_left%2C_06-08-2025.jpg/330px-2023_Peugeot_2008_in_Vertigo_Blue%2C_front_left%2C_06-08-2025.jpg",
+    "e-3008": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ed/Peugeot_e-3008_Automesse_Ludwigsburg_2024_IMG_1537.jpg/330px-Peugeot_e-3008_Automesse_Ludwigsburg_2024_IMG_1537.jpg",
+    "Model 3": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Tesla_Model_3_%282023%29_Autofr%C3%BChling_Ulm_IMG_9282.jpg/330px-Tesla_Model_3_%282023%29_Autofr%C3%BChling_Ulm_IMG_9282.jpg",
+    "Model Y": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/Tesla_Model_Y_Premium_%28Facelift%29_%E2%80%93_f_05052026.jpg/330px-Tesla_Model_Y_Premium_%28Facelift%29_%E2%80%93_f_05052026.jpg",
+    "Model S": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Tesla_Model_S_%28Facelift_ab_04-2016%29_%28cropped%29.jpg/330px-Tesla_Model_S_%28Facelift_ab_04-2016%29_%28cropped%29.jpg",
+    "Spring": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/2023_Renault_Kwid_Iconic_%28Colombia%29_front_view_01.png/330px-2023_Renault_Kwid_Iconic_%28Colombia%29_front_view_01.png",
+    "Duster Hybrid": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Dacia_Duster_TCe_130_Extreme_%28III%29_%E2%80%93_f_13102024.jpg/330px-Dacia_Duster_TCe_130_Extreme_%28III%29_%E2%80%93_f_13102024.jpg",
+    "Jogger Hybrid": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/2023_Dacia_Jogger_DSC_7288.jpg/330px-2023_Dacia_Jogger_DSC_7288.jpg",
+    "Yaris Hybrid": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/2020_Toyota_Yaris_Design_HEV_CVT_1.5_Front.jpg/330px-2020_Toyota_Yaris_Design_HEV_CVT_1.5_Front.jpg",
+    "Yaris Cross": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f4/Toyota_Yaris_Cross_Hybrid_%28XP210%29_1X7A1846.jpg/330px-Toyota_Yaris_Cross_Hybrid_%28XP210%29_1X7A1846.jpg",
+    "bZ4X": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Toyota_bZ4X_Automesse_Ludwigsburg_2022_1X7A5895.jpg/330px-Toyota_bZ4X_Automesse_Ludwigsburg_2022_1X7A5895.jpg",
+    "ID.3": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/2020_Volkswagen_ID.3_1st_Front.jpg/330px-2020_Volkswagen_ID.3_1st_Front.jpg",
+    "ID.4": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/2025_Volkswagen_ID4_Pro_Redspot_front.jpg/330px-2025_Volkswagen_ID4_Pro_Redspot_front.jpg",
+    "Golf eHybrid": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/2020_Volkswagen_Golf_Style_1.5_Front.jpg/330px-2020_Volkswagen_Golf_Style_1.5_Front.jpg",
+    "e-C3": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Citro%C3%ABn_C3_Hybrid_110_%C3%AB-DSC6_Max_%28IV%29_%E2%80%93_f_05042026.jpg/330px-Citro%C3%ABn_C3_Hybrid_110_%C3%AB-DSC6_Max_%28IV%29_%E2%80%93_f_05042026.jpg",
+    "e-C4": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Citroen_C4_%282020%29_1X7A5851.jpg/330px-Citroen_C4_%282020%29_1X7A5851.jpg",
+    "C5 Aircross Hybrid": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/2022_Citro%C3%ABn_C5_Aircross_Automesse_Ludwigsburg_2024_IMG_1342.jpg/330px-2022_Citro%C3%ABn_C5_Aircross_Automesse_Ludwigsburg_2024_IMG_1342.jpg",
+    "Ioniq 5": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/85/Hyundai_Ioniq_5_AWD_Techniq-Paket_%E2%80%93_f_31122024.jpg/330px-Hyundai_Ioniq_5_AWD_Techniq-Paket_%E2%80%93_f_31122024.jpg",
+    "Kona Electric": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/Hyundai_Kona_N_Line_%28SX2%29_DSC_8250.jpg/330px-Hyundai_Kona_N_Line_%28SX2%29_DSC_8250.jpg",
+    "Tucson Hybrid": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c6/2022_Hyundai_Tucson_Preferred%2C_Front_Right%2C_05-24-2021.jpg/330px-2022_Hyundai_Tucson_Preferred%2C_Front_Right%2C_05-24-2021.jpg",
+    "EV6": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d9/2021_Kia_EV6_GT-Line_S.jpg/330px-2021_Kia_EV6_GT-Line_S.jpg",
+    "EV9": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Kia_EV9_1X7A2472.jpg/330px-Kia_EV9_1X7A2472.jpg",
+    "Sportage PHEV": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/2025_Kia_Sportage_S_front_only.jpg/330px-2025_Kia_Sportage_S_front_only.jpg",
+    "iX1": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/65/2022_BMW_X1_sDrive18d_M_Sport_MHEV_Automatic_2.0.jpg/330px-2022_BMW_X1_sDrive18d_M_Sport_MHEV_Automatic_2.0.jpg",
+    "i4": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ad/BMW_i4_IMG_6695.jpg/330px-BMW_i4_IMG_6695.jpg",
+    "iX3": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/BMW_iX3_50_xDrive_M_Sportpaket_Pro_%28NA5%29_%E2%80%93_f_17052026.jpg/330px-BMW_iX3_50_xDrive_M_Sportpaket_Pro_%28NA5%29_%E2%80%93_f_17052026.jpg",
+    "EQA": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Mercedes-Benz_H243_IMG_5876.jpg/330px-Mercedes-Benz_H243_IMG_5876.jpg",
+    "EQB": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/Mercedes-Benz_X243_300_1X7A0422.jpg/330px-Mercedes-Benz_X243_300_1X7A0422.jpg",
+    "EQC": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/Mercedes-Benz_EQC_400_4MATIC_AMG_Line_%28N_293%29_%E2%80%93_f_02042021.jpg/330px-Mercedes-Benz_EQC_400_4MATIC_AMG_Line_%28N_293%29_%E2%80%93_f_02042021.jpg",
+    "Q4 e-tron": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/2021_Audi_Q4_e-tron_Sport_35.jpg/330px-2021_Audi_Q4_e-tron_Sport_35.jpg",
+    "e-tron GT": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/Audi_e-tron_GT_IMG_5689.jpg/330px-Audi_e-tron_GT_IMG_5689.jpg",
+    "A6 e-tron": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/91/Audi_A6_Avant_e-tron_%E2%80%93_f_18042025.jpg/330px-Audi_A6_Avant_e-tron_%E2%80%93_f_18042025.jpg",
+    "MG4": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/MG4_Electric_%E2%80%93_f_21042025.jpg/330px-MG4_Electric_%E2%80%93_f_21042025.jpg",
+    "MG ZS EV": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cf/MG_ZS_%28crossover%2C_second_generation%29_DSC_8542.jpg/330px-MG_ZS_%28crossover%2C_second_generation%29_DSC_8542.jpg",
+    "EX30": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Volvo_EX30_IMG_8923.jpg/330px-Volvo_EX30_IMG_8923.jpg",
+    "XC40 Recharge": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/27/2019_Volvo_XC40_T5_Momentum_in_Bright_Silver_Metallic%2C_front_left%2C_2025-09-22.jpg/330px-2019_Volvo_XC40_T5_Momentum_in_Bright_Silver_Metallic%2C_front_left%2C_2025-09-22.jpg",
+    "Leaf": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/73/Nissan_Leaf_%28ZE2%29_autoMOBIL_T%C3%BCbingen_2025_DSC_2752.jpg/330px-Nissan_Leaf_%28ZE2%29_autoMOBIL_T%C3%BCbingen_2025_DSC_2752.jpg",
+    "Ariya": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/64/2023_Nissan_Ariya_Advance_Front.jpg/330px-2023_Nissan_Ariya_Advance_Front.jpg",
+    "Enyaq": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/%C5%A0koda_Enyaq_IMG_1190.jpg/330px-%C5%A0koda_Enyaq_IMG_1190.jpg",
+    "Octavia iV": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Skoda_Octavia_IV_liftback_%28cropped%29.jpg/330px-Skoda_Octavia_IV_liftback_%28cropped%29.jpg",
+    "Born": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Cupra_Born_%E2%80%93_f_03042026.jpg/330px-Cupra_Born_%E2%80%93_f_03042026.jpg",
+    "Formentor e-Hybrid": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9f/Cupra_Formentor_IMG_9668.jpg/330px-Cupra_Formentor_IMG_9668.jpg",
+    "Atto 3": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/BYD_Yuan_Plus_II_002.jpg/330px-BYD_Yuan_Plus_II_002.jpg",
+    "Seal": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/60/2022_BYD_Seal.jpg/330px-2022_BYD_Seal.jpg",
+    "Mustang Mach-E": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/49/2021_Ford_Mustang_Mach-E_Standard_Range_Front.jpg/330px-2021_Ford_Mustang_Mach-E_Standard_Range_Front.jpg",
+    "Explorer Electric": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/93/Ford_Explorer_EV_IMG_2120.jpg/330px-Ford_Explorer_EV_IMG_2120.jpg",
+    "500e": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Fiat-500-vorne2.jpg/330px-Fiat-500-vorne2.jpg",
+    "Panda Hybrid": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/2018_Fiat_Panda_Easy_1.2.jpg/330px-2018_Fiat_Panda_Easy_1.2.jpg"
 }
 
 
-def get_or_upload_model_image(brand_name: str, model_name: str, category: str, fuel_type: str = "ELECTRIC") -> str:
+def get_or_upload_model_image(brand_name: str, model_name: str) -> str:
     """
-    1. Tente de recuperer la vraie photo du vehicule sur Wikipedia / Wikimedia Commons.
-    2. Si trouvee, la telecharge et l'uploade sur le backend (PNG / JPEG).
-    3. Si indisponible, fallback sur un SVG genere propre.
+    Telecharge la vraie photo officielle (PNG / JPEG / WebP) et l'uploade sur le backend.
+    Retourne l'URL enregistree sur le serveur, ou "" si aucune photo reelle n'est disponible.
     """
     clean_name = f"{brand_name}_{model_name}".lower().replace(" ", "_").replace("/", "_").replace("-", "_")
-    wiki_title = WIKIPEDIA_MODEL_TITLES.get(model_name) or f"{brand_name} {model_name}"
 
     # Verifier si deja en cache
     cache_key = f"models:{clean_name}"
@@ -222,41 +220,30 @@ def get_or_upload_model_image(brand_name: str, model_name: str, category: str, f
         if cache_key in UPLOAD_CACHE:
             return UPLOAD_CACHE[cache_key]
 
-    # Essayer de recuperer l'URL Wikipedia avec retry
-    wiki_img_url = ""
-    for attempt in range(3):
+    img_url = DIRECT_MODEL_IMAGE_URLS.get(model_name)
+    if not img_url:
+        return ""
+
+    # Telecharger et uploader la vraie photo avec backoff
+    for attempt in range(5):
         try:
-            encoded = urllib.parse.quote(wiki_title.replace(" ", "_"))
-            url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{encoded}"
-            req = urllib.request.Request(url, headers={"User-Agent": "EcoSwitchBotApp/2.0 (contact@ecoswitch.fr)"})
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                wiki_img_url = (data.get("thumbnail") or data.get("originalimage") or {}).get("source", "")
-                if wiki_img_url:
-                    break
-        except Exception:
-            time.sleep(0.5 * (attempt + 1))
+            req_img = urllib.request.Request(
+                img_url,
+                headers={"User-Agent": f"EcoSwitchAppBot/{attempt + 1}.0 (contact@ecoswitch.fr)"}
+            )
+            with urllib.request.urlopen(req_img, timeout=12) as r_img:
+                img_data = r_img.read()
+                content_type = r_img.headers.get("Content-Type", "image/jpeg").split(";")[0].strip()
+                ext = ".jpg" if "jpeg" in content_type or "jpg" in content_type else ".png" if "png" in content_type else ".webp"
+                uploaded_url = upload_image_bytes(img_data, f"{clean_name}{ext}", content_type=content_type, folder="models")
+                if uploaded_url:
+                    return uploaded_url
+        except Exception as ex:
+            time.sleep(1.0 * (attempt + 1))
+            if attempt == 4:
+                print(f"  [!] Telechargement image pour {model_name} echoue : {ex}", file=sys.stderr)
 
-    # Telecharger et uploader la vraie photo
-    if wiki_img_url:
-        for attempt in range(3):
-            try:
-                req_img = urllib.request.Request(wiki_img_url, headers={"User-Agent": "EcoSwitchBotApp/2.0 (contact@ecoswitch.fr)"})
-                with urllib.request.urlopen(req_img, timeout=10) as r_img:
-                    img_data = r_img.read()
-                    content_type = r_img.headers.get("Content-Type", "image/jpeg").split(";")[0].strip()
-                    ext = ".jpg" if "jpeg" in content_type or "jpg" in content_type else ".png" if "png" in content_type else ".webp"
-                    uploaded_url = upload_image_bytes(img_data, f"{clean_name}{ext}", content_type=content_type, folder="models")
-                    if uploaded_url:
-                        return uploaded_url
-            except Exception as ex:
-                time.sleep(0.5 * (attempt + 1))
-                if attempt == 2:
-                    print(f"  [!] Telechargement image Wiki pour {model_name} echoue : {ex}", file=sys.stderr)
-
-    # Fallback SVG propre
-    fallback_svg = generate_model_svg(brand_name, model_name, category, fuel_type=fuel_type)
-    return upload_svg(fallback_svg, clean_name, folder="models")
+    return ""
 
 
 # ── Logos SVG haute fidelite ──────────────────────────────────────────────────
@@ -1222,7 +1209,10 @@ def seed_brand(brand_data, stats_lock, stats):
                       else "HYBRID" if any("HYBRID" in f for f in fuel_types)
                       else "PETROL")
 
-        model_url = get_or_upload_model_image(brand_name, model_name, model_cat, fuel_type=dominant)
+        model_url = get_or_upload_model_image(brand_name, model_name)
+        if not model_url:
+            print(f"  [SKIP] Modele {brand_name} {model_name} ignore car aucune image reelle trouvee.")
+            continue
 
         model_obj = _get_or_create(
             list_fn=lambda: api_get("/models", params={"brandId": brand_id}),
