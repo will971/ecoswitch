@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="pwaBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#059669" />
+      <stop offset="100%" stop-color="#047857" />
+    </linearGradient>
+    <filter id="dropShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000" flood-opacity="0.25" />
+    </filter>
+  </defs>
+  <!-- Fond Arrondi Style iOS / Android Maskable -->
+  <rect width="512" height="512" rx="128" fill="url(#pwaBg)" />
+  <!-- Éclair Stylisé Blanc / Émeraude -->
+  <path d="M280 48L112 288h128l-32 176 192-256H256l48-160z" 
+        fill="#FFFFFF" 
+        filter="url(#dropShadow)"
+        stroke="#FFFFFF" 
+        stroke-width="8" 
+        stroke-linejoin="round" />
+</svg>

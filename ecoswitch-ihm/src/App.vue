@@ -23,7 +23,9 @@ import {
   Fuel,
   Menu,
   X,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Smartphone,
+  Download
 } from '@lucide/vue'
 
 import DirectSimulator from './components/DirectSimulator.vue'
@@ -370,6 +372,17 @@ onMounted(() => {
     }
   })
 
+  // PWA Install Prompt
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault()
+    deferredInstallPrompt.value = e
+    showPwaBanner.value = true
+  })
+  window.addEventListener('appinstalled', () => {
+    showPwaBanner.value = false
+    deferredInstallPrompt.value = null
+  })
+
   // Chargement propre du script Google Identity Services
   if (!document.getElementById('google-gsi-script')) {
     const script = document.createElement('script')
@@ -395,6 +408,20 @@ onMounted(() => {
     initGoogleSignIn()
   }
 })
+
+// PWA Install Action
+const deferredInstallPrompt = ref(null)
+const showPwaBanner = ref(false)
+
+const installPwa = async () => {
+  if (!deferredInstallPrompt.value) return
+  deferredInstallPrompt.value.prompt()
+  const { outcome } = await deferredInstallPrompt.value.userChoice
+  if (outcome === 'accepted') {
+    showPwaBanner.value = false
+  }
+  deferredInstallPrompt.value = null
+}
 </script>
 
 <template>
@@ -557,6 +584,17 @@ onMounted(() => {
             <span class="font-mono font-bold text-teal">{{ Number(liveFuelPrices.ELECTRIC).toFixed(2).replace('.', ',') }} €/kWh</span>
           </div>
         </div>
+
+        <!-- PWA Install Button (si supporté par le navigateur) -->
+        <button
+          v-if="showPwaBanner"
+          type="button"
+          class="btn-install-pwa w-100 mb-3 p-2 rounded-xl flex items-center justify-center gap-2 text-xxs font-bold"
+          @click="installPwa"
+        >
+          <Download size="13" />
+          <span>Installer l'application</span>
+        </button>
 
         <!-- Theme Toggle & Admin -->
         <div class="flex-between items-center mb-3">
@@ -990,6 +1028,18 @@ onMounted(() => {
   background: var(--bg-card-subtle);
   border-color: var(--border-hover);
   transform: translateY(-1px);
+}
+
+.btn-install-pwa {
+  background: var(--accent-teal-soft);
+  color: var(--accent-teal);
+  border: 1px solid rgba(16, 124, 65, 0.25);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-install-pwa:hover {
+  background: var(--accent-teal);
+  color: #FFFFFF;
 }
 
 .auth-divider {
