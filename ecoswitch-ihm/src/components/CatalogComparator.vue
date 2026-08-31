@@ -107,6 +107,8 @@ const fetchVehicles = async () => {
         consumption: v.consumptionWltp,
         powerHp: v.powerHp,
         batteryCapacityKwh: v.batteryCapacityKwh,
+        autonomieWltpKm: v.autonomieWltpKm,
+        consoThermiquePhev: v.consoThermiquePhev,
         purchasePrice: v.purchasePrice,
         monthlyLoa: v.monthlyLoa,
         monthlyLld: v.monthlyLld,

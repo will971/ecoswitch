@@ -285,7 +285,7 @@
                         Conso WLTP : <strong>{{ mot.consumptionWltp }} {{ mot.fuelType === 'ELECTRIC' ? 'kWh' : 'L' }}/100km</strong>
                       </span>
                       <span class="mot-specs-pill">
-                        {{ mot.powerHp }} ch {{ mot.batteryCapacityKwh ? `• ${mot.batteryCapacityKwh} kWh` : '' }}
+                        {{ mot.powerHp }} ch {{ mot.batteryCapacityKwh ? `• ${mot.batteryCapacityKwh} kWh` : '' }} {{ mot.autonomieWltpKm ? `• ⚡ ${mot.autonomieWltpKm} km WLTP` : '' }}
                       </span>
                     </div>
 

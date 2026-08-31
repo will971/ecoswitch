@@ -17,6 +17,7 @@ import com.example.springbootapp.controller.comparison.ComparisonController.Vehi
 import com.example.springbootapp.model.entity.Brand;
 import com.example.springbootapp.model.entity.Finition;
 import com.example.springbootapp.model.entity.FinitionMotorisation;
+import com.example.springbootapp.model.entity.FuelType;
 import com.example.springbootapp.model.entity.Motorisation;
 import com.example.springbootapp.model.entity.VehicleModel;
 import com.example.springbootapp.model.entity.Vehicule;
@@ -103,37 +104,47 @@ public class ComparisonBusiness {
     }
 
     public ProfitabilityComparisonResponse compareCustomProfitability(CustomProfitabilityComparisonRequest request) {
-        if (request == null || request.currentVehicle() == null || request.targetVehicleIds() == null || request.targetVehicleIds().isEmpty()) {
-            throw new IllegalArgumentException("Requête invalide ou incomplète.");
+        if (request == null || request.currentVehicle() == null) {
+            throw new IllegalArgumentException("Le véhicule actuel est obligatoire.");
+        }
+        if (request.targetVehicleIds() == null || request.targetVehicleIds().isEmpty()) {
+            throw new IllegalArgumentException("Au moins un véhicule cible est obligatoire.");
         }
 
         Vehicule currentVehicle = request.currentVehicle();
         Integer requestedMaxYears = request.maxYears();
         int maxYears = requestedMaxYears == null ? DEFAULT_MAX_YEARS : requestedMaxYears;
+        double immediateRepairCost = request.immediateRepairCost() == null ? 0.0 : request.immediateRepairCost();
+
+        double currentFuelPrice = costCalculationService.resolveFuelPrice(currentVehicle, request.fuelPricesByType());
+        double currentAnnualCost = costCalculationService.calculateAnnualCost(currentVehicle, currentFuelPrice);
+
         List<VehicleProfitability> alternatives = new ArrayList<>();
 
         for (Long targetVehicleId : request.targetVehicleIds()) {
             Vehicule targetVehicle = resolveVehicle(targetVehicleId);
-            double currentAnnualCost = costCalculationService.calculateAnnualCost(
-                    currentVehicle,
-                    costCalculationService.resolveFuelPrice(currentVehicle, request.fuelPricesByType()));
-            double targetAnnualCost = costCalculationService.calculateAnnualCost(
-                    targetVehicle,
-                    costCalculationService.resolveFuelPrice(targetVehicle, request.fuelPricesByType()));
+            if (targetVehicle == null) continue;
+
+            double targetFuelPrice = costCalculationService.resolveFuelPrice(targetVehicle, request.fuelPricesByType());
+            double targetAnnualCost = costCalculationService.calculateAnnualCost(targetVehicle, targetFuelPrice);
             double annualSavings = currentAnnualCost - targetAnnualCost;
+
             double switchInvestment = Math.max(0.0, targetVehicle.getPurchasePrice() - currentVehicle.getResaleValue());
-            double immediateRepairCost = request.immediateRepairCost() == null ? 0.0 : request.immediateRepairCost();
             double totalCostDeltaAtHorizon = costCalculationService.calculateSwitchCostAtYear(
                     currentVehicle,
                     targetVehicle,
                     maxYears,
-                    request.fuelPricesByType(),
+                    currentFuelPrice,
+                    targetFuelPrice,
+                    switchInvestment,
                     immediateRepairCost);
             Integer breakEvenYear = costCalculationService.calculateBreakEvenYear(
                     currentVehicle,
                     targetVehicle,
                     maxYears,
-                    request.fuelPricesByType(),
+                    currentFuelPrice,
+                    targetFuelPrice,
+                    switchInvestment,
                     immediateRepairCost);
 
             alternatives.add(
@@ -176,8 +187,9 @@ public class ComparisonBusiness {
         double rawTargetPrice = costCalculationService.resolveFuelPrice(target, request.fuelPricesByType());
         double targetPrice = costCalculationService.resolveWeightedFuelPrice(target, rawTargetPrice, request.homeChargingRatio());
 
-        double currentAnnualCost = costCalculationService.calculateAnnualCost(current, currentPrice);
-        double targetAnnualCost = costCalculationService.calculateAnnualCost(target, targetPrice);
+        // Prise en compte PHEV pour target et current
+        double currentAnnualCost = costCalculationService.calculateAnnualCost(current, currentPrice, request.fuelPricesByType(), request.homeChargingRatio(), null);
+        double targetAnnualCost = costCalculationService.calculateAnnualCost(target, targetPrice, request.fuelPricesByType(), request.homeChargingRatio(), null);
         double annualSavings = currentAnnualCost - targetAnnualCost;
 
         double bonusEcologique = costCalculationService.calculateBonusEcologique(target, request.taxIncome());
@@ -233,21 +245,35 @@ public class ComparisonBusiness {
         double targetMonthlyTotalCost = leasingMonthlyPrice + (targetAnnualCost / 12.0);
         double monthlySavings = currentMonthlyTotalCost - targetMonthlyTotalCost;
 
-        // Recommendations
-        List<Vehicule> catalog = getAllVehicles();
+        // Recommendations intelligentes filtrées par adéquation d'usage (Kilométrage vs Autonomie)
+        List<CatalogVariantItem> catalog = getCatalogVariantsWithDetails();
         List<VehicleProfitability> recommendations = new ArrayList<>();
+        int userAnnualMileage = current.getAnnualMileage() > 0 ? current.getAnnualMileage() : 15000;
 
-        for (Vehicule catalogVehicle : catalog) {
+        for (CatalogVariantItem item : catalog) {
+            Vehicule catalogVehicle = item.vehicule;
             if (catalogVehicle.getName().equalsIgnoreCase(current.getName()) || 
                 catalogVehicle.getName().equalsIgnoreCase(target.getName())) {
                 continue;
+            }
+
+            // Filtre d'adéquation d'autonomie :
+            // Si l'utilisateur roule beaucoup (> 22 000 km/an), on élimine les véhicules électriques urbains à faible autonomie (< 320 km)
+            if (catalogVehicle.getFuelType() == FuelType.ELECTRIC) {
+                int wltp = item.autonomieWltp != null ? item.autonomieWltp : 350;
+                if (userAnnualMileage >= 25000 && wltp < 400) {
+                    continue; // Inadapté aux gros rouleurs (ex: Dacia Spring / petite citadine)
+                }
+                if (userAnnualMileage >= 18000 && wltp < 300) {
+                    continue;
+                }
             }
 
             try {
                 double catFuelPrice = costCalculationService.resolveFuelPrice(catalogVehicle, request.fuelPricesByType());
                 double weightedCatPrice = costCalculationService.resolveWeightedFuelPrice(catalogVehicle, catFuelPrice, request.homeChargingRatio());
 
-                double catAnnualCost = costCalculationService.calculateAnnualCost(catalogVehicle, weightedCatPrice);
+                double catAnnualCost = costCalculationService.calculateAnnualCost(catalogVehicle, weightedCatPrice, request.fuelPricesByType(), request.homeChargingRatio(), item.autonomieWltp);
                 double catSavings = currentAnnualCost - catAnnualCost;
 
                 double catBonus = costCalculationService.calculateBonusEcologique(catalogVehicle, request.taxIncome());
@@ -388,8 +414,10 @@ public class ComparisonBusiness {
         return vehiculeService.findById(id);
     }
 
-    private List<Vehicule> getAllVehicles() {
-        List<Vehicule> list = new ArrayList<>(vehiculeService.findAll());
+    private record CatalogVariantItem(Vehicule vehicule, Integer autonomieWltp, Double batteryCapacity) {}
+
+    private List<CatalogVariantItem> getCatalogVariantsWithDetails() {
+        List<CatalogVariantItem> list = new ArrayList<>();
         for (FinitionMotorisation fm : finitionMotorisationRepository.findAll()) {
             Motorisation m = fm.getMotorisation();
             Finition f = fm.getFinition();
@@ -409,7 +437,8 @@ public class ComparisonBusiness {
             v.setMaintenanceCost(fm.getDefaultMaintenanceCost() != null ? fm.getDefaultMaintenanceCost() : 250.0);
             v.setResaleValue(fm.getEstimatedResaleValue() != null ? fm.getEstimatedResaleValue() : 0.0);
             v.setUrl(f.getImageUrl() != null ? f.getImageUrl() : model.getImageUrl());
-            list.add(v);
+
+            list.add(new CatalogVariantItem(v, m.getAutonomieWltpKm(), m.getBatteryCapacityKwh()));
         }
         return list;
     }

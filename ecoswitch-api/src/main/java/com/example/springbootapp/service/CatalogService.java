@@ -233,6 +233,12 @@ public class CatalogService {
         if (updated.getBatteryCapacityKwh() != null) {
             existing.setBatteryCapacityKwh(updated.getBatteryCapacityKwh());
         }
+        if (updated.getAutonomieWltpKm() != null) {
+            existing.setAutonomieWltpKm(updated.getAutonomieWltpKm());
+        }
+        if (updated.getConsoThermiquePhev() != null) {
+            existing.setConsoThermiquePhev(updated.getConsoThermiquePhev());
+        }
         return motorisationRepository.save(existing);
     }
 
@@ -438,6 +444,8 @@ public class CatalogService {
                             mot.getConsumptionWltp(),
                             mot.getPowerHp(),
                             mot.getBatteryCapacityKwh(),
+                            mot.getAutonomieWltpKm(),
+                            mot.getConsoThermiquePhev(),
                             priceDtos
                     ));
                 }
@@ -491,7 +499,9 @@ public class CatalogService {
                 m.getFuelType(),
                 m.getConsumptionWltp(),
                 m.getPowerHp(),
-                m.getBatteryCapacityKwh()
+                m.getBatteryCapacityKwh(),
+                m.getAutonomieWltpKm(),
+                m.getConsoThermiquePhev()
         );
     }
 
@@ -523,6 +533,8 @@ public class CatalogService {
                 m.getConsumptionWltp(),
                 m.getPowerHp(),
                 m.getBatteryCapacityKwh(),
+                m.getAutonomieWltpKm(),
+                m.getConsoThermiquePhev(),
                 model.getId(),
                 model.getName(),
                 model.getImageUrl(),

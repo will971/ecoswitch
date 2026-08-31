@@ -13,6 +13,8 @@ public record FinitionMotorisationDto(
     double consumptionWltp,
     Integer powerHp,
     Double batteryCapacityKwh,
+    Integer autonomieWltpKm,
+    Double consoThermiquePhev,
     Long modelId,
     String modelName,
     String modelImageUrl,

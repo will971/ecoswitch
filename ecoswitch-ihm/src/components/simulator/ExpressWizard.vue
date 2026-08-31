@@ -330,6 +330,17 @@ const dynamicTargetCars = computed(() => {
     )
 
     if (v) {
+      // Filtrage intelligent selon les habitudes de l'utilisateur :
+      // Si l'utilisateur roule >= 25 000 km/an, on n'affiche pas de citadines à faible autonomie (< 350 km) en suggestion par défaut
+      const annualMileage = props.currentVehicle.annualMileage || 15000
+      const wltp = v.autonomieWltpKm || 350
+      if (annualMileage >= 25000 && v.fuelType === 'ELECTRIC' && wltp < 380) {
+        continue
+      }
+      if (annualMileage <= 12000 && wltp > 550) {
+        // Pour les petits rouleurs, privilégier les modèles accessibles
+      }
+
       usedIds.add(v.id)
       results.push({
         id: v.id,
@@ -338,6 +349,8 @@ const dynamicTargetCars = computed(() => {
         model: v.modelName,
         fuelType: v.fuelType,
         consumption: v.consumptionWltp || 15.0,
+        autonomieWltpKm: v.autonomieWltpKm,
+        batteryCapacityKwh: v.batteryCapacityKwh,
         purchasePrice: v.purchasePrice || 35000,
         monthlyLoa: v.monthlyLoa,
         monthlyLld: v.monthlyLld,
@@ -361,6 +374,8 @@ const dynamicTargetCars = computed(() => {
         model: props.targetVehicle.model || '',
         fuelType: props.targetVehicle.fuelType || 'ELECTRIC',
         consumption: props.targetVehicle.consumption || 15.0,
+        autonomieWltpKm: props.targetVehicle.autonomieWltpKm,
+        batteryCapacityKwh: props.targetVehicle.batteryCapacityKwh,
         purchasePrice: props.targetVehicle.purchasePrice || 35000,
         monthlyLoa: props.targetVehicle.monthlyLoa || props.customLeasingMonthlyPrice,
         monthlyLld: props.targetVehicle.monthlyLld,
@@ -416,7 +431,8 @@ const showTaxHelp = ref(false)
 const fuelOptions = [
   { value: 'PETROL', label: 'Essence', icon: '⛽' },
   { value: 'DIESEL', label: 'Diesel', icon: '🛢️' },
-  { value: 'HYBRID', label: 'Hybride', icon: '🔋' },
+  { value: 'HYBRID', label: 'Hybride', icon: '🍃' },
+  { value: 'PLUGIN_HYBRID', label: 'Hybride Rechargeable', icon: '🔌' },
   { value: 'ELECTRIC', label: 'Électrique', icon: '⚡' }
 ]
 
@@ -431,9 +447,16 @@ const consumptionHints = computed(() => {
   }
   if (props.currentVehicle.fuelType === 'HYBRID') {
     return [
-      { label: '3.5 L', value: 3.5 },
+      { label: '3.8 L', value: 3.8 },
       { label: '4.5 L', value: 4.5 },
       { label: '5.5 L', value: 5.5 }
+    ]
+  }
+  if (props.currentVehicle.fuelType === 'PLUGIN_HYBRID') {
+    return [
+      { label: '5.5 L', value: 5.5 },
+      { label: '6.5 L', value: 6.5 },
+      { label: '7.5 L', value: 7.5 }
     ]
   }
   if (props.currentVehicle.fuelType === 'DIESEL') {
@@ -1037,8 +1060,14 @@ const formatFuelBadge = (fuelType) => {
               </div>
             </div>
             <div class="car-card-name text-main">{{ car.name }}</div>
-            <div class="car-card-meta text-xxs text-dimmed">
-              <strong class="text-teal">{{ formatCurrency(car.purchasePrice) }}</strong> &middot; {{ car.consumption }} {{ car.fuelType === 'ELECTRIC' ? 'kWh' : 'L' }}/100km
+            <div class="car-card-meta text-xxs text-dimmed flex items-center gap-1.5 flex-wrap">
+              <strong class="text-teal">{{ formatCurrency(car.purchasePrice) }}</strong>
+              <span v-if="car.autonomieWltpKm" class="badge badge-small badge-teal">
+                ⚡ {{ car.autonomieWltpKm }} km WLTP
+              </span>
+              <span v-else>
+                &middot; {{ car.consumption }} {{ car.fuelType === 'ELECTRIC' ? 'kWh' : 'L' }}/100km
+              </span>
             </div>
           </div>
         </div>

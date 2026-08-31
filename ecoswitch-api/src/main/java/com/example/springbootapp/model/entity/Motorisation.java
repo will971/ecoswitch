@@ -41,6 +41,12 @@ public class Motorisation {
     @Column(name = "battery_capacity_kwh")
     private Double batteryCapacityKwh; // Capacité batterie utile/brute en kWh
 
+    @Column(name = "autonomie_wltp_km")
+    private Integer autonomieWltpKm; // Autonomie électrique WLTP en km (100% élec ou PHEV)
+
+    @Column(name = "conso_thermique_phev")
+    private Double consoThermiquePhev; // Conso essence batterie vide pour PHEV (L/100km)
+
     @ManyToOne(fetch = FetchType.EAGER, optional = false)
     @JoinColumn(name = "model_id", nullable = false)
     @JsonIgnoreProperties({"motorisations", "finitions"})
@@ -53,12 +59,14 @@ public class Motorisation {
     public Motorisation() {
     }
 
-    public Motorisation(String name, FuelType fuelType, double consumptionWltp, Integer powerHp, Double batteryCapacityKwh, VehicleModel model) {
+    public Motorisation(String name, FuelType fuelType, double consumptionWltp, Integer powerHp, Double batteryCapacityKwh, Integer autonomieWltpKm, Double consoThermiquePhev, VehicleModel model) {
         this.name = name;
         this.fuelType = fuelType;
         this.consumptionWltp = consumptionWltp;
         this.powerHp = powerHp;
         this.batteryCapacityKwh = batteryCapacityKwh;
+        this.autonomieWltpKm = autonomieWltpKm;
+        this.consoThermiquePhev = consoThermiquePhev;
         this.model = model;
     }
 
@@ -108,6 +116,22 @@ public class Motorisation {
 
     public void setBatteryCapacityKwh(Double batteryCapacityKwh) {
         this.batteryCapacityKwh = batteryCapacityKwh;
+    }
+
+    public Integer getAutonomieWltpKm() {
+        return autonomieWltpKm;
+    }
+
+    public void setAutonomieWltpKm(Integer autonomieWltpKm) {
+        this.autonomieWltpKm = autonomieWltpKm;
+    }
+
+    public Double getConsoThermiquePhev() {
+        return consoThermiquePhev;
+    }
+
+    public void setConsoThermiquePhev(Double consoThermiquePhev) {
+        this.consoThermiquePhev = consoThermiquePhev;
     }
 
     public VehicleModel getModel() {

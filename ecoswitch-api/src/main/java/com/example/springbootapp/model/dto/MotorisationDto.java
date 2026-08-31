@@ -11,5 +11,7 @@ public record MotorisationDto(
     FuelType fuelType,
     double consumptionWltp,
     Integer powerHp,
-    Double batteryCapacityKwh
+    Double batteryCapacityKwh,
+    Integer autonomieWltpKm,
+    Double consoThermiquePhev
 ) {}

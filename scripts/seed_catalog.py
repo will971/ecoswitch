@@ -435,8 +435,8 @@ CATALOG_DATA = [
     {"brand": "Renault", "models": [
         {"name": "Megane E-Tech", "category": "Compacte",
          "motorisations": [
-             {"name": "EV40 Boost Charge 130 ch", "fuelType": "ELECTRIC", "consumptionWltp": 15.4, "powerHp": 130, "batteryCapacityKwh": 40.0},
-             {"name": "EV60 Optimum Charge 220 ch", "fuelType": "ELECTRIC", "consumptionWltp": 16.1, "powerHp": 220, "batteryCapacityKwh": 60.0},
+             {"name": "EV40 Boost Charge 130 ch", "fuelType": "ELECTRIC", "consumptionWltp": 15.4, "powerHp": 130, "batteryCapacityKwh": 40.0, "autonomieWltpKm": 300},
+             {"name": "EV60 Optimum Charge 220 ch", "fuelType": "ELECTRIC", "consumptionWltp": 16.1, "powerHp": 220, "batteryCapacityKwh": 60.0, "autonomieWltpKm": 450},
          ],
          "finitions": ["Equilibre", "Techno", "Iconic"],
          "variants": [
@@ -446,8 +446,8 @@ CATALOG_DATA = [
          ]},
         {"name": "Scenic E-Tech", "category": "SUV",
          "motorisations": [
-             {"name": "Autonomie Confort 170 ch",  "fuelType": "ELECTRIC", "consumptionWltp": 16.3, "powerHp": 170, "batteryCapacityKwh": 60.0},
-             {"name": "Grande Autonomie 220 ch",   "fuelType": "ELECTRIC", "consumptionWltp": 16.8, "powerHp": 220, "batteryCapacityKwh": 87.0},
+             {"name": "Autonomie Confort 170 ch",  "fuelType": "ELECTRIC", "consumptionWltp": 16.3, "powerHp": 170, "batteryCapacityKwh": 60.0, "autonomieWltpKm": 430},
+             {"name": "Grande Autonomie 220 ch",   "fuelType": "ELECTRIC", "consumptionWltp": 16.8, "powerHp": 220, "batteryCapacityKwh": 87.0, "autonomieWltpKm": 625},
          ],
          "finitions": ["Evolution", "Techno", "Esprit Alpine", "Iconic"],
          "variants": [
@@ -458,8 +458,8 @@ CATALOG_DATA = [
          ]},
         {"name": "R5 E-Tech", "category": "Citadine",
          "motorisations": [
-             {"name": "Autonomie Urbaine 120 ch",  "fuelType": "ELECTRIC", "consumptionWltp": 14.8, "powerHp": 120, "batteryCapacityKwh": 40.0},
-             {"name": "Autonomie Confort 150 ch",  "fuelType": "ELECTRIC", "consumptionWltp": 15.2, "powerHp": 150, "batteryCapacityKwh": 52.0},
+             {"name": "Autonomie Urbaine 120 ch",  "fuelType": "ELECTRIC", "consumptionWltp": 14.8, "powerHp": 120, "batteryCapacityKwh": 40.0, "autonomieWltpKm": 310},
+             {"name": "Autonomie Confort 150 ch",  "fuelType": "ELECTRIC", "consumptionWltp": 15.2, "powerHp": 150, "batteryCapacityKwh": 52.0, "autonomieWltpKm": 410},
          ],
          "finitions": ["Evolution", "Techno", "Iconic Cinq"],
          "variants": [
@@ -483,7 +483,7 @@ CATALOG_DATA = [
     {"brand": "Peugeot", "models": [
         {"name": "e-208", "category": "Citadine",
          "motorisations": [
-             {"name": "Electrique 156 ch (54 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 14.4, "powerHp": 156, "batteryCapacityKwh": 54.0},
+             {"name": "Electrique 156 ch (54 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 14.4, "powerHp": 156, "batteryCapacityKwh": 54.0, "autonomieWltpKm": 410},
              {"name": "Hybrid 100 e-DCS6",           "fuelType": "HYBRID",   "consumptionWltp": 4.5,  "powerHp": 100, "batteryCapacityKwh": 0.9},
          ],
          "finitions": ["Style", "Allure", "GT"],
@@ -496,7 +496,7 @@ CATALOG_DATA = [
          ]},
         {"name": "e-2008", "category": "SUV",
          "motorisations": [
-             {"name": "Electrique 156 ch (54 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 15.3, "powerHp": 156, "batteryCapacityKwh": 54.0},
+             {"name": "Electrique 156 ch (54 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 15.3, "powerHp": 156, "batteryCapacityKwh": 54.0, "autonomieWltpKm": 406},
              {"name": "Hybrid 136 e-DCS6",           "fuelType": "HYBRID",   "consumptionWltp": 4.9,  "powerHp": 136, "batteryCapacityKwh": 0.9},
          ],
          "finitions": ["Allure", "GT"],
@@ -507,7 +507,7 @@ CATALOG_DATA = [
          ]},
         {"name": "e-3008", "category": "SUV",
          "motorisations": [
-             {"name": "Electrique 210 ch (73 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 16.7, "powerHp": 210, "batteryCapacityKwh": 73.0},
+             {"name": "Electrique 210 ch (73 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 16.7, "powerHp": 210, "batteryCapacityKwh": 73.0, "autonomieWltpKm": 525},
              {"name": "Hybrid 136 e-DCS6",           "fuelType": "HYBRID",   "consumptionWltp": 5.5,  "powerHp": 136, "batteryCapacityKwh": 0.9},
          ],
          "finitions": ["Allure", "GT"],
@@ -522,9 +522,9 @@ CATALOG_DATA = [
     {"brand": "Tesla", "models": [
         {"name": "Model 3", "category": "Berline",
          "motorisations": [
-             {"name": "Propulsion RWD",       "fuelType": "ELECTRIC", "consumptionWltp": 13.2, "powerHp": 283,  "batteryCapacityKwh": 60.0},
-             {"name": "Grande Autonomie AWD",  "fuelType": "ELECTRIC", "consumptionWltp": 14.0, "powerHp": 498,  "batteryCapacityKwh": 78.0},
-             {"name": "Performance AWD",       "fuelType": "ELECTRIC", "consumptionWltp": 16.7, "powerHp": 627,  "batteryCapacityKwh": 78.0},
+             {"name": "Propulsion RWD",       "fuelType": "ELECTRIC", "consumptionWltp": 13.2, "powerHp": 283,  "batteryCapacityKwh": 60.0, "autonomieWltpKm": 513},
+             {"name": "Grande Autonomie AWD",  "fuelType": "ELECTRIC", "consumptionWltp": 14.0, "powerHp": 498,  "batteryCapacityKwh": 78.0, "autonomieWltpKm": 629},
+             {"name": "Performance AWD",       "fuelType": "ELECTRIC", "consumptionWltp": 16.7, "powerHp": 627,  "batteryCapacityKwh": 78.0, "autonomieWltpKm": 528},
          ],
          "finitions": ["Standard", "Long Range", "Performance"],
          "variants": [
@@ -534,8 +534,8 @@ CATALOG_DATA = [
          ]},
         {"name": "Model Y", "category": "SUV",
          "motorisations": [
-             {"name": "Propulsion RWD",      "fuelType": "ELECTRIC", "consumptionWltp": 15.7, "powerHp": 299, "batteryCapacityKwh": 60.0},
-             {"name": "Grande Autonomie AWD", "fuelType": "ELECTRIC", "consumptionWltp": 16.9, "powerHp": 514, "batteryCapacityKwh": 78.0},
+             {"name": "Propulsion RWD",      "fuelType": "ELECTRIC", "consumptionWltp": 15.7, "powerHp": 299, "batteryCapacityKwh": 60.0, "autonomieWltpKm": 455},
+             {"name": "Grande Autonomie AWD", "fuelType": "ELECTRIC", "consumptionWltp": 16.9, "powerHp": 514, "batteryCapacityKwh": 78.0, "autonomieWltpKm": 533},
          ],
          "finitions": ["Standard", "Long Range"],
          "variants": [
@@ -558,8 +558,8 @@ CATALOG_DATA = [
     {"brand": "Dacia", "models": [
         {"name": "Spring", "category": "Citadine",
          "motorisations": [
-             {"name": "Electric 45 ch", "fuelType": "ELECTRIC", "consumptionWltp": 13.9, "powerHp": 45, "batteryCapacityKwh": 26.8},
-             {"name": "Electric 65 ch", "fuelType": "ELECTRIC", "consumptionWltp": 14.5, "powerHp": 65, "batteryCapacityKwh": 26.8},
+             {"name": "Electric 45 ch", "fuelType": "ELECTRIC", "consumptionWltp": 13.9, "powerHp": 45, "batteryCapacityKwh": 26.8, "autonomieWltpKm": 230},
+             {"name": "Electric 65 ch", "fuelType": "ELECTRIC", "consumptionWltp": 14.5, "powerHp": 65, "batteryCapacityKwh": 26.8, "autonomieWltpKm": 225},
          ],
          "finitions": ["Essential", "Extreme"],
          "variants": [

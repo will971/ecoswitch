@@ -25,6 +25,8 @@ public record CatalogHierarchyDto(
         double consumptionWltp,
         Integer powerHp,
         Double batteryCapacityKwh,
+        Integer autonomieWltpKm,
+        Double consoThermiquePhev,
         List<VariantPriceDto> availableFinitions
     ) {}
 
