@@ -14,6 +14,7 @@ import urllib.request
 import urllib.parse
 import urllib.error
 import threading
+import time
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -32,8 +33,12 @@ API_UPLOAD_URL = f"{BASE_URL}/api/v1/uploads/image"
 UPLOAD_CACHE      = {}
 UPLOAD_CACHE_LOCK = threading.Lock()
 
-MAX_WORKERS_UPLOAD = 6   # uploads en parallèle
-MAX_WORKERS_BRAND  = 4   # marques en parallèle
+MAX_WORKERS_UPLOAD = 6   # uploads en parallele
+MAX_WORKERS_BRAND  = 4   # marques en parallele
+MAX_WORKERS_MODEL  = 3   # modeles en parallele par marque
+
+WIKI_IMAGE_CACHE = {}
+WIKI_IMAGE_LOCK  = threading.Lock()
 
 
 def resolve_target_url(env_or_url=None):
@@ -104,22 +109,20 @@ def api_delete(endpoint):
         raise RuntimeError(f"DELETE {url} -> {e.code}: {e.read().decode()}") from e
 
 
-def upload_svg(svg_content: str, filename: str, folder: str = "brands") -> str:
-    """Upload un SVG via multipart/form-data. Cache thread-safe."""
+def upload_image_bytes(image_data: bytes, filename: str, content_type: str = "image/jpeg", folder: str = "models") -> str:
+    """Upload une image binaire (JPEG, PNG, WEBP, SVG) via multipart/form-data. Cache thread-safe."""
     cache_key = f"{folder}:{filename}"
     with UPLOAD_CACHE_LOCK:
         if cache_key in UPLOAD_CACHE:
             return UPLOAD_CACHE[cache_key]
 
     boundary = f"----Boundary{uuid.uuid4().hex}"
-    data     = svg_content.encode("utf-8")
-    safe_fn  = filename if filename.endswith(".svg") else f"{filename}.svg"
 
     body = bytearray()
     body += f"--{boundary}\r\n".encode()
-    body += f'Content-Disposition: form-data; name="file"; filename="{safe_fn}"\r\n'.encode()
-    body += b"Content-Type: image/svg+xml\r\n\r\n"
-    body += data
+    body += f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'.encode()
+    body += f"Content-Type: {content_type}\r\n\r\n".encode()
+    body += image_data
     body += b"\r\n"
     body += f"--{boundary}--\r\n".encode()
 
@@ -136,8 +139,124 @@ def upload_svg(svg_content: str, filename: str, folder: str = "brands") -> str:
                 UPLOAD_CACHE[cache_key] = url
             return url
     except Exception as ex:
-        print(f"  [!] Upload {safe_fn} failed: {ex}", file=sys.stderr)
+        print(f"  [!] Upload image {filename} failed: {ex}", file=sys.stderr)
         return ""
+
+
+def upload_svg(svg_content: str, filename: str, folder: str = "brands") -> str:
+    """Upload un SVG via multipart/form-data. Cache thread-safe."""
+    safe_fn = filename if filename.endswith(".svg") else f"{filename}.svg"
+    return upload_image_bytes(svg_content.encode("utf-8"), safe_fn, content_type="image/svg+xml", folder=folder)
+
+
+# Mapping des modeles vers les titres d'articles Wikipedia officiels avec photos
+WIKIPEDIA_MODEL_TITLES = {
+    "Megane E-Tech": "Renault Megane E-Tech Electric",
+    "Scenic E-Tech": "Renault Scenic",
+    "R5 E-Tech": "Renault 5 E-Tech",
+    "Clio E-Tech Hybrid": "Renault Clio",
+    "e-208": "Peugeot 208",
+    "e-2008": "Peugeot 2008",
+    "e-3008": "Peugeot 3008",
+    "Model 3": "Tesla Model 3",
+    "Model Y": "Tesla Model Y",
+    "Model S": "Tesla Model S",
+    "Spring": "Dacia Spring",
+    "Duster Hybrid": "Dacia Duster",
+    "Jogger Hybrid": "Dacia Jogger",
+    "Yaris Hybrid": "Toyota Yaris",
+    "Yaris Cross": "Toyota Yaris Cross",
+    "bZ4X": "Toyota bZ4X",
+    "ID.3": "Volkswagen ID.3",
+    "ID.4": "Volkswagen ID.4",
+    "Golf eHybrid": "Volkswagen Golf",
+    "e-C3": "Citroën C3",
+    "e-C4": "Citroën C4",
+    "C5 Aircross Hybrid": "Citroën C5 Aircross",
+    "Ioniq 5": "Hyundai Ioniq 5",
+    "Kona Electric": "Hyundai Kona",
+    "Tucson Hybrid": "Hyundai Tucson",
+    "EV6": "Kia EV6",
+    "EV9": "Kia EV9",
+    "Sportage PHEV": "Kia Sportage",
+    "iX1": "BMW iX1",
+    "i4": "BMW i4",
+    "iX3": "BMW iX3",
+    "EQA": "Mercedes-Benz EQA",
+    "EQB": "Mercedes-Benz EQB",
+    "EQC": "Mercedes-Benz EQC",
+    "Q4 e-tron": "Audi Q4 e-tron",
+    "e-tron GT": "Audi e-tron GT",
+    "A6 e-tron": "Audi A6 e-tron",
+    "MG4": "MG4 EV",
+    "MG ZS EV": "MG ZS (2017)",
+    "EX30": "Volvo EX30",
+    "XC40 Recharge": "Volvo XC40",
+    "Leaf": "Nissan Leaf",
+    "Ariya": "Nissan Ariya",
+    "Enyaq": "Škoda Enyaq",
+    "Octavia iV": "Škoda Octavia",
+    "Born": "Cupra Born",
+    "Formentor e-Hybrid": "Cupra Formentor",
+    "Atto 3": "BYD Yuan Plus",
+    "Seal": "BYD Seal",
+    "Mustang Mach-E": "Ford Mustang Mach-E",
+    "Explorer Electric": "Ford Explorer EV",
+    "500e": "Fiat New 500",
+    "Panda Hybrid": "Fiat Panda",
+}
+
+
+def get_or_upload_model_image(brand_name: str, model_name: str, category: str, fuel_type: str = "ELECTRIC") -> str:
+    """
+    1. Tente de recuperer la vraie photo du vehicule sur Wikipedia / Wikimedia Commons.
+    2. Si trouvee, la telecharge et l'uploade sur le backend (PNG / JPEG).
+    3. Si indisponible, fallback sur un SVG genere propre.
+    """
+    clean_name = f"{brand_name}_{model_name}".lower().replace(" ", "_").replace("/", "_").replace("-", "_")
+    wiki_title = WIKIPEDIA_MODEL_TITLES.get(model_name) or f"{brand_name} {model_name}"
+
+    # Verifier si deja en cache
+    cache_key = f"models:{clean_name}"
+    with UPLOAD_CACHE_LOCK:
+        if cache_key in UPLOAD_CACHE:
+            return UPLOAD_CACHE[cache_key]
+
+    # Essayer de recuperer l'URL Wikipedia avec retry
+    wiki_img_url = ""
+    for attempt in range(3):
+        try:
+            encoded = urllib.parse.quote(wiki_title.replace(" ", "_"))
+            url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{encoded}"
+            req = urllib.request.Request(url, headers={"User-Agent": "EcoSwitchBotApp/2.0 (contact@ecoswitch.fr)"})
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                wiki_img_url = (data.get("thumbnail") or data.get("originalimage") or {}).get("source", "")
+                if wiki_img_url:
+                    break
+        except Exception:
+            time.sleep(0.5 * (attempt + 1))
+
+    # Telecharger et uploader la vraie photo
+    if wiki_img_url:
+        for attempt in range(3):
+            try:
+                req_img = urllib.request.Request(wiki_img_url, headers={"User-Agent": "EcoSwitchBotApp/2.0 (contact@ecoswitch.fr)"})
+                with urllib.request.urlopen(req_img, timeout=10) as r_img:
+                    img_data = r_img.read()
+                    content_type = r_img.headers.get("Content-Type", "image/jpeg").split(";")[0].strip()
+                    ext = ".jpg" if "jpeg" in content_type or "jpg" in content_type else ".png" if "png" in content_type else ".webp"
+                    uploaded_url = upload_image_bytes(img_data, f"{clean_name}{ext}", content_type=content_type, folder="models")
+                    if uploaded_url:
+                        return uploaded_url
+            except Exception as ex:
+                time.sleep(0.5 * (attempt + 1))
+                if attempt == 2:
+                    print(f"  [!] Telechargement image Wiki pour {model_name} echoue : {ex}", file=sys.stderr)
+
+    # Fallback SVG propre
+    fallback_svg = generate_model_svg(brand_name, model_name, category, fuel_type=fuel_type)
+    return upload_svg(fallback_svg, clean_name, folder="models")
 
 
 # ── Logos SVG haute fidelite ──────────────────────────────────────────────────
@@ -1103,9 +1222,7 @@ def seed_brand(brand_data, stats_lock, stats):
                       else "HYBRID" if any("HYBRID" in f for f in fuel_types)
                       else "PETROL")
 
-        model_key = f"model_{brand_name}_{model_name}".lower().replace(" ", "_").replace("/", "_").replace("-", "_")
-        model_svg = generate_model_svg(brand_name, model_name, model_cat, fuel_type=dominant)
-        model_url = upload_svg(model_svg, model_key, folder="models")
+        model_url = get_or_upload_model_image(brand_name, model_name, model_cat, fuel_type=dominant)
 
         model_obj = _get_or_create(
             list_fn=lambda: api_get("/models", params={"brandId": brand_id}),
@@ -1122,7 +1239,7 @@ def seed_brand(brand_data, stats_lock, stats):
         model_id = model_obj["id"]
         with stats_lock:
             stats["models"] += 1
-        print(f"  [Model] {model_name} ({model_cat}) -> id={model_id}")
+        print(f"  [Model] {model_name} ({model_cat}) -> id={model_id} | img={model_url}")
 
         # 4. Motorisations
         mot_id_map = {}
@@ -1138,15 +1255,11 @@ def seed_brand(brand_data, stats_lock, stats):
                 with stats_lock:
                     stats["motorisations"] += 1
 
-        # 5. Finitions en parallele
+        # 5. Finitions en parallele (reutilisation de l'image du modele)
         fin_names = model_data.get("finitions", [])
 
-        def process_finition(fin_name, _model_id=model_id, _dominant=dominant):
-            fin_key = (f"fin_{brand_name}_{model_name}_{fin_name}"
-                       .lower().replace(" ", "_").replace("/", "_").replace("-", "_"))
-            fin_svg = generate_model_svg(brand_name, f"{model_name} {fin_name}", model_cat, fuel_type=_dominant)
-            fin_url = upload_svg(fin_svg, fin_key, folder="finitions")
-            fin_payload = {"name": fin_name, "imageUrl": fin_url}
+        def process_finition(fin_name, _model_id=model_id, _img_url=model_url):
+            fin_payload = {"name": fin_name, "imageUrl": _img_url}
             fin_obj = _get_or_create(
                 list_fn=lambda: api_get("/finitions", params={"modelId": _model_id}),
                 create_fn=lambda: api_post("/finitions", fin_payload, params={"modelId": _model_id}),
