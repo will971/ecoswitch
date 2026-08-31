@@ -246,166 +246,64 @@ def get_or_upload_model_image(brand_name: str, model_name: str) -> str:
     return ""
 
 
-# ── Logos SVG haute fidelite ──────────────────────────────────────────────────
-# Chaque logo reconstruit fidelement la geometrie officielle en 100x100 px.
-
-BRAND_LOGOS_SVG = {
-
-    "Renault": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" fill="#FCD000"/>
-  <polygon points="50,8 82,50 50,92 18,50" fill="none" stroke="#1A1A1A" stroke-width="7" stroke-linejoin="round"/>
-  <polygon points="50,22 70,50 50,78 30,50" fill="#1A1A1A"/>
-</svg>''',
-
-    "Peugeot": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" fill="#002D72"/>
-  <path d="M50 12 C50 12 72 20 72 38 C72 64 60 80 50 88 C40 80 28 64 28 38 C28 20 50 12 50 12 Z" fill="none" stroke="#FFFFFF" stroke-width="3.5"/>
-  <ellipse cx="50" cy="22" rx="12" ry="9" fill="#FFFFFF"/>
-  <path d="M40 30 L40 62 M60 30 L60 62" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" fill="none"/>
-  <path d="M40 46 C44 40 56 40 60 46" fill="none" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round"/>
-  <path d="M40 62 L38 76 L44 76 M60 62 L58 76 L64 76" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>
-</svg>''',
-
-    "Tesla": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" fill="#CC0000"/>
-  <path d="M50 26 L50 78" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round"/>
-  <path d="M26 22 C38 28 62 28 74 22" fill="none" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round"/>
-  <path d="M16 16 C24 20 38 28 42 26" fill="none" stroke="#FFFFFF" stroke-width="5.5" stroke-linecap="round"/>
-  <path d="M84 16 C76 20 62 28 58 26" fill="none" stroke="#FFFFFF" stroke-width="5.5" stroke-linecap="round"/>
-</svg>''',
-
-    "Dacia": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" fill="#1D3461"/>
-  <path d="M18 22 L50 22 L50 78 L18 78 Z" fill="#FFFFFF"/>
-  <path d="M50 22 L78 22 L50 50 L78 78 L50 78 Z" fill="#FFFFFF"/>
-  <path d="M24 28 L44 28 L44 72 L24 72 Z" fill="#1D3461"/>
-  <path d="M50 28 L66 50 L50 72 Z" fill="#1D3461"/>
-</svg>''',
-
-    "Toyota": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" fill="#EB0A1E"/>
-  <ellipse cx="50" cy="55" rx="42" ry="26" fill="none" stroke="#FFFFFF" stroke-width="5"/>
-  <ellipse cx="50" cy="55" rx="18" ry="26" fill="none" stroke="#FFFFFF" stroke-width="5"/>
-  <ellipse cx="50" cy="30" rx="28" ry="13" fill="none" stroke="#FFFFFF" stroke-width="4"/>
-</svg>''',
-
-    "Volkswagen": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <circle cx="50" cy="50" r="50" fill="#001E50"/>
-  <circle cx="50" cy="50" r="42" fill="none" stroke="#FFFFFF" stroke-width="2"/>
-  <path d="M28 28 L40 62 L50 40 L60 62 L72 28" fill="none" stroke="#FFFFFF" stroke-width="5.5" stroke-linejoin="round" stroke-linecap="round"/>
-  <line x1="36" y1="48" x2="64" y2="48" stroke="#FFFFFF" stroke-width="2"/>
-</svg>''',
-
-    "Citroen": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" fill="#C51C22"/>
-  <path d="M20 34 L50 18 L80 34 L70 42 L50 30 L30 42 Z" fill="#FFFFFF"/>
-  <path d="M20 58 L50 42 L80 58 L70 66 L50 54 L30 66 Z" fill="#FFFFFF"/>
-</svg>''',
-
-    "Citroen_accent": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" fill="#C51C22"/>
-  <path d="M20 34 L50 18 L80 34 L70 42 L50 30 L30 42 Z" fill="#FFFFFF"/>
-  <path d="M20 58 L50 42 L80 58 L70 66 L50 54 L30 66 Z" fill="#FFFFFF"/>
-</svg>''',
-
-    "Hyundai": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" fill="#002C5F"/>
-  <ellipse cx="50" cy="50" rx="46" ry="30" fill="none" stroke="#FFFFFF" stroke-width="4" transform="rotate(-12 50 50)"/>
-  <text x="50" y="57" font-family="Arial Black, sans-serif" font-size="38" font-weight="900" fill="#FFFFFF" text-anchor="middle">H</text>
-</svg>''',
-
-    "Kia": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" fill="#05141F"/>
-  <ellipse cx="50" cy="50" rx="46" ry="28" fill="none" stroke="#FFFFFF" stroke-width="3"/>
-  <text x="50" y="58" font-family="Arial Narrow, Arial, sans-serif" font-size="22" font-weight="900" fill="#FFFFFF" letter-spacing="5" text-anchor="middle">KIA</text>
-</svg>''',
-
-    "BMW": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <circle cx="50" cy="50" r="48" fill="#000000" stroke="#8A8D8F" stroke-width="2"/>
-  <circle cx="50" cy="50" r="36" fill="#FFFFFF"/>
-  <path d="M50 14 A36 36 0 0 1 86 50 L50 50 Z" fill="#1C6CB4"/>
-  <path d="M50 50 L14 50 A36 36 0 0 1 50 14 Z" fill="#FFFFFF"/>
-  <path d="M50 50 L50 86 A36 36 0 0 1 14 50 Z" fill="#1C6CB4"/>
-  <path d="M50 50 L86 50 A36 36 0 0 1 50 86 Z" fill="#FFFFFF"/>
-  <circle cx="50" cy="50" r="36" fill="none" stroke="#8A8D8F" stroke-width="1.5"/>
-  <text x="50" y="12" font-family="sans-serif" font-size="8" font-weight="bold" fill="#FFFFFF" text-anchor="middle" letter-spacing="1">BMW</text>
-</svg>''',
-
-    "Mercedes-Benz": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <circle cx="50" cy="50" r="48" fill="#1A1A1A" stroke="#C0C0C0" stroke-width="2"/>
-  <circle cx="50" cy="50" r="40" fill="none" stroke="#9B9B9B" stroke-width="1.5"/>
-  <line x1="50" y1="12" x2="50" y2="50" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
-  <line x1="50" y1="50" x2="17" y2="70" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
-  <line x1="50" y1="50" x2="83" y2="70" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
-  <circle cx="50" cy="50" r="5" fill="#FFFFFF"/>
-</svg>''',
-
-    "Audi": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" fill="#1A1A1A"/>
-  <circle cx="19" cy="50" r="14" fill="none" stroke="#FFFFFF" stroke-width="4"/>
-  <circle cx="37" cy="50" r="14" fill="none" stroke="#FFFFFF" stroke-width="4"/>
-  <circle cx="63" cy="50" r="14" fill="none" stroke="#FFFFFF" stroke-width="4"/>
-  <circle cx="81" cy="50" r="14" fill="none" stroke="#FFFFFF" stroke-width="4"/>
-</svg>''',
-
-    "MG Motor": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" fill="#B41A24"/>
-  <polygon points="50,5 82,18 95,50 82,82 50,95 18,82 5,50 18,18" fill="none" stroke="#FFFFFF" stroke-width="4"/>
-  <text x="50" y="62" font-family="Arial Black, sans-serif" font-size="32" font-weight="900" fill="#FFFFFF" text-anchor="middle">MG</text>
-</svg>''',
-
-    "Volvo": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" fill="#003057"/>
-  <circle cx="44" cy="56" r="32" fill="none" stroke="#FFFFFF" stroke-width="5"/>
-  <line x1="66" y1="34" x2="88" y2="12" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round"/>
-  <polygon points="88,12 74,12 88,26" fill="#FFFFFF"/>
-  <line x1="15" y1="56" x2="73" y2="56" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round"/>
-</svg>''',
-
-    "Nissan": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" fill="#C71F28"/>
-  <circle cx="50" cy="50" r="44" fill="none" stroke="#FFFFFF" stroke-width="4"/>
-  <rect x="6" y="41" width="88" height="18" fill="#C71F28"/>
-  <rect x="6" y="41" width="88" height="18" fill="none" stroke="#FFFFFF" stroke-width="3"/>
-  <text x="50" y="56" font-family="Arial Narrow, Arial, sans-serif" font-size="13" font-weight="900" fill="#FFFFFF" letter-spacing="2" text-anchor="middle">NISSAN</text>
-</svg>''',
-
-    "Skoda": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <circle cx="50" cy="50" r="50" fill="#4BA82E"/>
-  <circle cx="50" cy="50" r="42" fill="#1A1A1A"/>
-  <path d="M30 30 C50 20 72 36 72 50 C72 64 50 72 38 62 L50 50 Z" fill="#4BA82E"/>
-  <circle cx="44" cy="41" r="4" fill="#1A1A1A"/>
-</svg>''',
-
-    "Cupra": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" fill="#0A0A0A"/>
-  <polygon points="50,10 88,32 88,68 50,90 12,68 12,32" fill="none" stroke="#C7832A" stroke-width="4"/>
-  <path d="M30 35 L70 35 L50 70 Z" fill="none" stroke="#C7832A" stroke-width="3"/>
-  <text x="50" y="55" font-family="Arial Black, sans-serif" font-size="12" font-weight="900" fill="#C7832A" letter-spacing="2" text-anchor="middle">CUPRA</text>
-</svg>''',
-
-    "BYD": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" fill="#1A1A2E"/>
-  <ellipse cx="50" cy="50" rx="46" ry="28" fill="none" stroke="#E8E8E8" stroke-width="3.5"/>
-  <text x="50" y="57" font-family="Arial Black, sans-serif" font-size="22" font-weight="900" fill="#E8E8E8" letter-spacing="4" text-anchor="middle">BYD</text>
-</svg>''',
-
-    "Ford": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" fill="#003776"/>
-  <ellipse cx="50" cy="50" rx="46" ry="30" fill="#003776" stroke="#FFFFFF" stroke-width="3.5"/>
-  <ellipse cx="50" cy="50" rx="40" ry="24" fill="none" stroke="#6AABFF" stroke-width="1.5"/>
-  <text x="50" y="59" font-family="Times New Roman, Georgia, serif" font-size="28" font-weight="bold" font-style="italic" fill="#FFFFFF" text-anchor="middle">Ford</text>
-</svg>''',
-
-    "Fiat": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" rx="50" fill="#CC2222"/>
-  <path d="M50 12 C50 12 72 20 72 38 C72 64 60 80 50 88 C40 80 28 64 28 38 C28 20 50 12 50 12 Z" fill="none" stroke="#FFFFFF" stroke-width="3.5"/>
-  <text x="50" y="60" font-family="Arial Black, sans-serif" font-size="20" font-weight="900" fill="#FFFFFF" letter-spacing="3" text-anchor="middle">FIAT</text>
-</svg>''',
+# Mapping direct des logos officiels des marques (Wikimedia Commons)
+DIRECT_BRAND_LOGOS = {
+    "Renault": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Renault_2021.svg/330px-Renault_2021.svg.png",
+    "Peugeot": "https://upload.wikimedia.org/wikipedia/en/thumb/9/9d/Peugeot_2021_Logo.svg/330px-Peugeot_2021_Logo.svg.png",
+    "Tesla": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/Tesla_Motors.svg/330px-Tesla_Motors.svg.png",
+    "Dacia": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/Dacia_2021.svg/330px-Dacia_2021.svg.png",
+    "Toyota": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/Toyota.svg/330px-Toyota.svg.png",
+    "Volkswagen": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/Volkswagen_logo_2019.svg/330px-Volkswagen_logo_2019.svg.png",
+    "Citroën": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Citroen_2022.svg/330px-Citroen_2022.svg.png",
+    "Hyundai": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/Hyundai_Motor_Company_logo.svg/330px-Hyundai_Motor_Company_logo.svg.png",
+    "Kia": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/Kia_buildings_New_Logo.png/330px-Kia_buildings_New_Logo.png",
+    "BMW": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/BMW.svg/330px-BMW.svg.png",
+    "Mercedes-Benz": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/90/Mercedes-Logo.svg/330px-Mercedes-Logo.svg.png",
+    "Audi": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/92/Audi-Logo_2016.svg/330px-Audi-Logo_2016.svg.png",
+    "MG Motor": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c8/MG_Motor_2021_logo.svg/330px-MG_Motor_2021_logo.svg.png",
+    "Volvo": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/Volvo-Iron-Mark-Black.svg/330px-Volvo-Iron-Mark-Black.svg.png",
+    "Nissan": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Nissan_2020_logo.svg/330px-Nissan_2020_logo.svg.png",
+    "Skoda": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/%C5%A0koda_nieuw.png/330px-%C5%A0koda_nieuw.png",
+    "Cupra": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ef/Cupra_symbol.svg/330px-Cupra_symbol.svg.png",
+    "BYD": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e2/BYD_Auto_2022_logo.svg/330px-BYD_Auto_2022_logo.svg.png",
+    "Ford": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Ford_Motor_Company_Logo.svg/330px-Ford_Motor_Company_Logo.svg.png",
+    "Fiat": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Fiat_Automobiles_logo.svg/330px-Fiat_Automobiles_logo.svg.png"
 }
 
-# Alias pour les marques avec caracteres speciaux
-BRAND_LOGOS_SVG["Citroën"] = BRAND_LOGOS_SVG["Citroen"]
+
+def get_or_upload_brand_logo(brand_name: str) -> str:
+    """
+    Telecharge le vrai logo officiel en PNG transparent et l'uploade sur le backend.
+    """
+    clean_name = f"logo_{brand_name.lower().replace(' ', '_').replace('-', '_')}"
+    cache_key = f"brands:{clean_name}"
+    with UPLOAD_CACHE_LOCK:
+        if cache_key in UPLOAD_CACHE:
+            return UPLOAD_CACHE[cache_key]
+
+    img_url = DIRECT_BRAND_LOGOS.get(brand_name)
+    if not img_url:
+        return ""
+
+    for attempt in range(5):
+        try:
+            req = urllib.request.Request(
+                img_url,
+                headers={"User-Agent": f"EcoSwitchLogoBot/{attempt + 1}.0 (contact@ecoswitch.fr)"}
+            )
+            with urllib.request.urlopen(req, timeout=12) as r:
+                img_data = r.read()
+                content_type = r.headers.get("Content-Type", "image/png").split(";")[0].strip()
+                ext = ".png" if "png" in content_type else ".jpg" if "jpeg" in content_type else ".svg"
+                uploaded = upload_image_bytes(img_data, f"{clean_name}{ext}", content_type=content_type, folder="brands")
+                if uploaded:
+                    return uploaded
+        except Exception as ex:
+            time.sleep(1.0 * (attempt + 1))
+            if attempt == 4:
+                print(f"  [!] Upload logo marque {brand_name} echoue : {ex}", file=sys.stderr)
+
+    return ""
 
 
 # ── Palette de couleurs par marque ────────────────────────────────────────────
@@ -1174,15 +1072,8 @@ def seed_brand(brand_data, stats_lock, stats):
     """Traite une marque : logo + modeles + motorisations + finitions + variantes."""
     brand_name = brand_data["brand"]
 
-    # 1. Logo
-    brand_svg = BRAND_LOGOS_SVG.get(brand_name) or (
-        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
-        f'<rect width="100" height="100" fill="#18181b"/>'
-        f'<text x="50" y="62" font-size="26" font-weight="bold" fill="#fff" text-anchor="middle">'
-        f'{brand_name[:3].upper()}</text></svg>'
-    )
-    logo_key = f"logo_{brand_name.lower().replace(' ', '_').replace('-', '_')}"
-    logo_url = upload_svg(brand_svg, logo_key, folder="brands")
+    # 1. Logo officiel PNG transparent
+    logo_url = get_or_upload_brand_logo(brand_name)
     print(f"[Brand] {brand_name} — logo -> {logo_url or '(echec)'}")
 
     # 2. Creer/retrouver la marque
