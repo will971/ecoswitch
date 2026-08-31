@@ -429,11 +429,11 @@ const showTaxHelp = ref(false)
 
 // Options statiques pour l'étape 1
 const fuelOptions = [
-  { value: 'PETROL', label: 'Essence', icon: '⛽' },
-  { value: 'DIESEL', label: 'Diesel', icon: '🛢️' },
-  { value: 'HYBRID', label: 'Hybride', icon: '🍃' },
-  { value: 'PLUGIN_HYBRID', label: 'Hybride Rechargeable', icon: '🔌' },
-  { value: 'ELECTRIC', label: 'Électrique', icon: '⚡' }
+  { value: 'PETROL', label: 'Essence' },
+  { value: 'DIESEL', label: 'Diesel' },
+  { value: 'HYBRID', label: 'Hybride' },
+  { value: 'PLUGIN_HYBRID', label: 'Hybride Rechargeable' },
+  { value: 'ELECTRIC', label: '100% Électrique' }
 ]
 
 const consumptionHints = computed(() => {
@@ -664,7 +664,7 @@ const formatFuelBadge = (fuelType) => {
 </script>
 
 <template>
-  <div class="express-wizard card-glass p-5">
+  <div class="express-wizard">
     
     <!-- Stepper Supérieur Apple Style -->
     <div class="wizard-header mb-5">
@@ -732,10 +732,10 @@ const formatFuelBadge = (fuelType) => {
         <div class="current-form-row">
           <!-- Type de carburant -->
           <div class="form-group mb-0 flex-1">
-            <div class="flex-between items-center mb-1.5">
-              <label class="form-label text-xs font-bold m-0">⛽ Type de carburant</label>
-              <span v-if="fuelPrices[currentVehicle.fuelType || 'PETROL']" class="badge badge-small badge-teal flex items-center gap-1">
-                <span>Prix en direct : {{ fuelPrices[currentVehicle.fuelType || 'PETROL'] }} €/{{ currentVehicle.fuelType === 'ELECTRIC' ? 'kWh' : 'L' }}</span>
+            <div class="flex-between items-center mb-2">
+              <label class="form-label text-xs font-semibold m-0">Énergie du véhicule actuel</label>
+              <span v-if="fuelPrices[currentVehicle.fuelType || 'PETROL']" class="badge badge-small badge-teal">
+                {{ fuelPrices[currentVehicle.fuelType || 'PETROL'] }} €/{{ currentVehicle.fuelType === 'ELECTRIC' ? 'kWh' : 'L' }}
               </span>
             </div>
             <div class="fuel-pills-row">
@@ -747,9 +747,8 @@ const formatFuelBadge = (fuelType) => {
                 :class="{ active: currentVehicle.fuelType === fuel.value }"
                 @click="currentVehicle.fuelType = fuel.value"
               >
-                <span class="fuel-pill-icon">{{ fuel.icon }}</span>
                 <span class="fuel-pill-label">{{ fuel.label }}</span>
-                <span v-if="fuelPrices[fuel.value]" class="text-xxs text-dimmed block font-normal">
+                <span v-if="fuelPrices[fuel.value]" class="text-xxs text-dimmed block font-mono">
                   {{ fuelPrices[fuel.value] }} €
                 </span>
               </button>
@@ -758,9 +757,9 @@ const formatFuelBadge = (fuelType) => {
         </div>
 
         <!-- Consommation -->
-        <div class="form-group mt-3 mb-0">
-          <label class="form-label text-xs font-bold">
-            📊 Consommation
+        <div class="form-group mt-3.5 mb-0">
+          <label class="form-label text-xs font-semibold">
+            Consommation moyenne
             <span class="text-dimmed font-normal">
               ({{ currentVehicle.fuelType === 'ELECTRIC' ? 'kWh/100km' : 'L/100km' }})
             </span>
@@ -790,21 +789,21 @@ const formatFuelBadge = (fuelType) => {
 
       <!-- Kilométrage annuel -->
       <div class="current-form-card mb-3">
-        <label class="form-label text-xs font-bold mb-2 block">🗓️ Kilométrage annuel</label>
+        <label class="form-label text-xs font-semibold mb-2 block">Distance parcourue par an</label>
         <div class="mileage-presets flex gap-2 mb-3">
           <button type="button" class="btn-preset flex-1" :class="{ active: currentVehicle.annualMileage === 8000 }" @click="setMileagePreset(8000)">
             <span class="preset-km">8 000 km</span><span class="preset-desc">Urbain</span>
           </button>
           <button type="button" class="btn-preset flex-1" :class="{ active: currentVehicle.annualMileage === 15000 }" @click="setMileagePreset(15000)">
-            <span class="preset-km">15 000 km</span><span class="preset-desc">Moyenne FR</span>
+            <span class="preset-km">15 000 km</span><span class="preset-desc">Moyenne France</span>
           </button>
           <button type="button" class="btn-preset flex-1" :class="{ active: currentVehicle.annualMileage === 25000 }" @click="setMileagePreset(25000)">
-            <span class="preset-km">25 000 km</span><span class="preset-desc">Grand rouleur</span>
+            <span class="preset-km">25 000 km</span><span class="preset-desc">Usage intensif</span>
           </button>
         </div>
         <div class="flex-between items-center mb-1">
           <span class="text-xxs text-dimmed">3 000 km</span>
-          <span class="badge badge-teal font-bold">{{ Number(currentVehicle.annualMileage || 0).toLocaleString('fr-FR') }} km / an</span>
+          <span class="badge badge-teal font-mono font-semibold">{{ Number(currentVehicle.annualMileage || 0).toLocaleString('fr-FR') }} km / an</span>
           <span class="text-xxs text-dimmed">40 000 km</span>
         </div>
         <input
@@ -817,8 +816,8 @@ const formatFuelBadge = (fuelType) => {
 
       <!-- Valeur de reprise -->
       <div class="current-form-card mb-4">
-        <label class="form-label text-xs font-bold mb-1 block">💰 Valeur de reprise estimée de votre véhicule</label>
-        <p class="text-xxs text-dimmed mb-2">Sera déduite du coût net d'acquisition du nouveau véhicule.</p>
+        <label class="form-label text-xs font-semibold mb-1 block">Valeur estimée du véhicule actuel (Reprise)</label>
+        <p class="text-xxs text-dimmed mb-2">Montant déduit de l'apport ou du coût de transition.</p>
         <div class="resale-input-row">
           <input
             v-model.number="currentVehicle.resaleValue"
@@ -826,10 +825,10 @@ const formatFuelBadge = (fuelType) => {
             class="form-control text-xs"
             placeholder="ex: 8 000"
           />
-          <span class="resale-unit text-xs text-dimmed">€</span>
+          <span class="resale-unit text-xs text-dimmed font-mono">€</span>
         </div>
         <div class="resale-hints flex gap-2 mt-2">
-          <button v-for="h in resaleHints" :key="h.v" type="button" class="hint-chip" :class="{ active: currentVehicle.resaleValue === h.v }" @click="currentVehicle.resaleValue = h.v">{{ h.l }}</button>
+          <button v-for="h in resaleHints" :key="h.v" type="button" class="hint-chip font-mono" :class="{ active: currentVehicle.resaleValue === h.v }" @click="currentVehicle.resaleValue = h.v">{{ h.l }}</button>
         </div>
       </div>
 
@@ -861,8 +860,8 @@ const formatFuelBadge = (fuelType) => {
 
       <!-- Cartes de profil de recharge -->
       <div class="form-group mb-4">
-        <label class="form-label text-xs font-bold uppercase text-dimmed mb-2.5 block">
-          🔌 Où stationnez-vous votre véhicule la nuit ?
+        <label class="form-label text-xs font-semibold uppercase text-dimmed mb-2.5 block">
+          Stationnement principal de nuit (Recharge)
         </label>
         <div class="charging-profiles-grid">
           <div
@@ -873,10 +872,10 @@ const formatFuelBadge = (fuelType) => {
             @click="applyChargingProfile(prof)"
           >
             <div class="charging-icon-wrapper">
-              <component :is="prof.icon" size="22" class="text-teal" />
+              <component :is="prof.icon" size="20" class="text-teal" />
             </div>
             <div class="charging-card-content">
-              <h5 class="charging-title text-main font-bold text-xs">{{ prof.title }}</h5>
+              <h5 class="charging-title text-main font-semibold text-xs">{{ prof.title }}</h5>
               <p class="charging-desc text-xxs text-muted m-0">{{ prof.desc }}</p>
             </div>
             <div class="charging-check flex-center" v-if="selectedChargingProfile === prof.id">
@@ -888,8 +887,8 @@ const formatFuelBadge = (fuelType) => {
 
       <!-- Tranches de revenus et subventions -->
       <div class="subsidies-section p-4 rounded-xl border-glass mb-4 bg-card-subtle">
-        <label class="form-label text-xs font-bold uppercase text-dimmed mb-2.5 block">
-          🏛️ Éligibilité au Bonus Écologique de l'État
+        <label class="form-label text-xs font-semibold uppercase text-dimmed mb-2.5 block">
+          Éligibilité aux aides publiques (Bonus Écologique)
         </label>
 
         <div class="grid-2-fields gap-3 mb-3">
@@ -1143,8 +1142,8 @@ const formatFuelBadge = (fuelType) => {
 
       <!-- Mode de financement -->
       <div class="financing-box p-4 rounded-xl border-glass mb-4 bg-card-subtle">
-        <label class="form-label text-xs font-bold uppercase text-dimmed mb-2.5 block">
-          💳 Mode d'acquisition du véhicule cible
+        <label class="form-label text-xs font-semibold uppercase text-dimmed mb-2.5 block">
+          Mode d'acquisition envisagé
         </label>
         
         <div class="segmented-control w-100 mb-3">
@@ -1202,9 +1201,17 @@ const formatFuelBadge = (fuelType) => {
 </template>
 
 <style scoped>
+.express-wizard {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-xl);
+  padding: 28px 32px;
+  box-shadow: var(--shadow-card);
+}
+
 .wizard-title {
   font-size: 1.15rem;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: -0.02em;
 }
 
@@ -1595,48 +1602,58 @@ const formatFuelBadge = (fuelType) => {
 .current-form-card {
   background: var(--bg-card);
   border: 1px solid var(--border-glass);
-  border-radius: var(--radius-md);
-  padding: 14px 16px;
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  box-shadow: var(--shadow-card);
 }
 
 /* Fuel pills */
 .fuel-pills-row {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  margin-top: 10px;
 }
+@media (max-width: 860px) {
+  .fuel-pills-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 520px) {
+  .fuel-pills-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 .fuel-pill {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
-  padding: 8px 12px;
-  border-radius: 10px;
-  border: 1.5px solid var(--border-glass);
+  justify-content: center;
+  text-align: center;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-glass);
   background: var(--bg-card-subtle);
   cursor: pointer;
   transition: all 0.15s ease;
-  flex: 1;
-  min-width: 64px;
+  min-height: 60px;
 }
 .fuel-pill:hover {
   border-color: var(--border-hover);
+  background: var(--bg-card-hover);
 }
 .fuel-pill.active {
   border-color: var(--accent-teal);
   background: var(--accent-teal-soft);
   box-shadow: 0 0 0 1px var(--accent-teal);
 }
-.fuel-pill-icon {
-  font-size: 1.25rem;
-  line-height: 1;
-}
 .fuel-pill-label {
-  font-size: 0.68rem;
-  font-weight: 700;
-  color: var(--text-muted);
-  white-space: nowrap;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-main);
+  line-height: 1.2;
 }
 .fuel-pill.active .fuel-pill-label {
   color: var(--accent-teal);
@@ -1646,27 +1663,29 @@ const formatFuelBadge = (fuelType) => {
 .consumption-input-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   flex-wrap: wrap;
+  margin-top: 8px;
 }
 .consumption-input {
-  width: 100px;
+  width: 120px;
   flex-shrink: 0;
+  padding: 9px 12px;
 }
 .consumption-hints {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
 /* Generic hint chip */
 .hint-chip {
-  padding: 4px 10px;
-  border-radius: 9999px;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
   border: 1px solid var(--border-glass);
   background: var(--bg-card-subtle);
-  font-size: 0.7rem;
-  font-weight: 600;
+  font-size: 0.72rem;
+  font-weight: 500;
   color: var(--text-muted);
   cursor: pointer;
   transition: all 0.12s ease;
@@ -1674,41 +1693,65 @@ const formatFuelBadge = (fuelType) => {
 .hint-chip:hover {
   border-color: var(--border-hover);
   color: var(--text-main);
+  background: var(--bg-card-hover);
 }
 .hint-chip.active {
   border-color: var(--accent-teal);
   background: var(--accent-teal-soft);
   color: var(--accent-teal);
+  font-weight: 600;
 }
 
-/* Mileage preset km label */
+/* Mileage Presets */
+.btn-preset {
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+}
+.btn-preset:hover {
+  color: var(--text-main);
+  border-color: var(--border-hover);
+  background: var(--bg-card-hover);
+}
+.btn-preset.active {
+  background: var(--accent-teal-soft);
+  border-color: var(--accent-teal);
+  box-shadow: 0 0 0 1px var(--accent-teal);
+}
 .preset-km {
   display: block;
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-weight: 700;
   color: var(--text-main);
 }
-.btn-preset .preset-desc {
-  display: block;
-  font-size: 0.62rem;
-  color: var(--text-dimmed);
-  font-weight: 500;
+.btn-preset.active .preset-km {
+  color: var(--accent-teal);
 }
-.btn-preset.flex-1 {
-  text-align: center;
-  padding: 6px 8px;
+.preset-desc {
+  display: block;
+  font-size: 0.65rem;
+  color: var(--text-dimmed);
+  margin-top: 2px;
 }
 
 /* Resale row */
 .resale-input-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  max-width: 280px;
 }
 .resale-unit {
-  font-weight: 700;
+  font-weight: 600;
 }
 .resale-hints {
+  display: flex;
+  gap: 8px;
   flex-wrap: wrap;
+  margin-top: 10px;
 }
 </style>

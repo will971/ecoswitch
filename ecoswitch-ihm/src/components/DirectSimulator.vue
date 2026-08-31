@@ -1,7 +1,6 @@
 <script setup>
 import { ref, watch, onMounted } from 'vue'
 import { Zap, ArrowRight, Sparkles, AlertCircle, Layers, SlidersHorizontal, CheckCircle2, RefreshCw } from '@lucide/vue'
-import vehicleEcoSavingsImg from '../assets/vehicle_eco_savings.png'
 import { apiGetCatalogVariants, apiGetLiveFuelPrices } from '../utils/api.js'
 
 // Import des sous-composants
@@ -287,14 +286,32 @@ const calculate = async () => {
 const handleLoadAlternative = async (rec) => {
   loading.value = true
   try {
-    const response = await fetch(`/api/v1/vehicules/${rec.vehicleId}`)
+    const response = await fetch(`/api/v1/catalog/variants/${rec.vehicleId}`)
     if (response.ok) {
       const data = await response.json()
-      targetVehicle.value = { ...data }
+      const fm = data.finition || {}
+      const mot = data.motorisation || {}
+      const mdl = fm.model || mot.model || {}
+      const brd = mdl.brand || {}
+
+      targetVehicle.value = {
+        name: `${brd.name || ''} ${mdl.name || ''} ${mot.name || ''} (${fm.name || ''})`.trim(),
+        purchasePrice: data.purchasePrice || 0,
+        fuelType: mot.fuelType || 'ELECTRIC',
+        consumption: mot.consumptionWltp || 15.0,
+        annualMileage: currentVehicle.value.annualMileage || 15000,
+        monthlyLoa: data.monthlyLoa,
+        monthlyLld: data.monthlyLld,
+        insuranceCost: data.defaultInsuranceCost || 650,
+        maintenanceCost: data.defaultMaintenanceCost || 250,
+        resaleValue: data.estimatedResaleValue || 0,
+        imageUrl: fm.imageUrl || mdl.imageUrl
+      }
       await calculate()
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     }
   } catch (err) {
-    console.error("Erreur de chargement du véhicule recommandé", err)
+    console.error("Erreur de chargement de l'alternative recommandée :", err)
   } finally {
     loading.value = false
   }
@@ -312,11 +329,8 @@ const handleLoadAlternative = async (rec) => {
         </div>
         <h2 class="hero-title text-main">Simulateur de Rentabilité Automobile</h2>
         <p class="hero-description">
-          Évaluez en temps réel le coût total de possession (TCO), l'amortissement de l'investissement, les subventions d'État (bonus & prime) et vos économies de carburant et de CO₂.
+          Évaluez en temps réel le coût total de possession (TCO), l'amortissement net, les subventions d'État (bonus & prime) et vos économies réelles de carburant et d'entretien.
         </p>
-      </div>
-      <div class="hero-image-wrapper hide-on-mobile">
-        <img :src="vehicleEcoSavingsImg" class="hero-brand-image" alt="EcoSwitch Transition" />
       </div>
     </div>
 

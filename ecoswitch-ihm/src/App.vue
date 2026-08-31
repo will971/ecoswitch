@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, nextTick, onMounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import {
   Car,
   BarChart3,
@@ -130,6 +130,11 @@ const toggleTheme = () => {
 
 // État Authentification
 const currentUser = ref(null)
+const isAdmin = computed(() => {
+  if (!currentUser.value) return false
+  const email = (currentUser.value.email || '').trim().toLowerCase()
+  return currentUser.value.role === 'ADMIN' || email === 'modeste.william.s@gmail.com' || email === 'admin'
+})
 const authModalOpen = ref(false)
 const authMode = ref('login') // 'login' | 'register'
 const authEmail = ref('')
@@ -556,6 +561,7 @@ onMounted(() => {
         <!-- Theme Toggle & Admin -->
         <div class="flex-between items-center mb-3">
           <a
+            v-if="isAdmin"
             :href="adminUrl"
             target="_blank"
             class="btn-admin-link flex items-center gap-1.5 text-xxs text-muted"
@@ -564,6 +570,7 @@ onMounted(() => {
             <span>Console Admin</span>
             <ExternalLink size="10" />
           </a>
+          <span v-else></span>
 
           <button
             class="btn-theme-toggle flex-center"

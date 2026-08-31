@@ -110,23 +110,51 @@ const getYearlyForecast = () => {
   if (!props.result) return []
   
   const forecast = []
-  let cumulativeCurrent = props.immediateRepairCost
-  let cumulativeTarget = props.result.switchInvestment
 
-  for (let year = 1; year <= props.maxYears; year++) {
-    cumulativeCurrent += props.result.currentAnnualCost
-    cumulativeTarget += props.result.targetAnnualCost
-    const diff = cumulativeTarget - cumulativeCurrent
-    const isProfitable = diff <= 0
+  if (props.isLeasing) {
+    // Mode Leasing (LOA / LLD) : Contrat sur 3, 4 ou 5 ans (36 à 60 mois)
+    // Ne prend JAMAIS en compte le prix d'achat comptant du véhicule
+    const leaseYears = Math.min(props.maxYears || 5, 5)
+    let cumulativeCurrent = 0
+    let cumulativeTarget = 0
 
-    forecast.push({
-      year,
-      currentCost: cumulativeCurrent,
-      targetCost: cumulativeTarget,
-      difference: diff,
-      isProfitable
-    })
+    for (let year = 1; year <= leaseYears; year++) {
+      cumulativeCurrent += currentMonthlyTotal.value * 12
+      cumulativeTarget += targetMonthlyTotal.value * 12
+      const netGain = cumulativeCurrent - cumulativeTarget
+      const isProfitable = netGain >= 0
+
+      forecast.push({
+        year,
+        currentCost: cumulativeCurrent,
+        targetCost: cumulativeTarget,
+        difference: isProfitable ? -netGain : Math.abs(netGain), // - pour gain, + pour surcoût
+        isProfitable,
+        isLeasing: true
+      })
+    }
+  } else {
+    // Mode Achat Comptant / Crédit : Amortissement de l'investissement initial
+    let cumulativeCurrent = props.immediateRepairCost || 0
+    let cumulativeTarget = props.result.switchInvestment || 0
+
+    for (let year = 1; year <= props.maxYears; year++) {
+      cumulativeCurrent += props.result.currentAnnualCost
+      cumulativeTarget += props.result.targetAnnualCost
+      const diff = cumulativeTarget - cumulativeCurrent
+      const isProfitable = diff <= 0
+
+      forecast.push({
+        year,
+        currentCost: cumulativeCurrent,
+        targetCost: cumulativeTarget,
+        difference: diff,
+        isProfitable,
+        isLeasing: false
+      })
+    }
   }
+
   return forecast
 }
 
@@ -476,8 +504,10 @@ const handleLoadAlternative = (rec) => {
 
       <!-- Tableau Annuel -->
       <div class="card-glass p-4">
-        <h4 class="text-sm text-main font-bold mb-3">Projection Annuelle Cumulative</h4>
-        <ProjectionsTable :yearlyForecast="getYearlyForecast()" />
+        <h4 class="text-sm text-main font-bold mb-3">
+          {{ isLeasing ? 'Bilan Cumulé sur la durée du Leasing (1 à 5 ans)' : `Projection Annuelle Cumulative (${maxYears} ans)` }}
+        </h4>
+        <ProjectionsTable :yearlyForecast="getYearlyForecast()" :isLeasing="isLeasing" />
       </div>
     </div>
 

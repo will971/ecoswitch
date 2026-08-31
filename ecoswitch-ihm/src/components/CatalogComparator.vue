@@ -28,7 +28,6 @@ import {
   Leaf,
   Filter
 } from '@lucide/vue'
-import vehicleEcoSavingsImg from '../assets/vehicle_eco_savings.png'
 import { apiGetCatalogVariants, apiCompareCustomProfitability, apiGetLiveFuelPrices } from '../utils/api.js'
 
 const props = defineProps({

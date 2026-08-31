@@ -1,21 +1,6 @@
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
-import {
-  Sparkles,
-  Zap,
-  TrendingUp,
-  Fuel,
-  Gift,
-  Coins,
-  ChevronDown,
-  ChevronUp,
-  CheckCircle2,
-  ThumbsUp,
-  AlertTriangle,
-  Lightbulb,
-  ShieldCheck,
-  RefreshCw
-} from '@lucide/vue'
+import { Sparkles, RefreshCw, CheckCircle2, ChevronDown, ChevronUp, ShieldCheck } from '@lucide/vue'
+import { ref, computed, onMounted } from 'vue'
 import { apiGetAiAdvisorSummary } from '../../utils/api.js'
 
 const props = defineProps({
@@ -41,7 +26,7 @@ const props = defineProps({
   },
   homeChargingRatio: {
     type: Number,
-    default: 0.85
+    default: 80
   },
   taxIncome: {
     type: Number,
@@ -53,61 +38,95 @@ const props = defineProps({
   }
 })
 
-const annualMileage = computed(() => props.currentVehicle.annualMileage || props.targetVehicle.annualMileage || 15000)
+const aiData = ref(null)
+const aiLoading = ref(false)
+const aiError = ref(null)
+const openedFaq = ref(null)
 
-// Labels d'affichage avec fallback
-const currentVehicleLabel = computed(() => props.currentVehicle?.name?.trim() || 'Votre véhicule')
-const targetVehicleLabel  = computed(() => props.targetVehicle?.name?.trim()  || 'Véhicule cible')
+const annualMileage = computed(() => {
+  return props.currentVehicle.annualMileage || props.targetVehicle.annualMileage || 15000
+})
+
+const currentVehicleLabel = computed(() => {
+  return props.currentVehicle.name || props.currentVehicle.model || 'Véhicule actuel'
+})
+
+const targetVehicleLabel = computed(() => {
+  return props.targetVehicle.name || props.targetVehicle.model || 'Véhicule cible'
+})
+
+const savingsPer1000km = computed(() => {
+  const km = annualMileage.value
+  if (!km || km <= 0) return 0
+  const totalFuelSavings = props.result.annualSavings || 0
+  return Math.round((totalFuelSavings / km) * 1000)
+})
 
 const formatCurrency = (val) => {
   return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val || 0)
 }
 
-// Calcul du coût aux 1 000 km
-const currentCostPer1000km = computed(() => {
-  const price = props.fuelPrices[props.currentVehicle.fuelType] || 1.88
-  return (props.currentVehicle.consumption * price * 10)
-})
+const toggleFaq = (index) => {
+  openedFaq.value = openedFaq.value === index ? null : index
+}
 
-const targetCostPer1000km = computed(() => {
-  if (props.targetVehicle.fuelType === 'ELECTRIC') {
-    const homePrice = props.fuelPrices.ELECTRIC || 0.25
-    const publicPrice = 0.55
-    const ratio = props.homeChargingRatio || 0.85
-    const blendedKwhPrice = (homePrice * ratio) + (publicPrice * (1 - ratio))
-    return (props.targetVehicle.consumption * blendedKwhPrice * 10)
+const faqItems = computed(() => {
+  const isTargetElectric = props.targetVehicle.fuelType === 'ELECTRIC'
+  if (isTargetElectric) {
+    return [
+      {
+        question: 'Comment installer une prise ou borne à domicile ?',
+        answer: 'Une prise renforcée (3,7 kW) coûte environ 500 € et couvre 80% des besoins quotidiens. Une borne Wallbox (7,4 kW) coûte entre 1 200 € et 1 500 € avant crédit d\'impôt de 500 €.'
+      },
+      {
+        question: 'Comment se déroulent les trajets sur autoroute ?',
+        answer: 'Le réseau autoroutier français compte plus de 100 000 points de recharge. Une pause de 20 minutes toutes les 2 heures suffit généralement pour passer de 20% à 80% de batterie.'
+      },
+      {
+        question: 'Quelle est la garantie et longévité de la batterie ?',
+        answer: 'Les constructeurs garantissent légalement leurs batteries pendant 8 ans ou 160 000 km avec maintien d\'au moins 70% de la capacité initiale.'
+      }
+    ]
+  } else {
+    return [
+      {
+        question: 'Quel est le coût réel de maintenance d\'un véhicule hybride ?',
+        answer: 'Grâce au freinage régénératif, les disques et plaquettes de frein s\'usent 2 fois moins vite qu\'un véhicule thermique standard.'
+      },
+      {
+        question: 'Quelle est la durée de vie du système hybride ?',
+        answer: 'La batterie de traction hybride est conçue pour durer toute la vie du véhicule (plus de 10 à 15 ans sans remplacement).'
+      }
+    ]
   }
-  const price = props.fuelPrices[props.targetVehicle.fuelType] || 1.88
-  return (props.targetVehicle.consumption * price * 10)
 })
-
-const savingsPer1000km = computed(() => currentCostPer1000km.value - targetCostPer1000km.value)
-
-// ── Gestion IA ──
-const aiLoading = ref(false)
-const aiData = ref(null)
 
 const fetchAiAdvice = async () => {
   aiLoading.value = true
+  aiError.value = null
   try {
-    const payload = {
-      currentVehicle: props.currentVehicle,
-      targetVehicle: props.targetVehicle,
+    const request = {
+      currentVehicleName: currentVehicleLabel.value,
+      currentFuelType: props.currentVehicle.fuelType,
+      currentConsumption: props.currentVehicle.consumption || 6.5,
+      targetVehicleName: targetVehicleLabel.value,
+      targetFuelType: props.targetVehicle.fuelType,
+      targetConsumption: props.targetVehicle.consumption || 15.0,
       annualMileage: annualMileage.value,
-      homeChargingRatio: props.homeChargingRatio || 0.85,
+      annualFuelSavings: props.result.annualSavings || 0,
+      annualCO2Savings: props.result.annualCO2Savings || 0,
+      breakEvenYear: props.result.breakEvenYear,
+      switchInvestment: props.result.switchInvestment || 0,
+      homeChargingRatio: props.homeChargingRatio,
       taxIncome: props.taxIncome,
       scrapVehicle: props.scrapVehicle,
       isLeasing: props.isLeasing,
-      monthlySavings: props.result.monthlySavings,
-      annualSavings: props.result.annualSavings,
-      totalSubsidies: props.result.totalSubsidies,
-      breakEvenYear: props.result.breakEvenYear,
-      annualCO2Savings: props.result.annualCO2Savings
+      targetMonthlyPrice: props.targetVehicle.monthlyLoa || props.targetVehicle.monthlyLld || 0
     }
-    const response = await apiGetAiAdvisorSummary(payload)
-    aiData.value = response
+    const data = await apiGetAiAdvisorSummary(request)
+    aiData.value = data
   } catch (err) {
-    console.warn("Erreur chargement IA Advisor :", err)
+    aiError.value = err.message
   } finally {
     aiLoading.value = false
   }
@@ -116,138 +135,102 @@ const fetchAiAdvice = async () => {
 onMounted(() => {
   fetchAiAdvice()
 })
-
-watch(() => [props.targetVehicle.name, props.currentVehicle.name], () => {
-  fetchAiAdvice()
-})
-
-// FAQ
-const openedFaq = ref(null)
-const toggleFaq = (idx) => {
-  openedFaq.value = openedFaq.value === idx ? null : idx
-}
-
-const faqItems = [
-  {
-    question: "Comment installer une prise ou borne à domicile ?",
-    answer: "Une prise renforcée (ex: Green'Up à ~350 €) suffit pour recharger 150 km chaque nuit. L'installation d'une borne 7.4 kW ouvre droit à un crédit d'impôt forfaitaire de 500 €."
-  },
-  {
-    question: "Comment se déroulent les trajets sur autoroute ?",
-    answer: "Le réseau autoroutier français compte plus de 130 000 points de charge. Les bornes rapides 150 kW+ permettent de récupérer 80% d'autonomie en 20 à 25 minutes, soit le temps d'une pause café."
-  },
-  {
-    question: "Quelle est la garantie et longévité de la batterie ?",
-    answer: "Les constructeurs garantissent la batterie pendant 8 ans ou 160 000 km (avec capacité minimale garantie de 70%). La perte moyenne observée est de seulement 1% à 1.5% par an."
-  }
-]
 </script>
 
 <template>
-  <div class="card-glass p-5 mb-4">
-    
-    <!-- En-tête épuré avec 1 seul badge discret -->
-    <div class="flex-between items-center mb-4 pb-3 border-b border-glass">
-      <div class="flex items-center gap-2.5">
-        <div class="ai-icon-badge flex-center">
-          <Sparkles size="18" class="text-teal" />
-        </div>
-        <div>
-          <div class="flex items-center gap-2">
-            <h4 class="text-main font-heading text-md font-bold m-0">Analyse Personnalisée</h4>
-            <span class="badge badge-teal badge-small">Conseiller IA</span>
-          </div>
-          <p class="text-xs text-muted m-0">
-            Profil de conduite : {{ Number(annualMileage).toLocaleString('fr-FR') }} km / an
-          </p>
-        </div>
+  <div class="insight-card mb-4">
+    <!-- En-tête -->
+    <div class="flex-between items-center mb-3 pb-3 border-b border-glass">
+      <div class="flex items-center gap-2">
+        <h4 class="text-xs font-semibold text-main m-0 uppercase tracking-wider">Synthèse du Diagnostic</h4>
+        <span class="badge badge-teal badge-small">Conseiller Mobilité</span>
       </div>
 
       <button
         type="button"
-        class="btn-refresh-ai"
+        class="btn-refresh"
         :disabled="aiLoading"
         @click="fetchAiAdvice"
         title="Actualiser l'analyse"
       >
-        <RefreshCw size="13" :class="{ 'spin-animate': aiLoading }" />
-        <span class="hide-on-mobile">{{ aiLoading ? 'Actualisation...' : 'Actualiser' }}</span>
+        <RefreshCw size="12" :class="{ 'spin-animate': aiLoading }" />
+        <span>{{ aiLoading ? 'Actualisation...' : 'Actualiser' }}</span>
       </button>
     </div>
 
-    <!-- Synthèse textuelle de l'IA (Typographie haute lisibilité) -->
-    <div class="ai-narrative mb-4">
+    <!-- Synthèse textuelle -->
+    <div class="narrative-box mb-3.5">
       <p v-if="aiData && aiData.financialAdvice" class="narrative-text text-main m-0">
         {{ aiData.financialAdvice }}
       </p>
       <p v-else class="narrative-text text-main m-0">
-        Passer de votre <strong>{{ currentVehicleLabel }}</strong> à la <strong>{{ targetVehicleLabel }}</strong> vous permet de réduire directement vos dépenses d'énergie de <strong>{{ formatCurrency(result.annualSavings) }}/an</strong>.
+        Le passage à la <strong>{{ targetVehicleLabel }}</strong> permet de réduire vos dépenses énergétiques de <strong>{{ formatCurrency(result.annualSavings) }}/an</strong> pour un profil de <strong>{{ Number(annualMileage).toLocaleString('fr-FR') }} km/an</strong>.
       </p>
     </div>
 
     <!-- 3 Métriques clés alignées -->
-    <div class="metrics-grid mb-4">
+    <div class="metrics-grid mb-3.5">
       <div class="metric-tile">
-        <span class="metric-tile-label">Gain carburant</span>
-        <div class="metric-tile-val text-teal">
+        <span class="metric-tile-label">Gain aux 1 000 km</span>
+        <div class="metric-tile-val text-teal font-mono">
           +{{ formatCurrency(savingsPer1000km) }}
         </div>
-        <span class="metric-tile-sub">tous les 1 000 km</span>
+        <span class="metric-tile-sub">sur votre budget carburant</span>
       </div>
 
       <div class="metric-tile">
-        <span class="metric-tile-label">Consommation cible</span>
-        <div class="metric-tile-val text-cyan">
-          {{ targetVehicle.consumption }} <span class="text-xs font-semibold">{{ targetVehicle.fuelType === 'ELECTRIC' ? 'kWh' : 'L' }}/100km</span>
+        <span class="metric-tile-label">Consommation homologuée</span>
+        <div class="metric-tile-val text-cyan font-mono">
+          {{ targetVehicle.consumption }} <span class="metric-unit font-sans">{{ targetVehicle.fuelType === 'ELECTRIC' ? 'kWh' : 'L' }}/100km</span>
         </div>
-        <span class="metric-tile-sub">contre {{ currentVehicle.consumption }} L/100km avant</span>
+        <span class="metric-tile-sub">contre {{ currentVehicle.consumption }} L/100km</span>
       </div>
 
       <div class="metric-tile">
         <span class="metric-tile-label">Aides publiques</span>
-        <div class="metric-tile-val" :class="result.totalSubsidies > 0 ? 'text-teal' : 'text-main'">
+        <div class="metric-tile-val font-mono" :class="result.totalSubsidies > 0 ? 'text-teal' : 'text-main'">
           {{ result.totalSubsidies > 0 ? formatCurrency(result.totalSubsidies) : '0 €' }}
         </div>
-        <span class="metric-tile-sub">{{ result.totalSubsidies > 0 ? 'Bonus & prime déduits' : 'Aucune aide applicable' }}</span>
+        <span class="metric-tile-sub">{{ result.totalSubsidies > 0 ? 'Bonus déduit' : 'Non éligible' }}</span>
       </div>
     </div>
 
-    <!-- Recommandations d'actions sous forme de liste fluide -->
-    <div v-if="aiData && aiData.keyRecommendations && aiData.keyRecommendations.length" class="recs-section mb-4 pt-3 border-t border-glass">
-      <h5 class="text-xs font-bold text-main uppercase tracking-wider mb-2.5">
+    <!-- Recommandations d'actions -->
+    <div v-if="aiData && aiData.keyRecommendations && aiData.keyRecommendations.length" class="recs-section mb-3 pt-3 border-t border-glass">
+      <div class="text-xxs font-semibold text-dimmed uppercase tracking-wider mb-2">
         Points d'attention recommandés :
-      </h5>
-      <div class="recs-list flex flex-column gap-2">
+      </div>
+      <div class="recs-list flex flex-column gap-1.5">
         <div
           v-for="(rec, idx) in aiData.keyRecommendations"
           :key="idx"
-          class="rec-row flex items-start gap-2 text-xs text-muted"
+          class="rec-row flex items-start gap-2 text-xs"
         >
-          <CheckCircle2 size="15" class="text-teal shrink-0 mt-0.5" />
-          <span class="leading-relaxed text-main">{{ rec }}</span>
+          <CheckCircle2 size="14" class="text-teal shrink-0 mt-0.5" />
+          <span class="text-muted leading-normal">{{ rec }}</span>
         </div>
       </div>
     </div>
 
-    <!-- Questions fréquentes (Accordéon intégré propre) -->
+    <!-- Questions fréquentes -->
     <div class="faq-container pt-3 border-t border-glass">
-      <div class="flex items-center gap-1.5 mb-2.5 text-xs font-bold text-main uppercase">
-        <ShieldCheck size="15" class="text-teal" />
-        <span>Questions pratiques & réassurance</span>
+      <div class="flex items-center gap-1.5 mb-2 text-xxs font-semibold text-dimmed uppercase tracking-wider">
+        <ShieldCheck size="13" class="text-teal" />
+        <span>Questions pratiques</span>
       </div>
 
       <div class="faq-items flex flex-column gap-1.5">
         <div
           v-for="(item, idx) in faqItems"
           :key="idx"
-          class="faq-item p-3 rounded-xl border-glass bg-card-subtle cursor-pointer"
+          class="faq-item p-2.5 rounded-lg border-glass bg-card-subtle cursor-pointer"
           @click="toggleFaq(idx)"
         >
           <div class="flex-between items-center">
-            <span class="text-xs font-bold text-main">{{ item.question }}</span>
-            <component :is="openedFaq === idx ? ChevronUp : ChevronDown" size="14" class="text-dimmed shrink-0 ml-2" />
+            <span class="text-xs font-medium text-main">{{ item.question }}</span>
+            <component :is="openedFaq === idx ? ChevronUp : ChevronDown" size="13" class="text-dimmed shrink-0 ml-2" />
           </div>
-          <p v-if="openedFaq === idx" class="text-xs text-muted mt-2 pt-2 border-t border-glass m-0 leading-relaxed animation-fadeIn">
+          <p v-if="openedFaq === idx" class="text-xxs text-muted mt-2 pt-2 border-t border-glass m-0 leading-relaxed animation-fadeIn">
             {{ item.answer }}
           </p>
         </div>
@@ -258,39 +241,38 @@ const faqItems = [
 </template>
 
 <style scoped>
-.ai-icon-badge {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: var(--accent-teal-soft);
-  border: 1px solid rgba(16, 124, 65, 0.15);
+.insight-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  box-shadow: var(--shadow-card);
 }
 
-.btn-refresh-ai {
+.btn-refresh {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   background: var(--bg-card-subtle);
   border: 1px solid var(--border-glass);
   color: var(--text-muted);
-  font-size: 0.76rem;
-  font-weight: 600;
-  padding: 5px 10px;
-  border-radius: 8px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 6px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
-.btn-refresh-ai:hover {
+.btn-refresh:hover {
   background: var(--bg-card-hover);
   color: var(--text-main);
   border-color: var(--border-hover);
 }
 
 .narrative-text {
-  font-size: 0.94rem;
-  line-height: 1.6;
+  font-size: 0.88rem;
+  line-height: 1.55;
   color: var(--text-main);
-  font-weight: 500;
 }
 
 /* 3 Metrics Grid */
@@ -309,30 +291,36 @@ const faqItems = [
   background: var(--bg-card-subtle);
   border: 1px solid var(--border-glass);
   border-radius: var(--radius-md);
-  padding: 14px 16px;
+  padding: 12px 14px;
 }
 
 .metric-tile-label {
   display: block;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   color: var(--text-dimmed);
   margin-bottom: 4px;
 }
 
 .metric-tile-val {
-  font-family: var(--font-heading);
-  font-size: 1.4rem;
-  font-weight: 800;
+  font-size: 1.25rem;
+  font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1.1;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
+}
+
+.metric-unit {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-dimmed);
+  margin-left: 2px;
 }
 
 .metric-tile-sub {
-  font-size: 0.75rem;
+  font-size: 0.68rem;
   color: var(--text-muted);
 }
 
@@ -345,11 +333,5 @@ const faqItems = [
 
 .spin-animate {
   animation: spin 0.8s linear infinite;
-}
-
-@media (max-width: 600px) {
-  .hide-on-mobile {
-    display: none;
-  }
 }
 </style>

@@ -231,7 +231,7 @@ def get_or_upload_model_image(brand_name: str, model_name: str) -> str:
         try:
             req_img = urllib.request.Request(
                 img_url,
-                headers={"User-Agent": f"EcoSwitchAppBot/{attempt + 1}.0 (contact@ecoswitch.fr)"}
+                headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"}
             )
             with urllib.request.urlopen(req_img, timeout=12) as r_img:
                 img_data = r_img.read()
@@ -291,7 +291,7 @@ def get_or_upload_brand_logo(brand_name: str) -> str:
         try:
             req = urllib.request.Request(
                 img_url,
-                headers={"User-Agent": f"EcoSwitchLogoBot/{attempt + 1}.0 (contact@ecoswitch.fr)"}
+                headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"}
             )
             with urllib.request.urlopen(req, timeout=12) as r:
                 img_data = r.read()
