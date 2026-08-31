@@ -709,7 +709,12 @@ const formatFuelBadge = (fuelType) => {
         <div class="current-form-row">
           <!-- Type de carburant -->
           <div class="form-group mb-0 flex-1">
-            <label class="form-label text-xs font-bold">⛽ Type de carburant</label>
+            <div class="flex-between items-center mb-1.5">
+              <label class="form-label text-xs font-bold m-0">⛽ Type de carburant</label>
+              <span v-if="fuelPrices[currentVehicle.fuelType || 'PETROL']" class="badge badge-small badge-teal flex items-center gap-1">
+                <span>Prix en direct : {{ fuelPrices[currentVehicle.fuelType || 'PETROL'] }} €/{{ currentVehicle.fuelType === 'ELECTRIC' ? 'kWh' : 'L' }}</span>
+              </span>
+            </div>
             <div class="fuel-pills-row">
               <button
                 v-for="fuel in fuelOptions"
@@ -721,6 +726,9 @@ const formatFuelBadge = (fuelType) => {
               >
                 <span class="fuel-pill-icon">{{ fuel.icon }}</span>
                 <span class="fuel-pill-label">{{ fuel.label }}</span>
+                <span v-if="fuelPrices[fuel.value]" class="text-xxs text-dimmed block font-normal">
+                  {{ fuelPrices[fuel.value] }} €
+                </span>
               </button>
             </div>
           </div>

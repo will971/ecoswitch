@@ -445,8 +445,6 @@ export async function apiUploadImage(file, folder = 'general') {
   return data.url // e.g. "/uploads/brands/..."
 }
 
-// ── Comparateur Flotte Custom ──────────────────────────────────────────────
-
 export async function apiCompareCustomProfitability(payload) {
   const res = await apiFetch('/comparisons/profitability/custom', {
     method: 'POST',
@@ -455,4 +453,12 @@ export async function apiCompareCustomProfitability(payload) {
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || 'Erreur lors du calcul de rentabilité.')
   return data
+}
+
+// ── Prix Carburants Live (Open Data + IA) ──────────────────────────────────
+
+export async function apiGetLiveFuelPrices() {
+  const res = await apiFetch('/comparisons/fuel-prices/live')
+  if (!res.ok) throw new Error('Impossible de récupérer les prix des carburants en direct.')
+  return await res.json()
 }

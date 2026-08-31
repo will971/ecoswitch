@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RestController;
 import com.example.springbootapp.model.entity.Vehicule;
 import com.example.springbootapp.business.comparison.ComparisonBusiness;
 import com.example.springbootapp.service.AiAdvisorService;
+import com.example.springbootapp.service.FuelPriceLiveService;
+import org.springframework.web.bind.annotation.GetMapping;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -29,10 +31,21 @@ public class ComparisonController {
 
 	private final ComparisonBusiness comparisonBusiness;
 	private final AiAdvisorService aiAdvisorService;
+	private final FuelPriceLiveService fuelPriceLiveService;
 
-	public ComparisonController(ComparisonBusiness comparisonBusiness, AiAdvisorService aiAdvisorService) {
+	public ComparisonController(ComparisonBusiness comparisonBusiness,
+			AiAdvisorService aiAdvisorService,
+			FuelPriceLiveService fuelPriceLiveService) {
 		this.comparisonBusiness = comparisonBusiness;
 		this.aiAdvisorService = aiAdvisorService;
+		this.fuelPriceLiveService = fuelPriceLiveService;
+	}
+
+	@GetMapping("/fuel-prices/live")
+	@Operation(summary = "Obtenir les prix réels des carburants en temps réel (Open Data gouv + IA)")
+	@ApiResponse(responseCode = "200", description = "Prix des carburants en direct et conseils IA")
+	public FuelPriceLiveService.FuelPricesLiveResponse getLiveFuelPrices() {
+		return fuelPriceLiveService.getLiveFuelPrices();
 	}
 
 	@PostMapping("/ai-advisor")

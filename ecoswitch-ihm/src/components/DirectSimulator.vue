@@ -1,8 +1,8 @@
 <script setup>
 import { ref, watch, onMounted } from 'vue'
-import { Zap, ArrowRight, Sparkles, AlertCircle, Layers, SlidersHorizontal, CheckCircle2 } from '@lucide/vue'
+import { Zap, ArrowRight, Sparkles, AlertCircle, Layers, SlidersHorizontal, CheckCircle2, RefreshCw } from '@lucide/vue'
 import vehicleEcoSavingsImg from '../assets/vehicle_eco_savings.png'
-import { apiGetCatalogVariants } from '../utils/api.js'
+import { apiGetCatalogVariants, apiGetLiveFuelPrices } from '../utils/api.js'
 
 // Import des sous-composants
 import ExpressWizard from './simulator/ExpressWizard.vue'
@@ -50,9 +50,13 @@ const targetVehicle = ref({
 
 const fuelPrices = ref({
   PETROL: 1.88,
-  DIESEL: 1.74,
-  ELECTRIC: 0.25
+  DIESEL: 1.76,
+  ELECTRIC: 0.25,
+  HYBRID: 1.88
 })
+
+const liveFuelData = ref(null)
+const liveFuelLoading = ref(false)
 
 const maxYears = ref(10)
 const immediateRepairCost = ref(0)
@@ -70,6 +74,31 @@ const isLeasing = ref(false)
 const customLeasingMonthlyPrice = ref(null)
 
 const catalogVehicles = ref([])
+
+const fetchLivePrices = async () => {
+  liveFuelLoading.value = true
+  try {
+    const data = await apiGetLiveFuelPrices()
+    if (data && data.prices) {
+      liveFuelData.value = data
+      // N'écraser les prix par défaut que si l'utilisateur n'a pas de profil avec des prix customisés
+      if (!props.userProfile?.petrolPrice && data.prices.PETROL) {
+        fuelPrices.value.PETROL = data.prices.PETROL
+        fuelPrices.value.HYBRID = data.prices.HYBRID || data.prices.PETROL
+      }
+      if (!props.userProfile?.dieselPrice && data.prices.DIESEL) {
+        fuelPrices.value.DIESEL = data.prices.DIESEL
+      }
+      if (!props.userProfile?.electricPrice && data.prices.ELECTRIC) {
+        fuelPrices.value.ELECTRIC = data.prices.ELECTRIC
+      }
+    }
+  } catch (err) {
+    console.warn("Impossible de récupérer les prix des carburants en direct", err)
+  } finally {
+    liveFuelLoading.value = false
+  }
+}
 
 const fetchCatalog = async () => {
   try {
@@ -99,6 +128,7 @@ const fetchCatalog = async () => {
 }
 
 onMounted(async () => {
+  fetchLivePrices()
   await fetchCatalog()
   
   // Appliquer le profil s'il est déjà là au montage

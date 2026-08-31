@@ -29,7 +29,7 @@ import {
   Filter
 } from '@lucide/vue'
 import vehicleEcoSavingsImg from '../assets/vehicle_eco_savings.png'
-import { apiGetCatalogVariants, apiCompareCustomProfitability } from '../utils/api.js'
+import { apiGetCatalogVariants, apiCompareCustomProfitability, apiGetLiveFuelPrices } from '../utils/api.js'
 
 const props = defineProps({
   currentUser: Object,
@@ -404,7 +404,24 @@ const formatCurrency = (val) => {
   return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val || 0)
 }
 
-onMounted(() => {
+onMounted(async () => {
+  try {
+    apiGetLiveFuelPrices().then(data => {
+      if (data && data.prices) {
+        if (!props.activeUserProfile?.petrolPrice && data.prices.PETROL) {
+          fuelPrices.value.PETROL = data.prices.PETROL
+          fuelPrices.value.HYBRID = data.prices.HYBRID || data.prices.PETROL
+        }
+        if (!props.activeUserProfile?.dieselPrice && data.prices.DIESEL) {
+          fuelPrices.value.DIESEL = data.prices.DIESEL
+        }
+        if (!props.activeUserProfile?.electricPrice && data.prices.ELECTRIC) {
+          fuelPrices.value.ELECTRIC = data.prices.ELECTRIC
+        }
+      }
+    }).catch(e => console.warn('Erreur fuel prices live', e))
+  } catch (e) {}
+
   fetchVehicles()
 })
 </script>
