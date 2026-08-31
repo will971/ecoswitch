@@ -14,9 +14,8 @@
         </p>
       </div>
 
-      <div class="header-actions">
+      <div class="header-actions" v-if="isAdmin">
         <button
-          v-if="isAdmin"
           class="btn btn-primary btn-small flex items-center gap-1.5 font-semibold"
           @click="openAddBrandModal"
         >
@@ -175,14 +174,13 @@
             <!-- Hero Header du Modèle -->
             <div class="model-hero-banner">
               <div class="hero-left">
-                <div class="hero-vehicle-media">
+                <div class="hero-vehicle-media" v-if="activeModel.imageUrl">
                   <img
-                    v-if="activeModel.imageUrl"
                     :src="activeModel.imageUrl"
                     :alt="activeModel.name"
                     class="hero-img"
+                    @error="(e) => e.target.parentElement.style.display = 'none'"
                   />
-                  <Car v-else size="28" class="text-dimmed" />
                   <span class="hero-category-tag">{{ activeModel.category || 'Automobile' }}</span>
                 </div>
 
@@ -236,14 +234,13 @@
                   class="finition-card-pill"
                 >
                   <div class="finition-pill-left">
-                    <div class="finition-media-box">
+                    <div class="finition-media-box" v-if="fin.imageUrl">
                       <img
-                        v-if="fin.imageUrl"
                         :src="fin.imageUrl"
                         :alt="fin.name"
                         class="finition-img"
+                        @error="(e) => e.target.parentElement.style.display = 'none'"
                       />
-                      <Sparkles v-else size="12" class="text-teal" />
                     </div>
                     <span class="finition-name">{{ fin.name }}</span>
                   </div>
@@ -290,8 +287,8 @@
                   <!-- En-tête Motorisation -->
                   <div class="mot-header-bar">
                     <div class="mot-header-left">
-                      <span class="badge badge-small" :class="mot.fuelType === 'ELECTRIC' ? 'badge-teal' : 'badge-cyan'">
-                        {{ mot.fuelType === 'ELECTRIC' ? '100% Électrique' : (mot.fuelType === 'HYBRID' ? 'Hybride' : mot.fuelType) }}
+                      <span class="badge badge-small" :class="mot.fuelType === 'ELECTRIC' ? 'badge-teal' : (mot.fuelType === 'HYBRID' ? 'badge-cyan' : 'badge-amber')">
+                        {{ mot.fuelType === 'ELECTRIC' ? '100% Électrique' : (mot.fuelType === 'HYBRID' ? 'Hybride' : (mot.fuelType === 'PLUGIN_HYBRID' ? 'Hybride Rechargeable' : mot.fuelType)) }}
                       </span>
                       <strong class="mot-name-label text-xs font-bold text-main">{{ mot.name }}</strong>
                       <span class="mot-wltp-badge font-mono text-xxs">
@@ -302,15 +299,14 @@
                       </span>
                     </div>
 
-                    <div class="mot-header-right">
+                    <div class="mot-header-right" v-if="isAdmin">
                       <button
-                        v-if="isAdmin"
                         class="btn-associate-pricing"
                         @click="openAddVariantModal(mot.id)"
                       >
                         + Associer Finition & Prix
                       </button>
-                      <div v-if="isAdmin" class="mot-action-btns">
+                      <div class="mot-action-btns">
                         <button class="action-btn-mini" @click="openEditMotorisationModal(mot)">
                           <Edit2 size="10" />
                         </button>
@@ -495,6 +491,7 @@
               <select v-model="motorisationForm.fuelType" class="form-control form-select">
                 <option value="ELECTRIC">Électrique</option>
                 <option value="HYBRID">Hybride</option>
+                <option value="PLUGIN_HYBRID">Hybride Rechargeable (PHEV)</option>
                 <option value="PETROL">Essence</option>
                 <option value="DIESEL">Diesel</option>
               </select>
@@ -789,18 +786,21 @@ const loadCatalogHierarchy = async () => {
   }
 }
 
-const handleFileUpload = async (event, targetField, folder) => {
+const formatCurrency = (val) => {
+  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val || 0)
+}
+
+const handleFileUpload = async (event, type, folder) => {
   const file = event.target.files?.[0]
   if (!file) return
-
   uploadingImage.value = true
-  error.value = null
   try {
     const url = await apiUploadImage(file, folder)
-    if (targetField === 'brand') brandForm.value.logoUrl = url
-    else if (targetField === 'model') modelForm.value.imageUrl = url
-    else if (targetField === 'finition') finitionForm.value.imageUrl = url
-    showSuccess("Image téléversée avec succès !")
+    if (type === 'brand') brandForm.value.logoUrl = url
+    if (type === 'model') modelForm.value.imageUrl = url
+    if (type === 'finition') finitionForm.value.imageUrl = url
+    successMsg.value = "Image téléversée avec succès !"
+    setTimeout(() => successMsg.value = null, 3000)
   } catch (err) {
     error.value = err.message || "Échec du téléversement de l'image."
   } finally {
@@ -808,30 +808,29 @@ const handleFileUpload = async (event, targetField, folder) => {
   }
 }
 
-// ── CRUD Handlers ─────────────────────────────────────────────────────────
+// ── CRUD Actions ──────────────────────────────────────────────────────────
 
 const openAddBrandModal = () => {
-  brandEditMode.value = false
   brandForm.value = { id: null, name: '', logoUrl: '' }
+  brandEditMode.value = false
   brandModalOpen.value = true
 }
-
-const openEditBrandModal = (brand) => {
+const openEditBrandModal = (b) => {
+  brandForm.value = { id: b.id, name: b.name, logoUrl: b.logoUrl }
   brandEditMode.value = true
-  brandForm.value = { id: brand.id, name: brand.name, logoUrl: brand.logoUrl || '' }
   brandModalOpen.value = true
 }
-
 const saveBrand = async () => {
   if (!brandForm.value.name.trim()) return
   loading.value = true
   try {
     if (brandEditMode.value) {
-      await apiUpdateBrand(brandForm.value.id, { name: brandForm.value.name, logoUrl: brandForm.value.logoUrl })
-      showSuccess("Marque mise à jour.")
+      await apiUpdateBrand(brandForm.value.id, brandForm.value)
+      successMsg.value = "Marque mise à jour !"
     } else {
-      await apiCreateBrand({ name: brandForm.value.name, logoUrl: brandForm.value.logoUrl })
-      showSuccess("Marque ajoutée.")
+      const created = await apiCreateBrand(brandForm.value)
+      activeBrand.value = created
+      successMsg.value = "Nouvelle marque ajoutée !"
     }
     brandModalOpen.value = false
     await loadCatalogHierarchy()
@@ -841,14 +840,13 @@ const saveBrand = async () => {
     loading.value = false
   }
 }
-
-const deleteBrand = async (brand) => {
-  if (!confirm(`Supprimer la marque ${brand.name} et tous ses modèles ?`)) return
+const deleteBrand = async (b) => {
+  if (!confirm(`Supprimer la marque ${b.name} et tous ses modèles associés ?`)) return
   loading.value = true
   try {
-    await apiDeleteBrand(brand.id)
-    showSuccess("Marque supprimée.")
-    if (activeBrand.value?.id === brand.id) activeBrand.value = null
+    await apiDeleteBrand(b.id)
+    successMsg.value = "Marque supprimée."
+    activeBrand.value = null
     await loadCatalogHierarchy()
   } catch (err) {
     error.value = err.message
@@ -859,27 +857,26 @@ const deleteBrand = async (brand) => {
 
 const openAddModelModal = () => {
   if (!activeBrand.value) return
-  modelEditMode.value = false
   modelForm.value = { id: null, name: '', imageUrl: '', category: 'Berline' }
+  modelEditMode.value = false
   modelModalOpen.value = true
 }
-
-const openEditModelModal = (model) => {
+const openEditModelModal = (m) => {
+  modelForm.value = { id: m.id, name: m.name, imageUrl: m.imageUrl, category: m.category || 'Berline' }
   modelEditMode.value = true
-  modelForm.value = { id: model.id, name: model.name, imageUrl: model.imageUrl || '', category: model.category || 'Berline' }
   modelModalOpen.value = true
 }
-
 const saveModel = async () => {
-  if (!modelForm.value.name.trim() || !activeBrand.value) return
+  if (!modelForm.value.name.trim()) return
   loading.value = true
   try {
     if (modelEditMode.value) {
       await apiUpdateModel(modelForm.value.id, modelForm.value)
-      showSuccess("Modèle mis à jour.")
+      successMsg.value = "Modèle mis à jour !"
     } else {
-      await apiCreateModel(activeBrand.value.id, modelForm.value)
-      showSuccess("Modèle ajouté.")
+      const created = await apiCreateModel(activeBrand.value.id, modelForm.value)
+      activeModel.value = created
+      successMsg.value = "Modèle ajouté !"
     }
     modelModalOpen.value = false
     await loadCatalogHierarchy()
@@ -889,14 +886,13 @@ const saveModel = async () => {
     loading.value = false
   }
 }
-
-const deleteModel = async (model) => {
-  if (!confirm(`Supprimer le modèle ${model.name} ?`)) return
+const deleteModel = async (m) => {
+  if (!confirm(`Supprimer le modèle ${m.name} ?`)) return
   loading.value = true
   try {
-    await apiDeleteModel(model.id)
-    showSuccess("Modèle supprimé.")
-    if (activeModel.value?.id === model.id) activeModel.value = null
+    await apiDeleteModel(m.id)
+    successMsg.value = "Modèle supprimé."
+    activeModel.value = null
     await loadCatalogHierarchy()
   } catch (err) {
     error.value = err.message
@@ -907,7 +903,6 @@ const deleteModel = async (model) => {
 
 const openAddMotorisationModal = () => {
   if (!activeModel.value) return
-  motorisationEditMode.value = false
   motorisationForm.value = {
     id: null,
     name: '',
@@ -916,25 +911,24 @@ const openAddMotorisationModal = () => {
     powerHp: 150,
     batteryCapacityKwh: 50.0
   }
+  motorisationEditMode.value = false
   motorisationModalOpen.value = true
 }
-
 const openEditMotorisationModal = (mot) => {
-  motorisationEditMode.value = true
   motorisationForm.value = { ...mot }
+  motorisationEditMode.value = true
   motorisationModalOpen.value = true
 }
-
 const saveMotorisation = async () => {
-  if (!motorisationForm.value.name.trim() || !activeModel.value) return
+  if (!motorisationForm.value.name.trim()) return
   loading.value = true
   try {
     if (motorisationEditMode.value) {
       await apiUpdateMotorisation(motorisationForm.value.id, motorisationForm.value)
-      showSuccess("Motorisation mise à jour.")
+      successMsg.value = "Motorisation mise à jour !"
     } else {
       await apiCreateMotorisation(activeModel.value.id, motorisationForm.value)
-      showSuccess("Motorisation ajoutée.")
+      successMsg.value = "Motorisation ajoutée !"
     }
     motorisationModalOpen.value = false
     await loadCatalogHierarchy()
@@ -944,13 +938,12 @@ const saveMotorisation = async () => {
     loading.value = false
   }
 }
-
 const deleteMotorisation = async (mot) => {
   if (!confirm(`Supprimer la motorisation ${mot.name} ?`)) return
   loading.value = true
   try {
     await apiDeleteMotorisation(mot.id)
-    showSuccess("Motorisation supprimée.")
+    successMsg.value = "Motorisation supprimée."
     await loadCatalogHierarchy()
   } catch (err) {
     error.value = err.message
@@ -961,27 +954,25 @@ const deleteMotorisation = async (mot) => {
 
 const openAddFinitionModal = () => {
   if (!activeModel.value) return
-  finitionEditMode.value = false
   finitionForm.value = { id: null, name: '', imageUrl: '' }
+  finitionEditMode.value = false
   finitionModalOpen.value = true
 }
-
 const openEditFinitionModal = (fin) => {
+  finitionForm.value = { ...fin }
   finitionEditMode.value = true
-  finitionForm.value = { id: fin.id, name: fin.name, imageUrl: fin.imageUrl || '' }
   finitionModalOpen.value = true
 }
-
 const saveFinition = async () => {
-  if (!finitionForm.value.name.trim() || !activeModel.value) return
+  if (!finitionForm.value.name.trim()) return
   loading.value = true
   try {
     if (finitionEditMode.value) {
       await apiUpdateFinition(finitionForm.value.id, finitionForm.value)
-      showSuccess("Finition mise à jour.")
+      successMsg.value = "Finition mise à jour !"
     } else {
       await apiCreateFinition(activeModel.value.id, finitionForm.value)
-      showSuccess("Finition ajoutée.")
+      successMsg.value = "Finition ajoutée !"
     }
     finitionModalOpen.value = false
     await loadCatalogHierarchy()
@@ -991,13 +982,12 @@ const saveFinition = async () => {
     loading.value = false
   }
 }
-
 const deleteFinition = async (fin) => {
   if (!confirm(`Supprimer la finition ${fin.name} ?`)) return
   loading.value = true
   try {
     await apiDeleteFinition(fin.id)
-    showSuccess("Finition supprimée.")
+    successMsg.value = "Finition supprimée."
     await loadCatalogHierarchy()
   } catch (err) {
     error.value = err.message
@@ -1006,13 +996,11 @@ const deleteFinition = async (fin) => {
   }
 }
 
-const openAddVariantModal = (motId = null) => {
-  if (!activeModel.value) return
-  variantEditMode.value = false
+const openAddVariantModal = (motId) => {
   variantForm.value = {
     id: null,
-    finitionId: activeModel.value.finitions?.[0]?.id || null,
-    motorisationId: motId || activeModel.value.motorisations?.[0]?.id || null,
+    finitionId: activeModel.value?.finitions?.[0]?.id || null,
+    motorisationId: motId,
     purchasePrice: 35000,
     monthlyLoa: 290,
     monthlyLld: 270,
@@ -1020,35 +1008,33 @@ const openAddVariantModal = (motId = null) => {
     defaultMaintenanceCost: 250,
     estimatedResaleValue: 18000
   }
+  variantEditMode.value = false
   variantModalOpen.value = true
 }
-
-const openEditVariantModal = (motId, price) => {
-  variantEditMode.value = true
+const openEditVariantModal = (motId, p) => {
   variantForm.value = {
-    id: price.variantId,
-    finitionId: price.finitionId,
+    id: p.variantId,
+    finitionId: p.finitionId,
     motorisationId: motId,
-    purchasePrice: price.purchasePrice,
-    monthlyLoa: price.monthlyLoa,
-    monthlyLld: price.monthlyLld,
-    defaultInsuranceCost: price.defaultInsuranceCost || 650,
-    defaultMaintenanceCost: price.defaultMaintenanceCost || 250,
-    estimatedResaleValue: price.estimatedResaleValue || 18000
+    purchasePrice: p.purchasePrice,
+    monthlyLoa: p.monthlyLoa,
+    monthlyLld: p.monthlyLld,
+    defaultInsuranceCost: p.defaultInsuranceCost || 650,
+    defaultMaintenanceCost: p.defaultMaintenanceCost || 250,
+    estimatedResaleValue: p.estimatedResaleValue || 18000
   }
+  variantEditMode.value = true
   variantModalOpen.value = true
 }
-
 const saveVariant = async () => {
-  if (!variantForm.value.finitionId || !variantForm.value.motorisationId) return
   loading.value = true
   try {
     if (variantEditMode.value) {
       await apiUpdateVariant(variantForm.value.id, variantForm.value)
-      showSuccess("Tarif mis à jour.")
+      successMsg.value = "Tarification mise à jour !"
     } else {
       await apiCreateVariant(variantForm.value.finitionId, variantForm.value.motorisationId, variantForm.value)
-      showSuccess("Tarification enregistrée.")
+      successMsg.value = "Tarification enregistrée !"
     }
     variantModalOpen.value = false
     await loadCatalogHierarchy()
@@ -1058,13 +1044,12 @@ const saveVariant = async () => {
     loading.value = false
   }
 }
-
 const deleteVariant = async (variantId) => {
-  if (!confirm("Supprimer cette variante tarifaire ?")) return
+  if (!confirm("Supprimer cette tarification de variante ?")) return
   loading.value = true
   try {
     await apiDeleteVariant(variantId)
-    showSuccess("Tarif supprimé.")
+    successMsg.value = "Tarification supprimée."
     await loadCatalogHierarchy()
   } catch (err) {
     error.value = err.message
@@ -1073,46 +1058,21 @@ const deleteVariant = async (variantId) => {
   }
 }
 
-const showSuccess = (msg) => {
-  successMsg.value = msg
-  setTimeout(() => {
-    successMsg.value = null
-  }, 3500)
-}
-
-const formatCurrency = (val) => {
-  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val || 0)
-}
-
-const getFuelBadgeClass = (type) => {
-  switch (type) {
-    case 'ELECTRIC': return 'badge-teal'
-    case 'HYBRID': return 'badge-cyan'
-    case 'DIESEL': return 'badge-amber'
-    default: return 'badge-rose'
-  }
-}
-
-const openSimulatorWithVariant = (brand, model, mot, price) => {
-  const simVehicle = {
-    name: `${brand.name} ${model.name} ${mot.name} ${price.finitionName}`,
-    brand: brand.name,
-    model: model.name,
-    version: `${mot.name} - ${price.finitionName}`,
-    fuelType: mot.fuelType,
-    consumption: mot.consumptionWltp,
-    purchasePrice: price.purchasePrice,
-    monthlyLoa: price.monthlyLoa,
-    monthlyLld: price.monthlyLld,
-    insuranceCost: price.defaultInsuranceCost || 650,
-    maintenanceCost: price.defaultMaintenanceCost || 250,
-    resaleValue: price.estimatedResaleValue || 0,
-    imageUrl: price.finitionImageUrl || model.imageUrl,
-    brandLogoUrl: brand.logoUrl,
-    annualMileage: 15000
-  }
-  localStorage.setItem('eco_custom_target_vehicle', JSON.stringify(simVehicle))
-  emit('open-simulator')
+const openSimulatorWithVariant = (brand, model, mot, variant) => {
+  emit('open-simulator', {
+    targetVehicle: {
+      name: `${brand.name} ${model.name} ${mot.name} (${variant.finitionName})`,
+      purchasePrice: variant.purchasePrice,
+      fuelType: mot.fuelType,
+      consumption: mot.consumptionWltp,
+      monthlyLoa: variant.monthlyLoa,
+      monthlyLld: variant.monthlyLld,
+      insuranceCost: variant.defaultInsuranceCost || 650,
+      maintenanceCost: variant.defaultMaintenanceCost || 250,
+      resaleValue: variant.estimatedResaleValue || 0,
+      imageUrl: variant.finitionImageUrl || model.imageUrl
+    }
+  })
 }
 
 onMounted(() => {
@@ -1136,9 +1096,6 @@ onMounted(() => {
   padding-bottom: 12px;
   border-bottom: 1px solid var(--border-glass);
 }
-.catalog-icon-badge {
-  font-size: 1.2rem;
-}
 .manager-main-title {
   font-size: 1.25rem;
   font-weight: 800;
@@ -1148,24 +1105,6 @@ onMounted(() => {
   gap: 8px;
   margin: 0 0 2px 0;
   flex-wrap: wrap;
-}
-.admin-status-badge {
-  font-size: 0.68rem;
-  font-weight: 700;
-  background: rgba(16, 124, 65, 0.15);
-  color: var(--accent-teal);
-  border: 1px solid rgba(16, 124, 65, 0.3);
-  padding: 3px 8px;
-  border-radius: 9999px;
-}
-.consultation-status-badge {
-  font-size: 0.68rem;
-  font-weight: 600;
-  background: var(--bg-card-subtle);
-  color: var(--text-dimmed);
-  border: 1px solid var(--border-glass);
-  padding: 3px 8px;
-  border-radius: 9999px;
 }
 .manager-subtitle {
   font-size: 0.75rem;
@@ -1257,9 +1196,20 @@ onMounted(() => {
 .sidebar-search-box {
   width: 100%;
 }
+.search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.search-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--text-dimmed);
+  pointer-events: none;
+}
 .sidebar-search-input {
   width: 100%;
-  padding: 6px 10px;
+  padding: 6px 10px 6px 30px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-glass);
   background: var(--bg-input);
@@ -1321,9 +1271,6 @@ onMounted(() => {
   height: 100%;
   object-fit: contain;
 }
-.fallback-emoji {
-  font-size: 0.85rem;
-}
 .brand-name-text {
   font-size: 0.8rem;
   font-weight: 700;
@@ -1351,8 +1298,8 @@ onMounted(() => {
 }
 
 .action-btn-mini {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: 4px;
   background: var(--bg-card);
   border: 1px solid var(--border-glass);
@@ -1360,7 +1307,6 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.65rem;
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -1392,9 +1338,6 @@ onMounted(() => {
   flex-direction: column;
   align-items: center;
   gap: 8px;
-}
-.empty-icon {
-  font-size: 2.5rem;
 }
 
 .models-selector-card {
@@ -1454,14 +1397,10 @@ onMounted(() => {
   background: var(--bg-card-hover);
 }
 .model-tab-btn.is-active {
-  background: #1D1D1F;
-  border-color: #1D1D1F;
-  color: #FFFFFF;
-}
-[data-theme="dark"] .model-tab-btn.is-active {
-  background: #FFFFFF;
-  border-color: #FFFFFF;
-  color: #000000;
+  background: var(--accent-teal-soft);
+  border-color: var(--accent-teal);
+  color: var(--accent-teal);
+  font-weight: 700;
 }
 .tab-img-box {
   width: 28px;
@@ -1530,9 +1469,6 @@ onMounted(() => {
   height: 100%;
   object-fit: cover;
 }
-.hero-placeholder-icon {
-  font-size: 2rem;
-}
 .hero-category-tag {
   position: absolute;
   bottom: 4px;
@@ -1544,16 +1480,15 @@ onMounted(() => {
   padding: 1px 5px;
   border-radius: 4px;
 }
-
 .hero-info {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
 }
 .hero-brand-line {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
 }
 .hero-mini-logo {
   width: 14px;
@@ -1563,49 +1498,46 @@ onMounted(() => {
 .hero-brand-name {
   font-size: 0.72rem;
   font-weight: 700;
+  text-transform: uppercase;
   color: var(--text-dimmed);
 }
 .hero-model-title {
-  font-size: 1.15rem;
+  font-size: 1.25rem;
   font-weight: 800;
   color: var(--text-main);
   margin: 0;
 }
 .hero-badges {
   display: flex;
-  align-items: center;
   gap: 6px;
-  margin-top: 2px;
 }
 .hero-actions {
   display: flex;
-  align-items: center;
   gap: 6px;
 }
 
-/* Sections */
+/* Finitions */
+.finitions-section-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 .section-title-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
 }
 .section-title {
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--text-main);
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  letter-spacing: 0.04em;
+  color: var(--text-dimmed);
   margin: 0;
 }
-
-/* Finitions Pill Grid */
 .finitions-pill-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 .finition-card-pill {
@@ -1616,6 +1548,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
 }
 .finition-pill-left {
   display: flex;
@@ -1623,8 +1556,8 @@ onMounted(() => {
   gap: 8px;
 }
 .finition-media-box {
-  width: 26px;
-  height: 18px;
+  width: 32px;
+  height: 20px;
   border-radius: 4px;
   background: var(--bg-card);
   border: 1px solid var(--border-glass);
@@ -1679,47 +1612,38 @@ onMounted(() => {
   gap: 8px;
   flex-wrap: wrap;
 }
-.fuel-badge-tag {
-  font-size: 0.7rem;
-  font-weight: 800;
-  padding: 2px 7px;
-  border-radius: 4px;
-}
 .mot-name-label {
-  font-size: 0.82rem;
-  color: var(--text-main);
+  font-size: 0.85rem;
 }
 .mot-wltp-badge {
-  font-size: 0.7rem;
-  color: var(--accent-teal);
-  background: var(--accent-teal-soft);
-  border: 1px solid rgba(16, 124, 65, 0.2);
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
   padding: 2px 6px;
   border-radius: 4px;
+  color: var(--text-muted);
 }
 .mot-specs-pill {
-  font-size: 0.7rem;
   color: var(--text-dimmed);
 }
-
 .mot-header-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 .btn-associate-pricing {
-  background: transparent;
-  border: 1px solid var(--accent-teal);
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
   color: var(--accent-teal);
   font-size: 0.72rem;
   font-weight: 700;
-  padding: 3px 8px;
+  padding: 4px 10px;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 .btn-associate-pricing:hover {
   background: var(--accent-teal-soft);
+  border-color: var(--accent-teal);
 }
 .mot-action-btns {
   display: flex;
@@ -1727,51 +1651,46 @@ onMounted(() => {
   gap: 2px;
 }
 
+.mot-variants-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 .no-variants-label {
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   color: var(--text-dimmed);
   font-style: italic;
   padding: 4px 0;
 }
-
-/* Grille des Variantes / Finitions Tarifées */
 .variants-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 10px;
 }
 .variant-price-card {
-  padding: 10px 12px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-glass);
   background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
   gap: 8px;
-  box-shadow: var(--shadow-sm);
 }
 .variant-top-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 .variant-finition-name {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: var(--text-main);
-}
-.sparkle-icon {
-  font-size: 0.8rem;
 }
 .variant-admin-btns {
   display: flex;
-  align-items: center;
   gap: 2px;
 }
-
 .variant-pricing-lines {
   display: flex;
   flex-direction: column;
@@ -1779,122 +1698,89 @@ onMounted(() => {
 }
 .price-line {
   display: flex;
-  align-items: center;
   justify-content: space-between;
+  align-items: center;
   font-size: 0.72rem;
 }
 .price-label {
   color: var(--text-dimmed);
 }
-.price-value {
-  font-weight: 700;
-}
-
 .btn-simulate-variant {
   width: 100%;
-  padding: 5px 8px;
-  background: var(--bg-card-subtle);
-  border: 1px solid var(--border-glass);
-  border-radius: 6px;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-teal-soft);
   color: var(--accent-teal);
+  border: 1px solid rgba(16, 124, 65, 0.2);
   font-size: 0.72rem;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.15s ease;
+  margin-top: 2px;
 }
 .btn-simulate-variant:hover {
-  background: var(--accent-teal-soft);
-  border-color: var(--accent-teal);
+  background: var(--accent-teal);
+  color: #FFFFFF;
+}
+
+.empty-sub-notice {
+  font-size: 0.72rem;
+  color: var(--text-dimmed);
+  font-style: italic;
 }
 
 /* Modals */
 .modal-box {
-  width: 100%;
   max-width: 440px;
+  width: 100%;
 }
 .modal-box-lg {
+  max-width: 580px;
   width: 100%;
-  max-width: 520px;
 }
 .modal-title {
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-weight: 800;
   color: var(--text-main);
-  margin-bottom: 12px;
+  margin: 0 0 16px 0;
 }
 .modal-form-stack {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-}
-.upload-input-group {
-  display: flex;
-  gap: 6px;
-}
-.hidden-file-input {
-  display: none;
+  gap: 12px;
 }
 .grid-2-modal {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 12px;
 }
 .grid-3-modal {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+}
+.upload-input-group {
+  display: flex;
   gap: 8px;
+}
+.hidden-file-input {
+  display: none;
 }
 .modal-footer-bar {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 16px;
+  margin-top: 20px;
   padding-top: 12px;
   border-top: 1px solid var(--border-glass);
 }
 
-.text-cyan {
-  color: var(--accent-cyan);
-}
-.text-teal {
-  color: var(--accent-teal);
-}
-.text-main {
-  color: var(--text-main);
-}
-.empty-sub-notice {
-  font-size: 0.74rem;
-  color: var(--text-dimmed);
-  font-style: italic;
-  padding: 6px 0;
-}
-
-/* ── Mobile & Tablet Optimizations (< 1024px) ───────────────────────── */
+/* RESPONSIVE MOBILE TWEAKS */
 @media (max-width: 1024px) {
-  .catalog-manager-app {
-    gap: 12px;
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-    overflow-x: hidden;
-    box-sizing: border-box;
-  }
-
   .manager-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
-    margin-bottom: 4px;
-    width: 100%;
-    box-sizing: border-box;
-  }
-  .manager-main-title {
-    font-size: 1.05rem;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-  .hide-on-mobile {
-    display: none !important;
   }
   .header-actions {
     width: 100%;
@@ -1933,7 +1819,7 @@ onMounted(() => {
     box-sizing: border-box;
   }
   .sidebar-search-input {
-    padding: 6px 10px;
+    padding: 6px 10px 6px 28px;
     font-size: 0.76rem;
     width: 100%;
     box-sizing: border-box;
@@ -2002,8 +1888,8 @@ onMounted(() => {
   }
 
   .models-selector-card {
-    padding: 10px 12px;
-    gap: 8px;
+    padding: 12px;
+    gap: 10px;
     width: 100%;
     max-width: 100%;
     min-width: 0;
@@ -2056,39 +1942,39 @@ onMounted(() => {
 
   /* Détail Modèle */
   .model-detail-card {
-    padding: 12px 10px;
+    padding: 14px 12px;
     gap: 12px;
     width: 100%;
     max-width: 100%;
     min-width: 0;
     box-sizing: border-box;
-    overflow: hidden;
   }
   .model-hero-banner {
     flex-direction: column;
     align-items: stretch;
-    gap: 10px;
+    gap: 8px;
     padding-bottom: 10px;
     width: 100%;
     box-sizing: border-box;
   }
   .hero-left {
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
-    text-align: center;
-    gap: 8px;
+    text-align: left;
+    gap: 12px;
     width: 100%;
     box-sizing: border-box;
   }
   .hero-vehicle-media {
-    width: 100%;
-    max-width: 240px;
-    height: 110px;
-    margin: 0 auto;
+    width: 90px;
+    height: 55px;
+    max-width: 90px;
+    margin: 0;
+    flex-shrink: 0;
   }
   .hero-info {
-    align-items: center;
-    text-align: center;
+    align-items: flex-start;
+    text-align: left;
     width: 100%;
     box-sizing: border-box;
   }
@@ -2096,19 +1982,17 @@ onMounted(() => {
     font-size: 1.05rem;
   }
   .hero-badges {
-    justify-content: center;
+    justify-content: flex-start;
   }
   .hero-actions {
     width: 100%;
-    justify-content: center;
-  }
-  .hero-actions button {
-    flex: 1;
+    justify-content: flex-end;
   }
 
   /* Finitions */
   .finitions-pill-grid {
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    display: flex;
+    flex-wrap: wrap;
     gap: 6px;
   }
   .finition-card-pill {
@@ -2120,7 +2004,7 @@ onMounted(() => {
 
   /* Motorisations & Variantes */
   .motorisation-item-card {
-    padding: 10px 8px;
+    padding: 10px 10px;
     gap: 8px;
   }
   .mot-header-bar {
