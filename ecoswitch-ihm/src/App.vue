@@ -31,7 +31,7 @@ import CatalogComparator from './components/CatalogComparator.vue'
 import VehicleManager from './components/VehicleManager.vue'
 import SavedSimulations from './components/SavedSimulations.vue'
 import UserProfileModal from './components/UserProfileModal.vue'
-import { apiLogin, apiRegister, apiGoogleLogin, apiGetMe, apiGetUserVehicleProfiles } from './utils/api.js'
+import { apiLogin, apiRegister, apiGoogleLogin, apiGetMe, apiGetUserVehicleProfiles, apiGetLiveFuelPrices } from './utils/api.js'
 
 // ── SYSTÈME DE ROUTING DYNAMIQUE HTML5 HISTORY API ───────────────────────────
 const ROUTES = {
@@ -141,6 +141,26 @@ const authLoading = ref(false)
 const userProfiles = ref([])
 const activeUserProfile = ref(null)
 const profileModalOpen = ref(false)
+
+// Prix Énergies en Direct (Open Data & IA)
+const liveFuelPrices = ref({
+  PETROL: 2.04,
+  DIESEL: 2.21,
+  ELECTRIC: 0.2516
+})
+
+const loadLiveFuelPrices = async () => {
+  try {
+    const data = await apiGetLiveFuelPrices()
+    if (data && data.prices) {
+      if (data.prices.PETROL) liveFuelPrices.value.PETROL = data.prices.PETROL
+      if (data.prices.DIESEL) liveFuelPrices.value.DIESEL = data.prices.DIESEL
+      if (data.prices.ELECTRIC) liveFuelPrices.value.ELECTRIC = data.prices.ELECTRIC
+    }
+  } catch (e) {
+    console.warn("Énergies live : fallback aux valeurs indicatives", e)
+  }
+}
 
 // Données transmises au simulateur lors d'un rechargement
 const simulationToLoad = ref(null)
@@ -331,6 +351,7 @@ const handleLoadSimulation = (simData) => {
 onMounted(() => {
   applyTheme(theme.value)
   checkCurrentUser()
+  loadLiveFuelPrices()
 
   // Synchronise l'URL et le titre au premier chargement
   syncUrlToTab(activeTab.value, true)
@@ -516,19 +537,19 @@ onMounted(() => {
             <span class="text-xxs uppercase font-bold text-dimmed flex items-center gap-1">
               <Fuel size="11" class="text-teal" /> Énergies (FR)
             </span>
-            <span class="badge badge-teal badge-small">2026</span>
+            <span class="badge badge-teal badge-small">EN DIRECT</span>
           </div>
           <div class="flex-between text-xxs py-0.5">
             <span class="text-muted">SP95-E10</span>
-            <span class="font-mono font-bold text-main">1,88 €/L</span>
+            <span class="font-mono font-bold text-main">{{ Number(liveFuelPrices.PETROL).toFixed(2).replace('.', ',') }} €/L</span>
           </div>
           <div class="flex-between text-xxs py-0.5">
             <span class="text-muted">Gazole B7</span>
-            <span class="font-mono font-bold text-main">1,74 €/L</span>
+            <span class="font-mono font-bold text-main">{{ Number(liveFuelPrices.DIESEL).toFixed(2).replace('.', ',') }} €/L</span>
           </div>
           <div class="flex-between text-xxs py-0.5">
             <span class="text-muted">Électricité</span>
-            <span class="font-mono font-bold text-teal">0,25 €/kWh</span>
+            <span class="font-mono font-bold text-teal">{{ Number(liveFuelPrices.ELECTRIC).toFixed(2).replace('.', ',') }} €/kWh</span>
           </div>
         </div>
 
