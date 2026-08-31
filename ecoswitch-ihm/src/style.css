@@ -506,6 +506,7 @@ a:hover {
   .grid-cols-2 { grid-template-columns: 1fr; }
 }
 
+.relative { position: relative !important; }
 .w-100 { width: 100%; }
 .m-0 { margin: 0 !important; }
 .mb-1 { margin-bottom: 4px; }

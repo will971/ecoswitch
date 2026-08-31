@@ -1088,13 +1088,13 @@ const formatFuelBadge = (fuelType) => {
         </button>
 
         <div v-if="showTargetCustom" class="custom-search-inputs mt-3 pt-3 border-t border-glass">
-          <div class="form-group relative mb-3">
-            <label class="form-label text-xxs">Nom du modèle</label>
+          <div class="search-input-wrapper relative mb-3">
+            <label class="form-label text-xxs">Recherche par marque ou modèle</label>
             <input
               v-model="searchTargetQuery"
               type="text"
               class="form-control text-xs"
-              placeholder="ex: e-2008, Ioniq 5, Fiat 500e..."
+              placeholder="ex: Cupra Formentor, Tesla Model 3, Renault Megane..."
             />
             <div v-if="targetSearchResults.length > 0" class="search-dropdown card-glass">
               <div
@@ -1103,10 +1103,23 @@ const formatFuelBadge = (fuelType) => {
                 class="dropdown-item"
                 @click="selectTargetCar(v)"
               >
-                <span class="font-bold text-xs text-main">{{ v.name }}</span>
-                <span class="text-xxs text-muted">
-                  {{ formatCurrency(v.purchasePrice) }} &middot; {{ v.consumption }} {{ v.fuelType === 'ELECTRIC' ? 'kWh' : 'L' }}/100km
-                </span>
+                <div class="flex items-center gap-2 min-w-0">
+                  <div class="dropdown-thumb-box" v-if="v.imageUrl">
+                    <img :src="v.imageUrl" :alt="v.name" class="dropdown-thumb-img" />
+                  </div>
+                  <div class="flex flex-column min-w-0">
+                    <span class="font-bold text-xs text-main truncate">{{ v.name }}</span>
+                    <span class="text-xxs text-dimmed">
+                      {{ v.consumption }} {{ v.fuelType === 'ELECTRIC' ? 'kWh' : 'L' }}/100km
+                    </span>
+                  </div>
+                </div>
+                <div class="text-right shrink-0 ml-3">
+                  <strong class="text-teal text-xs block">{{ formatCurrency(v.purchasePrice) }}</strong>
+                  <span class="badge badge-small badge-cyan text-xxs" v-if="v.monthlyLoa">
+                    {{ v.monthlyLoa }} €/m
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -1494,26 +1507,55 @@ const formatFuelBadge = (fuelType) => {
   text-decoration: underline;
 }
 
+.search-input-wrapper {
+  position: relative !important;
+}
+
 .search-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  z-index: 50;
-  max-height: 180px;
+  position: absolute !important;
+  top: 100% !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 9999 !important;
+  max-height: 260px;
   overflow-y: auto;
   border-radius: 12px;
-  margin-top: 4px;
+  margin-top: 6px;
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-hover) !important;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--border-glass) !important;
 }
 .dropdown-item {
-  padding: 8px 12px;
+  padding: 10px 14px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   cursor: pointer;
+  border-bottom: 1px solid var(--border-glass);
+  transition: all 0.12s ease;
+}
+.dropdown-item:last-child {
+  border-bottom: none;
 }
 .dropdown-item:hover {
-  background: var(--accent-teal-soft);
+  background: var(--accent-teal-soft) !important;
+}
+.dropdown-thumb-box {
+  width: 44px;
+  height: 32px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-glass);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dropdown-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 @media (max-width: 640px) {

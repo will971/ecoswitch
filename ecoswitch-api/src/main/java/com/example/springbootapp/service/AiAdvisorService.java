@@ -164,26 +164,31 @@ public class AiAdvisorService {
         double homeRatio = req.homeChargingRatio() != null ? req.homeChargingRatio() * 100.0 : 85.0;
         String breakEven = req.breakEvenYear() != null ? req.breakEvenYear() + " ans" : "> 10 ans";
         double co2 = req.annualCO2Savings() != null ? req.annualCO2Savings() : 0.0;
+        boolean isLeasing = req.isLeasing() != null && req.isLeasing();
 
         return """
                 Tu es l'expert automobile et conseiller en transition écologique d'EcoSwitch.
                 Analyse cette simulation réelle de changement de véhicule pour un particulier français et produis une synthèse percutante, personnalisée, ultra-claire et bienveillante en français.
 
                 DONNÉES DE LA SIMULATION :
+                - Type d'acquisition : %s
                 - Véhicule actuel : %s (%s, consommation : %.1f L/100km ou kWh/100km)
                 - Véhicule cible : %s (%s, consommation : %.1f L/100km ou kWh/100km, prix : %.0f €)
                 - Kilométrage annuel : %.0f km/an (~%.0f km/jour)
                 - Profil de recharge domicile : %.0f%% à domicile
                 - Aides de l'État déduites : %.0f €
-                - Économie annuelle de carburant/énergie : %.0f €/an (Impact mensuel : %.0f €/mois)
-                - Seuil de rentabilité calculé : %s
+                - Économie annuelle de carburant/énergie : %.0f €/an
+                - Bilan trésorerie mensuelle nette : %.0f €/mois %s
                 - Réduction de CO2 : %.0f kg/an
+
+                CONSIGNE SPÉCIALE LEASING / LOA / LLD :
+                Si l'acquisition est en leasing (LOA/LLD), ne parle JAMAIS d'amortissement sur 10 ans ni du prix total d'achat, car le contrat dure entre 3 et 5 ans (36 à 60 mois). Focalise ton conseil financier sur l'effort de loyer mensuel et la manière dont les économies de carburant viennent compenser tout ou partie du loyer.
 
                 RÉPONDS UNIQUEMENT AU FORMAT JSON STRICT avec la structure suivante :
                 {
                   "verdict": "Une phrase de verdict percutante et personnalisée qui résume la pertinence de ce choix pour son profil.",
-                  "status": "POSITIVE" (si rentable ou gain fort) ou "MODERATE" (si équilibré) ou "CAUTION" (si surcoût trop élevé),
-                  "financialAdvice": "Explication claire du gain financier mensuel et de l'amortissement de l'investissement.",
+                  "status": "POSITIVE" (si gain net ou loyer bien absorbé) ou "MODERATE" (si équilibré) ou "CAUTION" (si surcoût mensuel élevé),
+                  "financialAdvice": "Explication claire du gain financier mensuel ou de l'effort de trésorerie net par mois.",
                   "chargingAdvice": "Conseil pratique et chiffré sur sa routine de recharge et le coût du plein.",
                   "ecologicalImpact": "Vulgarisation concrète de son impact environnemental (arbres ou trajets).",
                   "keyRecommendations": [
@@ -194,13 +199,13 @@ public class AiAdvisorService {
                   "confidenceScore": 95
                 }
                 """.formatted(
+                isLeasing ? "Location avec Option d'Achat (LOA) / LLD (Contrat 3 à 5 ans)" : "Achat Comptant / Crédit classique",
                 cur.getName(), cur.getFuelType(), cur.getConsumption(),
                 tgt.getName(), tgt.getFuelType(), tgt.getConsumption(), tgt.getPurchasePrice(),
                 mileage, mileage / 365.0,
                 homeRatio,
                 subsidies,
-                savings, monthly,
-                breakEven,
+                savings, monthly, isLeasing ? "(Loyer déduit des économies)" : "(Gain net d'usage)",
                 co2
         );
     }
@@ -216,36 +221,58 @@ public class AiAdvisorService {
         Integer breakEven = req.breakEvenYear();
         double co2 = req.annualCO2Savings() != null ? req.annualCO2Savings() : 0.0;
         boolean isElectric = tgt.getFuelType() == FuelType.ELECTRIC;
-        boolean isHybrid = tgt.getFuelType() == FuelType.HYBRID;
+        boolean isHybrid = tgt.getFuelType() == FuelType.HYBRID || tgt.getFuelType() == FuelType.PLUGIN_HYBRID;
+        boolean isLeasing = req.isLeasing() != null && req.isLeasing();
 
         String verdict;
         String status;
         List<String> recs = new ArrayList<>();
 
-        if (breakEven != null && breakEven <= 5) {
-            status = "POSITIVE";
-            verdict = String.format("Excellente opportunité : votre passage à la %s est rentabilisé en seulement %d ans grâce à vos %s km annuels.",
-                    tgt.getName(), breakEven, formatNumber(mileage));
-        } else if (breakEven != null && breakEven <= 8) {
-            status = "POSITIVE";
-            verdict = String.format("Projet équilibré : votre investissement sur la %s s'amortit en %d ans avec un gain net immédiat sur vos pleins d'énergie.",
-                    tgt.getName(), breakEven);
-        } else if (annualSavings > 600) {
-            status = "MODERATE";
-            verdict = String.format("Investissement axé sur le confort et les économies d'usage : vous gagnez %.0f € par an sur votre carburant.", annualSavings);
+        if (isLeasing) {
+            if (monthlySavings >= 0) {
+                status = "POSITIVE";
+                verdict = String.format("Opération financièrement gagnante : vos économies de carburant absorbent entièrement votre loyer de leasing avec +%.0f €/mois de gain net.", monthlySavings);
+            } else if (monthlySavings > -150) {
+                status = "MODERATE";
+                verdict = String.format("Contrat LOA/LLD très compétitif : pour un effort net de seulement %.0f €/mois, vous roulez dans un véhicule moderne et garanti.", Math.abs(monthlySavings));
+            } else {
+                status = "CAUTION";
+                verdict = String.format("Projet de leasing haut de gamme : le loyer implique un surcoût mensuel net de %.0f € après déduction des économies d'énergie.", Math.abs(monthlySavings));
+            }
         } else {
-            status = "CAUTION";
-            verdict = String.format("Changement axé sur le renouvellement de véhicule : l'écart de prix initial nécessite un horizon plus long pour être amorti.");
+            if (breakEven != null && breakEven <= 5) {
+                status = "POSITIVE";
+                verdict = String.format("Excellente opportunité : votre passage à la %s est rentabilisé en seulement %d ans grâce à vos %s km annuels.",
+                        tgt.getName(), breakEven, formatNumber(mileage));
+            } else if (breakEven != null && breakEven <= 8) {
+                status = "POSITIVE";
+                verdict = String.format("Projet équilibré : votre investissement sur la %s s'amortit en %d ans avec un gain net immédiat sur vos pleins d'énergie.",
+                        tgt.getName(), breakEven);
+            } else if (annualSavings > 600) {
+                status = "MODERATE";
+                verdict = String.format("Investissement axé sur le confort et les économies d'usage : vous gagnez %.0f € par an sur votre carburant.", annualSavings);
+            } else {
+                status = "CAUTION";
+                verdict = String.format("Changement axé sur le renouvellement de véhicule : l'écart de prix initial nécessite un horizon plus long pour être amorti.");
+            }
         }
 
         // Conseil financier
         String financialAdvice;
-        if (monthlySavings > 0) {
-            financialAdvice = String.format("Sur vos %s km/an, vous économisez environ %.0f € chaque mois sur vos dépenses énergétiques (soit %.0f €/an).",
-                    formatNumber(mileage), monthlySavings, annualSavings);
+        if (isLeasing) {
+            if (monthlySavings >= 0) {
+                financialAdvice = String.format("En leasing, vous réalisez une économie d'énergie de %.0f €/an, ce qui compense l'intégralité du loyer et dégage un surplus de trésorerie de %.0f €/mois.", annualSavings, monthlySavings);
+            } else {
+                financialAdvice = String.format("Sur vos %s km/an, vous économisez %.0f €/mois de carburant, ce qui allège considérablement la charge de votre loyer de leasing.", formatNumber(mileage), annualSavings / 12.0);
+            }
         } else {
-            financialAdvice = String.format("Vos dépenses mensuelles d'énergie restent stables (écart de %.0f €/mois). L'avantage principal réside dans la fiabilité et la valeur de revente.",
-                    Math.abs(monthlySavings));
+            if (monthlySavings > 0) {
+                financialAdvice = String.format("Sur vos %s km/an, vous économisez environ %.0f € chaque mois sur vos dépenses énergétiques (soit %.0f €/an).",
+                        formatNumber(mileage), monthlySavings, annualSavings);
+            } else {
+                financialAdvice = String.format("Vos dépenses mensuelles d'énergie restent stables (écart de %.0f €/mois). L'avantage principal réside dans la fiabilité et la valeur de revente.",
+                        Math.abs(monthlySavings));
+            }
         }
 
         // Conseil recharge & routine

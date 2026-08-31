@@ -235,41 +235,80 @@ const handleLoadAlternative = (rec) => {
     </div>
 
     <!-- Bannière Diagnostic Hero Apple Style -->
-    <div class="hero-diagnostic-card mb-4" :class="result.breakEvenYear ? 'roi-profitable' : 'roi-neutral'">
+    <div 
+      class="hero-diagnostic-card mb-4" 
+      :class="isLeasing 
+        ? (netMonthlySavings >= 0 ? 'roi-profitable' : 'roi-neutral')
+        : (result.breakEvenYear ? 'roi-profitable' : 'roi-neutral')"
+    >
       <div class="diagnostic-icon-wrapper flex-center">
-        <CheckCircle2 v-if="result.breakEvenYear" size="26" class="text-teal" />
+        <CheckCircle2 v-if="isLeasing ? netMonthlySavings >= 0 : result.breakEvenYear" size="26" class="text-teal" />
         <AlertCircle v-else size="26" class="text-amber" />
       </div>
 
       <div class="diagnostic-content flex-1">
         <div class="flex items-center gap-2 mb-1">
-          <span class="badge badge-small" :class="result.breakEvenYear ? 'badge-teal' : 'badge-amber'">
-            {{ result.breakEvenYear ? 'Rentable' : 'Long terme' }}
+          <span 
+            class="badge badge-small" 
+            :class="(isLeasing ? netMonthlySavings >= 0 : result.breakEvenYear) ? 'badge-teal' : 'badge-amber'"
+          >
+            {{ isLeasing 
+              ? (netMonthlySavings >= 0 ? 'Budget Positif' : 'Effort Mensuel')
+              : (result.breakEvenYear ? 'Rentable' : 'Long terme') 
+            }}
           </span>
+          <span class="badge badge-small badge-cyan" v-if="isLeasing">Contrat LOA/LLD (3 à 5 ans)</span>
           <span class="text-xxs font-bold uppercase text-dimmed">
             {{ currentVehicleLabel }} ➔ {{ targetVehicleLabel }}
           </span>
         </div>
         
-        <h3 class="diagnostic-title text-main font-heading m-0">
-          {{ result.breakEvenYear 
-            ? `Changement de véhicule amorti en ${result.breakEvenYear} an${result.breakEvenYear > 1 ? 's' : ''}`
-            : `Investissement amorti au-delà de votre horizon de ${maxYears} ans`
-          }}
-        </h3>
-        <p class="diagnostic-description text-xs text-muted mt-1 m-0">
-          {{ result.breakEvenYear 
-            ? `Vos économies d'énergie et d'entretien (${formatCurrency(result.annualSavings)}/an) compensent votre investissement initial.`
-            : `Le surcoût d'acquisition (${formatCurrency(result.switchInvestment)}) nécessite plus de ${maxYears} ans pour être amorti par les économies d'énergie.`
-          }}
-        </p>
+        <!-- Cas LOA / LLD : Analyse en budget mensuel de trésorerie (contrat 36/48/60 mois) -->
+        <template v-if="isLeasing">
+          <h3 class="diagnostic-title text-main font-heading m-0">
+            {{ netMonthlySavings >= 0 
+              ? `Opération Blanche ou Positive : +${formatCurrency(netMonthlySavings)} / mois de gain net` 
+              : `Effort de trésorerie net de ${formatCurrency(Math.abs(netMonthlySavings))} / mois`
+            }}
+          </h3>
+          <p class="diagnostic-description text-xs text-muted mt-1 m-0">
+            {{ netMonthlySavings >= 0 
+              ? `Vos économies d'énergie (${formatCurrency(monthlyUsageSavings)}/mois) absorbent entièrement votre loyer de leasing de ${formatCurrency(targetMonthlyFinancing)}/mois.` 
+              : `En leasing (contrat 36-48 mois), le loyer de ${formatCurrency(targetMonthlyFinancing)}/mois est partiellement compensé par ${formatCurrency(monthlyUsageSavings)}/mois d'économies de carburant.`
+            }}
+          </p>
+        </template>
+
+        <!-- Cas Achat Comptant / Crédit : Analyse en amortissement de l'investissement initial -->
+        <template v-else>
+          <h3 class="diagnostic-title text-main font-heading m-0">
+            {{ result.breakEvenYear 
+              ? `Achat amorti en ${result.breakEvenYear} an${result.breakEvenYear > 1 ? 's' : ''}`
+              : `Investissement amorti au-delà de votre horizon de ${maxYears} ans`
+            }}
+          </h3>
+          <p class="diagnostic-description text-xs text-muted mt-1 m-0">
+            {{ result.breakEvenYear 
+              ? `Vos économies d'énergie et d'entretien (${formatCurrency(result.annualSavings)}/an) compensent votre investissement initial net.`
+              : `Le surcoût d'acquisition (${formatCurrency(result.switchInvestment)}) nécessite plus de ${maxYears} ans pour être amorti par les économies d'énergie.`
+            }}
+          </p>
+        </template>
       </div>
 
       <div class="diagnostic-stat shrink-0 text-right">
-        <div class="stat-label text-xxs uppercase font-bold text-dimmed">Point Mort</div>
-        <div class="stat-value font-heading" :class="result.breakEvenYear ? 'text-teal' : 'text-amber'">
-          {{ result.breakEvenYear ? `${result.breakEvenYear} ans` : `> ${maxYears} ans` }}
-        </div>
+        <template v-if="isLeasing">
+          <div class="stat-label text-xxs uppercase font-bold text-dimmed">Gain Net / Mois</div>
+          <div class="stat-value font-heading" :class="netMonthlySavings >= 0 ? 'text-teal' : 'text-rose'">
+            {{ netMonthlySavings >= 0 ? `+${formatCurrency(netMonthlySavings)}` : `-${formatCurrency(Math.abs(netMonthlySavings))}` }}
+          </div>
+        </template>
+        <template v-else>
+          <div class="stat-label text-xxs uppercase font-bold text-dimmed">Point Mort</div>
+          <div class="stat-value font-heading" :class="result.breakEvenYear ? 'text-teal' : 'text-amber'">
+            {{ result.breakEvenYear ? `${result.breakEvenYear} ans` : `> ${maxYears} ans` }}
+          </div>
+        </template>
       </div>
     </div>
 
@@ -367,11 +406,13 @@ const handleLoadAlternative = (rec) => {
       @load-alternative="handleLoadAlternative"
     />
 
-    <!-- Accordéon Détails Techniques & Amortissement 10 ans -->
+    <!-- Accordéon Détails Techniques & Amortissement -->
     <div class="detailed-toggle-bar p-3.5 rounded-xl border-glass mb-4 flex-between items-center bg-card">
       <div class="flex items-center gap-2">
         <Layers size="16" class="text-teal" />
-        <span class="text-xs font-bold text-main">Projections financières détaillées (10 ans)</span>
+        <span class="text-xs font-bold text-main">
+          {{ isLeasing ? 'Projections financières sur la durée du leasing (3 à 5 ans)' : `Projections financières détaillées (${maxYears} ans)` }}
+        </span>
       </div>
       <button
         type="button"
@@ -383,31 +424,44 @@ const handleLoadAlternative = (rec) => {
       </button>
     </div>
 
-    <!-- Volet Dépliable : Long Terme -->
+    <!-- Volet Dépliable -->
     <div v-if="showDetailedTables" class="collapsible-projections animation-fadeIn flex flex-column gap-4 mb-4">
       <div class="bento-grid">
         <div class="bento-card">
           <span class="badge badge-teal badge-small mb-1.5">Moyenne annuelle</span>
-          <div class="text-xs font-bold text-main">Économie Annuelle</div>
+          <div class="text-xs font-bold text-main">Économie Énergie / An</div>
           <div class="metric-value font-heading text-teal mt-1">{{ formatCurrency(result.annualSavings) }}<span class="metric-unit">/an</span></div>
         </div>
 
         <div class="bento-card">
-          <span class="badge badge-rose badge-small mb-1.5">Effort initial</span>
-          <div class="text-xs font-bold text-main">Coût Net d'Acquisition</div>
-          <div class="metric-value font-heading text-rose mt-1">{{ formatCurrency(result.switchInvestment) }}</div>
+          <span class="badge badge-small mb-1.5" :class="isLeasing ? 'badge-cyan' : 'badge-rose'">
+            {{ isLeasing ? 'Loyer Mensuel' : 'Effort initial' }}
+          </span>
+          <div class="text-xs font-bold text-main">
+            {{ isLeasing ? 'Loyer de Financement' : "Coût Net d'Acquisition" }}
+          </div>
+          <div class="metric-value font-heading mt-1" :class="isLeasing ? 'text-cyan' : 'text-rose'">
+            {{ isLeasing ? `${formatCurrency(targetMonthlyFinancing)}/mois` : formatCurrency(result.switchInvestment) }}
+          </div>
           <p class="text-xxs text-dimmed mt-1 m-0" v-if="result.totalSubsidies > 0">
             Aides déduites : -{{ formatCurrency(result.totalSubsidies) }}
           </p>
         </div>
 
         <div class="bento-card">
-          <span class="badge badge-small mb-1.5" :class="result.totalCostDeltaAtHorizon <= 0 ? 'badge-teal' : 'badge-amber'">
-            Horizon {{ maxYears }} ans
+          <span class="badge badge-small mb-1.5" :class="(isLeasing ? netMonthlySavings >= 0 : result.totalCostDeltaAtHorizon <= 0) ? 'badge-teal' : 'badge-amber'">
+            {{ isLeasing ? 'Bilan Mensuel Global' : `Horizon ${maxYears} ans` }}
           </span>
-          <div class="text-xs font-bold text-main">Bilan Cumulé Global</div>
-          <div class="metric-value font-heading mt-1" :class="result.totalCostDeltaAtHorizon <= 0 ? 'text-teal' : 'text-amber'">
-            {{ result.totalCostDeltaAtHorizon <= 0 ? '+' : '' }}{{ formatCurrency(-result.totalCostDeltaAtHorizon) }}
+          <div class="text-xs font-bold text-main">
+            {{ isLeasing ? 'Reste à Vivre Net' : 'Bilan Cumulé Global' }}
+          </div>
+          <div class="metric-value font-heading mt-1" :class="(isLeasing ? netMonthlySavings >= 0 : result.totalCostDeltaAtHorizon <= 0) ? 'text-teal' : 'text-amber'">
+            <template v-if="isLeasing">
+              {{ netMonthlySavings >= 0 ? '+' : '' }}{{ formatCurrency(netMonthlySavings) }}<span class="metric-unit">/mois</span>
+            </template>
+            <template v-else>
+              {{ result.totalCostDeltaAtHorizon <= 0 ? '+' : '' }}{{ formatCurrency(-result.totalCostDeltaAtHorizon) }}
+            </template>
           </div>
         </div>
       </div>
