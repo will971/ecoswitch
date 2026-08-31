@@ -15,6 +15,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import com.example.springbootapp.dao.FuelPriceOpenDataDao;
+import com.example.springbootapp.model.dto.FuelPriceOpenDataDto;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -23,12 +25,7 @@ public class FuelPriceLiveService {
 
     private static final Logger logger = LoggerFactory.getLogger(FuelPriceLiveService.class);
 
-    private static final String OPEN_DATA_URL =
-            "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records"
-            + "?where=gazole_prix%20%3E%201.0%20AND%20gazole_prix%20%3C%202.8%20AND%20e10_prix%20%3E%201.0%20AND%20e10_prix%20%3C%202.8"
-            + "&select=avg(gazole_prix)%20as%20avg_gazole,%20avg(e10_prix)%20as%20avg_e10,%20avg(sp95_prix)%20as%20avg_sp95,%20avg(sp98_prix)%20as%20avg_sp98,%20avg(e85_prix)%20as%20avg_e85,%20count(id)%20as%20total_stations"
-            + "&limit=1";
-
+    private final FuelPriceOpenDataDao fuelPriceOpenDataDao;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
 
@@ -41,7 +38,8 @@ public class FuelPriceLiveService {
     private String aiSummary = null;
     private int totalStationsSurveyed = 0;
 
-    public FuelPriceLiveService(ObjectMapper objectMapper) {
+    public FuelPriceLiveService(FuelPriceOpenDataDao fuelPriceOpenDataDao, ObjectMapper objectMapper) {
+        this.fuelPriceOpenDataDao = fuelPriceOpenDataDao;
         this.objectMapper = objectMapper;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(8))
@@ -52,132 +50,120 @@ public class FuelPriceLiveService {
         cachedPrices.put("DIESEL", 1.76);
         cachedPrices.put("ELECTRIC", 0.2516);
         cachedPrices.put("HYBRID", 1.88);
+        cachedPrices.put("PLUGIN_HYBRID", 1.88);
         cachedPrices.put("E85", 0.88);
         cachedPrices.put("SP98", 1.96);
         this.lastUpdatedIso = Instant.now().toString();
         this.aiSummary = "Tarifs moyens nationaux indicatifs en vigueur en France.";
 
-        // Charger en tâche de fond dès le démarrage
-        new Thread(this::fetchLivePrices).start();
-    }
-
-    public record FuelPricesLiveResponse(
-            Map<String, Double> prices,
-            String lastUpdated,
-            int stationsCount,
-            String source,
-            String aiInsights
-    ) {}
-
-    public FuelPricesLiveResponse getLiveFuelPrices() {
-        return new FuelPricesLiveResponse(
-                Map.copyOf(cachedPrices),
-                lastUpdatedIso,
-                totalStationsSurveyed,
-                "Ministère de l'Économie & CRE / RTE (Open Data temps réel)",
-                aiSummary
-        );
+        // Charger en tâche de fond dès le démarrage via la DAO
+        new Thread(this::fetchLiveFuelPrices).start();
     }
 
     /**
-     * Mise à jour automatique toutes les 3 heures.
+     * Synchronise les prix en temps réel via la DAO toutes les 6 heures (ou à 6h et 14h).
      */
-    @Scheduled(fixedRate = 3 * 60 * 60 * 1000)
-    public void scheduledUpdate() {
-        fetchLivePrices();
-    }
+    @Scheduled(cron = "0 0 6,12,18 * * *")
+    public void fetchLiveFuelPrices() {
+        logger.info("Synchronisation des prix des carburants via FuelPriceOpenDataDao...");
+        FuelPriceOpenDataDto result = fuelPriceOpenDataDao.fetchNationalAverages();
 
-    public synchronized void fetchLivePrices() {
-        logger.info("Synchronisation des prix des carburants en temps réel via Open Data...");
-        try {
-            HttpRequest req = HttpRequest.newBuilder()
-                    .uri(URI.create(OPEN_DATA_URL))
-                    .timeout(Duration.ofSeconds(10))
-                    .header("User-Agent", "EcoSwitchFuelSync/2.0 (contact@ecoswitch.fr)")
-                    .GET()
-                    .build();
-
-            HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
-            if (res.statusCode() == 200) {
-                JsonNode root = objectMapper.readTree(res.body());
-                JsonNode results = root.path("results");
-                if (results.isArray() && !results.isEmpty()) {
-                    JsonNode agg = results.get(0);
-                    double avgGazole = agg.path("avg_gazole").asDouble(1.76);
-                    double avgE10 = agg.path("avg_e10").asDouble(1.88);
-                    double avgSp98 = agg.path("avg_sp98").asDouble(1.96);
-                    double avgE85 = agg.path("avg_e85").asDouble(0.88);
-                    int stations = agg.path("total_stations").asInt(9000);
-
-                    double roundedGazole = Math.round(avgGazole * 100.0) / 100.0;
-                    double roundedE10 = Math.round(avgE10 * 100.0) / 100.0;
-                    double roundedSp98 = Math.round(avgSp98 * 100.0) / 100.0;
-                    double roundedE85 = Math.round(avgE85 * 100.0) / 100.0;
-
-                    cachedPrices.put("PETROL", roundedE10);
-                    cachedPrices.put("DIESEL", roundedGazole);
-                    cachedPrices.put("HYBRID", roundedE10);
-                    cachedPrices.put("SP98", roundedSp98);
-                    cachedPrices.put("E85", roundedE85);
-                    cachedPrices.put("ELECTRIC", 0.2516);
-
-                    this.totalStationsSurveyed = stations;
-                    this.lastUpdatedIso = Instant.now().toString();
-
-                    logger.info("Prix réels synchronisés : SP95-E10={}€, Gazole={}€ (sur {} stations)",
-                            roundedE10, roundedGazole, stations);
-
-                    enrichWithAiInsight(roundedE10, roundedGazole);
-                }
-            } else {
-                logger.warn("Open Data fuel API status code {}", res.statusCode());
+        if (result.success() && !result.prices().isEmpty()) {
+            Map<String, Double> prices = result.prices();
+            if (prices.containsKey("PETROL")) {
+                cachedPrices.put("PETROL", prices.get("PETROL"));
+                cachedPrices.put("HYBRID", prices.get("PETROL"));
+                cachedPrices.put("PLUGIN_HYBRID", prices.get("PETROL"));
             }
-        } catch (Exception e) {
-            logger.error("Erreur lors de la récupération des prix des carburants : {}", e.getMessage());
+            if (prices.containsKey("DIESEL")) {
+                cachedPrices.put("DIESEL", prices.get("DIESEL"));
+            }
+            if (prices.containsKey("SP95")) {
+                cachedPrices.put("SP95", prices.get("SP95"));
+            }
+            if (prices.containsKey("SP98")) {
+                cachedPrices.put("SP98", prices.get("SP98"));
+            }
+            if (prices.containsKey("E85")) {
+                cachedPrices.put("E85", prices.get("E85"));
+            }
+
+            this.totalStationsSurveyed = result.totalStationsSurveyed();
+            this.lastUpdatedIso = Instant.now().toString();
+
+            // Générer un résumé analytique via IA
+            generateAiFuelSummary(cachedPrices.get("PETROL"), cachedPrices.get("DIESEL"), cachedPrices.get("ELECTRIC"));
+        } else {
+            logger.warn("Open Data DAO n'a renvoyé aucun résultat valide, conservation du cache existant.");
         }
     }
 
-    private void enrichWithAiInsight(double sp95Price, double dieselPrice) {
-        if (apiKey == null || apiKey.trim().isEmpty()) {
-            this.aiSummary = String.format(
-                    "Moyennes nationales observées en direct sur %d stations : SP95-E10 à %.2f €/L, Gazole à %.2f €/L.",
-                    totalStationsSurveyed, sp95Price, dieselPrice);
+    private void generateAiFuelSummary(Double petrolPrice, Double dieselPrice, Double electricPrice) {
+        if (apiKey == null || apiKey.isBlank() || apiKey.startsWith("YOUR_")) {
+            this.aiSummary = String.format("Prix moyens observés sur %d stations en France : SP95-E10 à %.2f €/L, Gazole à %.2f €/L et Électricité à %.4f €/kWh (Tarif Bleu EDF).",
+                    totalStationsSurveyed > 0 ? totalStationsSurveyed : 7000, petrolPrice, dieselPrice, electricPrice);
             return;
         }
 
         try {
             String prompt = String.format(
-                    "Tu es l'économiste en transition énergétique de EcoSwitch. En une phrase courte et percutante (max 120 caractères), donne un conseil sur le coût à l'usage entre thermique (Essence: %.2f €/L, Diesel: %.2f €/L) et électricité (0.25 €/kWh).",
-                    sp95Price, dieselPrice
+                    "En tant qu'analyste des mobilités et énergies en France, résume en 2 phrases concises et percutantes "
+                    + "la situation actuelle du coût des énergies : Essence SP95-E10 = %.2f €/L, Gazole = %.2f €/L, Électricité = %.4f €/kWh. "
+                    + "Mets en avant le différentiel de coût aux 100 km entre thermique et électrique en France.",
+                    petrolPrice, dieselPrice, electricPrice
             );
 
-            String requestBody = objectMapper.writeValueAsString(Map.of(
-                    "contents", new Object[]{
-                            Map.of("parts", new Object[]{
-                                    Map.of("text", prompt)
-                            })
-                    }
-            ));
+            Map<String, Object> requestBody = Map.of(
+                    "contents", java.util.List.of(
+                            Map.of("parts", java.util.List.of(Map.of("text", prompt)))
+                    )
+            );
 
-            String geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=" + apiKey;
+            String jsonPayload = objectMapper.writeValueAsString(requestBody);
+            String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=" + apiKey;
 
-            HttpRequest req = HttpRequest.newBuilder()
-                    .uri(URI.create(geminiUrl))
-                    .timeout(Duration.ofSeconds(6))
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
                     .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .timeout(Duration.ofSeconds(10))
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
                     .build();
 
-            HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
-            if (res.statusCode() == 200) {
-                JsonNode root = objectMapper.readTree(res.body());
-                String text = root.path("candidates").path(0).path("content").path("parts").path(0).path("text").asText("");
-                if (text != null && !text.trim().isEmpty()) {
-                    this.aiSummary = text.trim().replace("\n", " ");
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 200) {
+                JsonNode root = objectMapper.readTree(response.body());
+                JsonNode textNode = root.at("/candidates/0/content/parts/0/text");
+                if (!textNode.isMissingNode() && !textNode.asText().isBlank()) {
+                    this.aiSummary = textNode.asText().trim();
+                    logger.info("Synthèse IA des prix du carburant générée : {}", this.aiSummary);
                 }
             }
-        } catch (Exception ex) {
-            this.aiSummary = String.format("Moyennes en direct : Essence à %.2f €/L, Gazole à %.2f €/L.", sp95Price, dieselPrice);
+        } catch (Exception e) {
+            logger.warn("Impossible de générer le résumé IA des prix : {}", e.getMessage());
+            this.aiSummary = String.format("SP95-E10 : %.2f €/L | Gazole : %.2f €/L | Électricité : %.4f €/kWh (Relevé sur %d stations).",
+                    petrolPrice, dieselPrice, electricPrice, totalStationsSurveyed);
         }
     }
+
+    public Map<String, Double> getLivePrices() {
+        return cachedPrices;
+    }
+
+    public FuelPricesLiveResponse getLiveFuelPrices() {
+        return new FuelPricesLiveResponse(
+                cachedPrices,
+                lastUpdatedIso,
+                aiSummary,
+                totalStationsSurveyed,
+                true
+        );
+    }
+
+    public record FuelPricesLiveResponse(
+            Map<String, Double> prices,
+            String lastUpdatedIso,
+            String aiSummary,
+            int totalStationsSurveyed,
+            boolean isLive
+    ) {}
 }

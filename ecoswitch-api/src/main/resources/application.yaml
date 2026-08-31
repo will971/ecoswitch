@@ -48,4 +48,6 @@ app:
   gemini:
     api-key: ${GEMINI_API_KEY:}
     model: ${GEMINI_MODEL:gemini-flash-lite-latest}
+  fuel-prices:
+    open-data-url: ${OPEN_DATA_FUEL_URL:https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records}
 
