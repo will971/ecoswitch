@@ -1912,8 +1912,11 @@ onMounted(() => {
 
   /* PANE 1 : Sélecteur de Marques Horizontal */
   .brands-sidebar-card {
-    padding: 10px 12px;
-    max-height: none;
+    padding: 12px;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    position: static !important;
     gap: 8px;
     width: 100%;
     max-width: 100%;
@@ -1935,21 +1938,6 @@ onMounted(() => {
     width: 100%;
     box-sizing: border-box;
   }
-  .scroll-hint-pill {
-    font-size: 0.62rem;
-    font-weight: 700;
-    color: var(--accent-teal);
-    background: var(--accent-teal-soft);
-    padding: 1px 6px;
-    border-radius: 9999px;
-    border: 1px solid rgba(16, 124, 65, 0.25);
-    white-space: nowrap;
-    animation: pulseHint 2s infinite ease-in-out;
-  }
-  @keyframes pulseHint {
-    0%, 100% { opacity: 0.85; transform: translateX(0); }
-    50% { opacity: 1; transform: translateX(2px); }
-  }
 
   .brands-items-list {
     display: flex;
@@ -1957,36 +1945,50 @@ onMounted(() => {
     overflow-x: auto;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
-    gap: 5px;
-    padding: 2px 0 6px 0;
+    gap: 6px;
+    padding: 4px 2px 8px 2px;
     width: 100%;
     max-width: 100%;
     min-width: 0;
     box-sizing: border-box;
+    height: auto !important;
   }
   .brands-items-list::-webkit-scrollbar {
     display: none;
   }
   .brand-row-item {
-    flex-shrink: 0;
-    padding: 4px 8px;
-    border-radius: 9999px;
-    gap: 5px;
+    flex: 0 0 auto !important;
+    display: inline-flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    height: 38px !important;
+    min-height: 38px !important;
+    max-height: 38px !important;
+    padding: 0 12px !important;
+    border-radius: var(--radius-md) !important;
+    gap: 8px !important;
+    box-sizing: border-box !important;
+  }
+  .brand-row-left {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
   }
   .brand-logo-box {
-    width: 18px;
-    height: 18px;
-    border-radius: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
     padding: 1px;
+    flex-shrink: 0;
   }
   .brand-name-text {
-    font-size: 0.72rem;
-    font-weight: 700;
+    font-size: 0.76rem;
+    font-weight: 600;
     white-space: nowrap;
   }
   .models-count-pill {
-    font-size: 0.58rem;
-    padding: 1px 4px;
+    font-size: 0.62rem;
+    padding: 1px 5px;
     border-radius: 9999px;
   }
 
