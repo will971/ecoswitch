@@ -11,3 +11,8 @@ springboot-app/.gradle/
 **/node_modules/
 **/dist/
 **/build/
+**/__pycache__/
+*.pyc
+
+# Local runtime uploads
+**/uploads/
