@@ -6,14 +6,11 @@
         <h2 class="manager-main-title">
           <span>Catalogue Constructeurs & Véhicules</span>
           <span v-if="isAdmin" class="badge badge-teal badge-small">
-            <ShieldCheck size="12" class="mr-1 inline" /> Mode Gestionnaire ({{ currentUser?.email }})
-          </span>
-          <span v-else class="badge badge-subtle badge-small">
-            <Eye size="12" class="mr-1 inline" /> Consultation
+            <ShieldCheck size="12" class="mr-1 inline" /> Mode Gestionnaire
           </span>
         </h2>
         <p class="manager-subtitle hide-on-mobile">
-          Base relationnelle des constructeurs, modèles, motorisations WLTP, finitions et barèmes tarifaires (Achat comptant, LOA, LLD).
+          Base de données des constructeurs, modèles, motorisations WLTP, finitions et barèmes de prix.
         </p>
       </div>
 
@@ -1220,11 +1217,14 @@ onMounted(() => {
 
 /* PANE 1 : Sidebar Marques */
 .brands-sidebar-card {
-  padding: 14px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  max-height: 750px;
+  gap: 12px;
+  position: sticky;
+  top: 24px;
+  height: calc(100vh - 120px);
+  min-height: 500px;
 }
 .sidebar-header {
   display: flex;
@@ -1272,11 +1272,12 @@ onMounted(() => {
 }
 
 .brands-items-list {
+  flex: 1;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding-right: 2px;
+  padding-right: 4px;
 }
 .brand-row-item {
   padding: 8px 10px;
