@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Seed script for EcoSwitch automotive catalog.
-Generates authentic official vector brand logos and vehicle model graphics,
-uploads them via multipart/form-data to /api/v1/uploads/image, and populates the 
-top 20 EV / Hybrid car brands in France with 3+ models per brand, motorisations,
-WLTP consumptions, finitions, and priced variants (Comptant, LOA, LLD).
+EcoSwitch Catalog Seeder — v3.0
+• Logos SVG haute fidélité des marques (géométrie officielle reconstituée)
+• Silhouettes de véhicules vectorielles par catégorie (SUV / Berline / Citadine / Break / Crossover)
+• Multi-threading : uploads et créations d'entités en parallèle (ThreadPoolExecutor)
+• Usage : python3 scripts/seed_catalog.py [local|prod] [--reset]
 """
 
 import sys
@@ -13,1304 +13,1196 @@ import uuid
 import urllib.request
 import urllib.parse
 import urllib.error
+import threading
+import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# ── Configuration ─────────────────────────────────────────────────────────────
 
 ENV_CONFIGS = {
     "local": "http://localhost:8080",
-    "prod": "https://ecoswitch-api.up.railway.app",
-    "production": "https://ecoswitch-api.up.railway.app"
+    "prod":  "https://ecoswitch-api.up.railway.app",
+    "production": "https://ecoswitch-api.up.railway.app",
 }
 
-BASE_URL = ENV_CONFIGS["local"]
-API_BASE = f"{BASE_URL}/api/v1/catalog"
+BASE_URL      = ENV_CONFIGS["local"]
+API_BASE      = f"{BASE_URL}/api/v1/catalog"
 API_UPLOAD_URL = f"{BASE_URL}/api/v1/uploads/image"
+
+UPLOAD_CACHE      = {}
+UPLOAD_CACHE_LOCK = threading.Lock()
+
+MAX_WORKERS_UPLOAD = 6   # uploads en parallèle
+MAX_WORKERS_BRAND  = 4   # marques en parallèle
+
 
 def resolve_target_url(env_or_url=None):
     if not env_or_url:
         return ENV_CONFIGS["local"]
-    target = env_or_url.strip().lower()
-    if target in ENV_CONFIGS:
-        return ENV_CONFIGS[target]
-    if env_or_url.startswith("http://") or env_or_url.startswith("https://"):
+    t = env_or_url.strip().lower()
+    if t in ENV_CONFIGS:
+        return ENV_CONFIGS[t]
+    if env_or_url.startswith("http"):
         return env_or_url.rstrip("/")
     return ENV_CONFIGS["local"]
 
+
 def configure_api_endpoints(base_url):
     global BASE_URL, API_BASE, API_UPLOAD_URL
-    BASE_URL = base_url.rstrip("/")
-    API_BASE = f"{BASE_URL}/api/v1/catalog"
+    BASE_URL       = base_url.rstrip("/")
+    API_BASE       = f"{BASE_URL}/api/v1/catalog"
     API_UPLOAD_URL = f"{BASE_URL}/api/v1/uploads/image"
 
-UPLOAD_CACHE = {}
 
-# ── LOGOS OFFICIELS DES MARQUES EN SVG VECTORIEL HAUTE QUALITÉ ────────────
+# ── HTTP Helpers ───────────────────────────────────────────────────────────────
 
-BRAND_LOGOS_SVG = {
-    "Fiat": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <defs>
-    <radialGradient id="fiatG" cx="50%" cy="35%" r="65%">
-      <stop offset="0%" stop-color="#dc2626"/>
-      <stop offset="100%" stop-color="#7f1d1d"/>
-    </radialGradient>
-  </defs>
-  <circle cx="50" cy="50" r="46" fill="url(#fiatG)" stroke="#e4e4e7" stroke-width="3"/>
-  <circle cx="50" cy="50" r="41" fill="none" stroke="#fca5a5" stroke-width="1.5" opacity="0.6"/>
-  <text x="50" y="58" font-family="-apple-system, BlinkMacSystemFont, Arial, sans-serif" font-size="21" font-weight="900" fill="#ffffff" letter-spacing="3" text-anchor="middle">FIAT</text>
-</svg>''',
+def _http(url, method="GET", data=None, headers=None, timeout=30):
+    req = urllib.request.Request(url, data=data, headers=headers or {}, method=method)
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read().decode("utf-8"))
 
-    "Renault": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" rx="18" fill="#18181b"/>
-  <path d="M50 14 L78 50 L50 86 L22 50 Z" fill="none" stroke="#eab308" stroke-width="6" stroke-linejoin="round"/>
-  <path d="M50 28 L68 50 L50 72 L32 50 Z" fill="none" stroke="#facc15" stroke-width="4" stroke-linejoin="round"/>
-</svg>''',
 
-    "Peugeot": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" rx="18" fill="#0f172a"/>
-  <path d="M50 12 L80 24 L76 72 L50 90 L24 72 L20 24 Z" fill="#1e293b" stroke="#38bdf8" stroke-width="2.5"/>
-  <text x="50" y="28" font-family="-apple-system, sans-serif" font-size="7" font-weight="900" fill="#f8fafc" letter-spacing="2" text-anchor="middle">PEUGEOT</text>
-  <path d="M42 42 C45 36 55 36 58 42 C60 48 56 54 50 56 C46 58 44 64 46 68 L54 68 M46 48 L54 48" fill="none" stroke="#38bdf8" stroke-width="3" stroke-linecap="round"/>
-</svg>''',
+def api_get(endpoint, params=None):
+    url = f"{API_BASE}{endpoint}"
+    if params:
+        url += "?" + urllib.parse.urlencode(params)
+    try:
+        return _http(url, headers={"Accept": "application/json"})
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"GET {url} -> {e.code}: {e.read().decode()}") from e
 
-    "Tesla": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" rx="18" fill="#18181b"/>
-  <path d="M50 32 L50 78 M42 32 C42 45 58 45 58 32 M24 22 C38 27 62 27 76 22 M28 26 C40 31 60 31 72 26" fill="none" stroke="#e11d48" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>''',
 
-    "Dacia": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" rx="18" fill="#14532d"/>
-  <path d="M22 36 L44 36 L52 50 L44 64 L22 64 Z" fill="none" stroke="#facc15" stroke-width="5" stroke-linejoin="round"/>
-  <path d="M78 36 L56 36 L48 50 L56 64 L78 64 Z" fill="none" stroke="#facc15" stroke-width="5" stroke-linejoin="round"/>
-</svg>''',
+def api_post(endpoint, data=None, params=None):
+    url = f"{API_BASE}{endpoint}"
+    if params:
+        url += "?" + urllib.parse.urlencode(params)
+    body = json.dumps(data or {}).encode("utf-8")
+    try:
+        return _http(url, method="POST", data=body, headers={"Content-Type": "application/json"})
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"POST {url} -> {e.code}: {e.read().decode()}") from e
 
-    "Toyota": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" rx="18" fill="#dc2626"/>
-  <ellipse cx="50" cy="50" rx="38" ry="24" fill="none" stroke="#ffffff" stroke-width="4"/>
-  <ellipse cx="50" cy="50" rx="16" ry="24" fill="none" stroke="#ffffff" stroke-width="3.5"/>
-  <ellipse cx="50" cy="38" rx="26" ry="12" fill="none" stroke="#ffffff" stroke-width="3.5"/>
-</svg>''',
 
-    "Volkswagen": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <circle cx="50" cy="50" r="46" fill="#0c4a6e" stroke="#38bdf8" stroke-width="3"/>
-  <circle cx="50" cy="50" r="40" fill="none" stroke="#bae6fd" stroke-width="1.5"/>
-  <path d="M32 30 L44 68 M44 68 L50 52 L56 68 M56 68 L68 30 M38 48 L46 74 M54 74 L62 48" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>''',
+def api_put(endpoint, data=None, params=None):
+    url = f"{API_BASE}{endpoint}"
+    if params:
+        url += "?" + urllib.parse.urlencode(params)
+    body = json.dumps(data or {}).encode("utf-8")
+    try:
+        return _http(url, method="PUT", data=body, headers={"Content-Type": "application/json"})
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"PUT {url} -> {e.code}: {e.read().decode()}") from e
 
-    "Citroën": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" rx="18" fill="#991b1b"/>
-  <path d="M26 38 L50 22 L74 38 L66 46 L50 34 L34 46 Z" fill="#ffffff"/>
-  <path d="M26 62 L50 46 L74 62 L66 70 L50 58 L34 70 Z" fill="#ffffff"/>
-</svg>''',
 
-    "Hyundai": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" rx="18" fill="#0f172a"/>
-  <ellipse cx="50" cy="50" rx="42" ry="28" fill="none" stroke="#0284c7" stroke-width="3.5" transform="rotate(-12 50 50)"/>
-  <path d="M38 34 L34 66 M66 34 L62 66 M35 50 L64 50" fill="none" stroke="#f8fafc" stroke-width="4.5" stroke-linecap="round"/>
-</svg>''',
+def api_delete(endpoint):
+    url = f"{API_BASE}{endpoint}"
+    req = urllib.request.Request(url, method="DELETE")
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return resp.status
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"DELETE {url} -> {e.code}: {e.read().decode()}") from e
 
-    "Kia": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" rx="18" fill="#000000"/>
-  <path d="M20 62 L20 38 M20 50 L34 38 M20 50 L34 62 M44 38 L44 62 M54 62 L54 38 L68 62 L68 38 M80 62 L80 38" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="square" stroke-linejoin="miter"/>
-</svg>''',
 
-    "BMW": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <circle cx="50" cy="50" r="46" fill="#000000" stroke="#94a3b8" stroke-width="3"/>
-  <circle cx="50" cy="50" r="32" fill="#ffffff"/>
-  <path d="M50 18 A32 32 0 0 1 82 50 L50 50 Z" fill="#0284c7"/>
-  <path d="M50 50 L18 50 A32 32 0 0 1 50 18 Z" fill="#ffffff"/>
-  <path d="M50 50 L50 82 A32 32 0 0 1 18 50 Z" fill="#0284c7"/>
-  <path d="M50 50 L82 50 A32 32 0 0 1 50 82 Z" fill="#ffffff"/>
-  <text x="50" y="14" font-family="sans-serif" font-size="8" font-weight="900" fill="#ffffff" letter-spacing="1" text-anchor="middle">BMW</text>
-</svg>''',
-
-    "Mercedes-Benz": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <circle cx="50" cy="50" r="46" fill="#0f172a" stroke="#cbd5e1" stroke-width="3"/>
-  <circle cx="50" cy="50" r="40" fill="none" stroke="#94a3b8" stroke-width="1.5"/>
-  <path d="M50 14 L50 50 L20 68 M50 50 L80 68" fill="none" stroke="#f8fafc" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>
-</svg>''',
-
-    "Audi": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" rx="18" fill="#18181b"/>
-  <circle cx="27" cy="50" r="14" fill="none" stroke="#d4d4d8" stroke-width="3.5"/>
-  <circle cx="42" cy="50" r="14" fill="none" stroke="#d4d4d8" stroke-width="3.5"/>
-  <circle cx="58" cy="50" r="14" fill="none" stroke="#d4d4d8" stroke-width="3.5"/>
-  <circle cx="73" cy="50" r="14" fill="none" stroke="#d4d4d8" stroke-width="3.5"/>
-</svg>''',
-
-    "MG Motor": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <path d="M50 10 L88 28 L88 72 L50 90 L12 72 L12 28 Z" fill="#991b1b" stroke="#f8fafc" stroke-width="3.5"/>
-  <text x="50" y="58" font-family="sans-serif" font-size="28" font-weight="900" fill="#ffffff" letter-spacing="2" text-anchor="middle">MG</text>
-</svg>''',
-
-    "Volvo": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <circle cx="46" cy="54" r="34" fill="#0f172a" stroke="#cbd5e1" stroke-width="4"/>
-  <path d="M70 30 L86 14 M74 14 L86 14 L86 26" fill="none" stroke="#cbd5e1" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  <rect x="20" y="47" width="52" height="14" fill="#1e3a8a"/>
-  <text x="46" y="58" font-family="sans-serif" font-size="9" font-weight="900" fill="#ffffff" letter-spacing="2" text-anchor="middle">VOLVO</text>
-</svg>''',
-
-    "Nissan": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <circle cx="50" cy="50" r="42" fill="#0f172a" stroke="#94a3b8" stroke-width="3.5"/>
-  <rect x="12" y="42" width="76" height="16" fill="#1e293b" stroke="#e2e8f0" stroke-width="2"/>
-  <text x="50" y="54" font-family="sans-serif" font-size="10" font-weight="900" fill="#ffffff" letter-spacing="2" text-anchor="middle">NISSAN</text>
-</svg>''',
-
-    "Skoda": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <circle cx="50" cy="50" r="46" fill="#064e3b" stroke="#34d399" stroke-width="3"/>
-  <circle cx="50" cy="50" r="38" fill="none" stroke="#a7f3d0" stroke-width="1.5"/>
-  <path d="M42 32 C58 26 68 38 68 50 C68 62 58 74 42 68 L50 50 Z" fill="#34d399"/>
-  <circle cx="44" cy="46" r="3" fill="#064e3b"/>
-</svg>''',
-
-    "Cupra": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" rx="18" fill="#18181b"/>
-  <path d="M26 30 L50 56 L74 30 M38 52 L50 68 L62 52 M50 68 L50 82" fill="none" stroke="#d97706" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>''',
-
-    "BYD": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" rx="18" fill="#0f172a"/>
-  <ellipse cx="50" cy="50" rx="44" ry="26" fill="none" stroke="#e2e8f0" stroke-width="3"/>
-  <text x="50" y="56" font-family="sans-serif" font-size="16" font-weight="900" fill="#f8fafc" letter-spacing="3" text-anchor="middle">BYD</text>
-</svg>''',
-
-    "Ford": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <ellipse cx="50" cy="50" rx="46" ry="28" fill="#1e3a8a" stroke="#cbd5e1" stroke-width="3"/>
-  <ellipse cx="50" cy="50" rx="41" ry="23" fill="none" stroke="#93c5fd" stroke-width="1.5"/>
-  <text x="50" y="57" font-family="'Brush Script MT', 'Snell Roundhand', cursive, sans-serif" font-size="26" font-weight="bold" font-style="italic" fill="#ffffff" text-anchor="middle">Ford</text>
-</svg>'''
-}
-
-def generate_model_svg(brand_name, model_name, category="Berline", is_ev=True):
-    """
-    Génère un visuel de véhicule haute définition en SVG vectoriel avec
-    silhouette selon la catégorie (Citadine, SUV, Berline, Break, Crossover)
-    et palette du constructeur.
-    """
-    # Palette de couleur de silhouette
-    color_map = {
-        "Fiat": ("#0284c7", "#38bdf8", "#7f1d1d"),
-        "Renault": ("#eab308", "#fde047", "#18181b"),
-        "Tesla": ("#e11d48", "#fb7185", "#18181b"),
-        "Peugeot": ("#0284c7", "#38bdf8", "#0f172a"),
-        "Dacia": ("#15803d", "#4ade80", "#14532d"),
-        "Toyota": ("#dc2626", "#f87171", "#7f1d1d"),
-        "Volkswagen": ("#0284c7", "#38bdf8", "#0c4a6e"),
-        "Citroën": ("#dc2626", "#f87171", "#991b1b"),
-        "Hyundai": ("#0369a1", "#38bdf8", "#0f172a"),
-        "Kia": ("#475569", "#94a3b8", "#000000"),
-        "BMW": ("#0284c7", "#38bdf8", "#000000"),
-        "Mercedes-Benz": ("#64748b", "#cbd5e1", "#0f172a"),
-        "Audi": ("#475569", "#cbd5e1", "#18181b"),
-        "MG Motor": ("#b91c1c", "#f87171", "#7f1d1d"),
-        "Volvo": ("#1e3a8a", "#60a5fa", "#0f172a"),
-        "Nissan": ("#b91c1c", "#f87171", "#0f172a"),
-        "Skoda": ("#059669", "#34d399", "#064e3b"),
-        "Cupra": ("#d97706", "#fbbf24", "#18181b"),
-        "BYD": ("#0284c7", "#38bdf8", "#0f172a"),
-        "Ford": ("#1d4ed8", "#60a5fa", "#1e3a8a")
-    }
-    c_prim, c_light, c_bg = color_map.get(brand_name, ("#0d9488", "#2dd4bf", "#18181b"))
-
-    # Profil silhouette carrosserie
-    if "SUV" in category or "CUV" in category or "Crossover" in category:
-        body_path = "M 45 115 C 50 85, 75 60, 105 55 L 185 55 C 215 58, 245 78, 255 115 Z"
-        window_path = "M 110 60 L 175 60 C 195 62, 210 75, 215 90 L 98 90 C 102 75, 106 62, 110 60 Z"
-        w_x1, w_x2, w_y = 85, 220, 115
-    elif "Citadine" in category or "Panda" in model_name or "500" in model_name:
-        body_path = "M 55 118 C 60 90, 80 72, 105 68 L 170 68 C 198 72, 230 88, 245 118 Z"
-        window_path = "M 110 72 L 160 72 C 180 75, 192 86, 198 96 L 100 96 C 104 84, 107 74, 110 72 Z"
-        w_x1, w_x2, w_y = 90, 210, 118
-    elif "Break" in category:
-        body_path = "M 40 118 C 45 92, 70 70, 95 65 L 215 65 C 235 70, 255 90, 260 118 Z"
-        window_path = "M 100 70 L 205 70 C 220 74, 228 86, 230 96 L 90 96 C 94 84, 97 74, 100 70 Z"
-        w_x1, w_x2, w_y = 80, 225, 118
-    else: # Berline / Compacte
-        body_path = "M 45 118 C 50 92, 75 68, 105 62 L 180 62 C 215 65, 245 88, 255 118 Z"
-        window_path = "M 110 66 L 170 66 C 192 68, 205 80, 210 94 L 98 94 C 102 82, 106 70, 110 66 Z"
-        w_x1, w_x2, w_y = 85, 220, 118
-
-    fuel_label = "⚡ 100% ÉLEC" if is_ev else "🍃 HYBRIDE"
-    fuel_color = "#34d399" if is_ev else "#38bdf8"
-
-    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 160">
-  <defs>
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#18181b"/>
-      <stop offset="100%" stop-color="#27272a"/>
-    </linearGradient>
-    <linearGradient id="bodyGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="{c_prim}"/>
-      <stop offset="100%" stop-color="{c_light}"/>
-    </linearGradient>
-  </defs>
-  <rect width="300" height="160" rx="14" fill="url(#bgGrad)"/>
-  <line x1="15" y1="125" x2="285" y2="125" stroke="#3f3f46" stroke-width="1.5" stroke-dasharray="6,6"/>
-  
-  <!-- Silhouette Carrosserie -->
-  <path d="{body_path}" fill="url(#bodyGrad)" opacity="0.95"/>
-  <path d="{window_path}" fill="#09090b" opacity="0.85"/>
-  
-  <!-- Roues Stylisées -->
-  <circle cx="{w_x1}" cy="{w_y}" r="17" fill="#09090b" stroke="#71717a" stroke-width="3.5"/>
-  <circle cx="{w_x1}" cy="{w_y}" r="7" fill="#d4d4d8"/>
-  <circle cx="{w_x2}" cy="{w_y}" r="17" fill="#09090b" stroke="#71717a" stroke-width="3.5"/>
-  <circle cx="{w_x2}" cy="{w_y}" r="7" fill="#d4d4d8"/>
-
-  <!-- Badge Modèle -->
-  <rect x="14" y="12" width="110" height="20" rx="5" fill="{c_bg}"/>
-  <text x="69" y="26" font-family="-apple-system, BlinkMacSystemFont, Arial, sans-serif" font-size="10" font-weight="900" fill="#ffffff" text-anchor="middle">{brand_name} {model_name[:10]}</text>
-  
-  <!-- Badge Énergie -->
-  <rect x="212" y="12" width="74" height="20" rx="10" fill="rgba(0, 0, 0, 0.4)" stroke="{fuel_color}" stroke-width="1"/>
-  <text x="249" y="26" font-family="sans-serif" font-size="9" font-weight="700" fill="{fuel_color}" text-anchor="middle">{fuel_label}</text>
-  
-  <text x="150" y="148" font-family="sans-serif" font-size="10" font-weight="600" fill="#a1a1aa" text-anchor="middle">{brand_name} {model_name} • {category}</text>
-</svg>'''
-
-def upload_image_bytes(svg_content, filename, folder="brands"):
-    """
-    Téléverse le SVG généré ou l'image vers l'API REST
-    """
+def upload_svg(svg_content: str, filename: str, folder: str = "brands") -> str:
+    """Upload un SVG via multipart/form-data. Cache thread-safe."""
     cache_key = f"{folder}:{filename}"
-    if cache_key in UPLOAD_CACHE:
-        return UPLOAD_CACHE[cache_key]
+    with UPLOAD_CACHE_LOCK:
+        if cache_key in UPLOAD_CACHE:
+            return UPLOAD_CACHE[cache_key]
 
-    boundary = f"----WebKitBoundary{uuid.uuid4().hex}"
+    boundary = f"----Boundary{uuid.uuid4().hex}"
+    data     = svg_content.encode("utf-8")
+    safe_fn  = filename if filename.endswith(".svg") else f"{filename}.svg"
+
     body = bytearray()
-    
-    data = svg_content.encode("utf-8") if isinstance(svg_content, str) else svg_content
-    safe_filename = f"{filename}.svg" if not filename.endswith(".svg") else filename
-
-    body.extend(f"--{boundary}\r\n".encode("utf-8"))
-    body.extend(f'Content-Disposition: form-data; name="file"; filename="{safe_filename}"\r\n'.encode("utf-8"))
-    body.extend(b'Content-Type: image/svg+xml\r\n\r\n')
-    body.extend(data)
-    body.extend(b"\r\n")
-    body.extend(f"--{boundary}--\r\n".encode("utf-8"))
+    body += f"--{boundary}\r\n".encode()
+    body += f'Content-Disposition: form-data; name="file"; filename="{safe_fn}"\r\n'.encode()
+    body += b"Content-Type: image/svg+xml\r\n\r\n"
+    body += data
+    body += b"\r\n"
+    body += f"--{boundary}--\r\n".encode()
 
     req = urllib.request.Request(
         f"{API_UPLOAD_URL}?folder={folder}",
         data=bytes(body),
         headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
-        method="POST"
+        method="POST",
     )
-
     try:
-        with urllib.request.urlopen(req) as resp:
-            res_json = json.loads(resp.read().decode("utf-8"))
-            url = res_json.get("url", "")
-            UPLOAD_CACHE[cache_key] = url
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            url = json.loads(resp.read().decode()).get("url", "")
+            with UPLOAD_CACHE_LOCK:
+                UPLOAD_CACHE[cache_key] = url
             return url
     except Exception as ex:
-        print(f"        [!] Erreur lors de l'upload de {safe_filename} : {ex}", file=sys.stderr)
+        print(f"  [!] Upload {safe_fn} failed: {ex}", file=sys.stderr)
         return ""
 
-def api_post(endpoint, data=None, params=None):
-    url = f"{API_BASE}{endpoint}"
-    if params:
-        query_string = urllib.parse.urlencode(params)
-        url += f"?{query_string}"
-    
-    headers = {"Content-Type": "application/json"}
-    body = json.dumps(data).encode("utf-8") if data is not None else b"{}"
-    
-    req = urllib.request.Request(url, data=body, headers=headers, method="POST")
-    try:
-        with urllib.request.urlopen(req) as resp:
-            return json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        err_msg = e.read().decode("utf-8")
-        print(f"[HTTP {e.code}] Error on {url}: {err_msg}", file=sys.stderr)
-        raise
 
-def api_get(endpoint, params=None):
-    url = f"{API_BASE}{endpoint}"
-    if params:
-        query_string = urllib.parse.urlencode(params)
-        url += f"?{query_string}"
-    
-    req = urllib.request.Request(url, headers={"Accept": "application/json"}, method="GET")
-    try:
-        with urllib.request.urlopen(req) as resp:
-            return json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        err_msg = e.read().decode("utf-8")
-        print(f"[HTTP {e.code}] Error on {url}: {err_msg}", file=sys.stderr)
-        raise
-    
-def api_put(endpoint, data=None, params=None):
-    url = f"{API_BASE}{endpoint}"
-    if params:
-        query_string = urllib.parse.urlencode(params)
-        url += f"?{query_string}"
-    
-    headers = {"Content-Type": "application/json"}
-    body = json.dumps(data).encode("utf-8") if data is not None else b"{}"
-    
-    req = urllib.request.Request(url, data=body, headers=headers, method="PUT")
-    try:
-        with urllib.request.urlopen(req) as resp:
-            return json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        err_msg = e.read().decode("utf-8")
-        print(f"[HTTP {e.code}] Error on {url}: {err_msg}", file=sys.stderr)
-        raise
+# ── Logos SVG haute fidelite ──────────────────────────────────────────────────
+# Chaque logo reconstruit fidelement la geometrie officielle en 100x100 px.
 
-def api_delete(endpoint, params=None):
-    url = f"{API_BASE}{endpoint}"
-    if params:
-        query_string = urllib.parse.urlencode(params)
-        url += f"?{query_string}"
-    
-    req = urllib.request.Request(url, method="DELETE")
-    try:
-        with urllib.request.urlopen(req) as resp:
-            return resp.status
-    except urllib.error.HTTPError as e:
-        err_msg = e.read().decode("utf-8")
-        print(f"[HTTP {e.code}] Error on DELETE {url}: {err_msg}", file=sys.stderr)
-        raise
+BRAND_LOGOS_SVG = {
+
+    "Renault": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" fill="#FCD000"/>
+  <polygon points="50,8 82,50 50,92 18,50" fill="none" stroke="#1A1A1A" stroke-width="7" stroke-linejoin="round"/>
+  <polygon points="50,22 70,50 50,78 30,50" fill="#1A1A1A"/>
+</svg>''',
+
+    "Peugeot": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" fill="#002D72"/>
+  <path d="M50 12 C50 12 72 20 72 38 C72 64 60 80 50 88 C40 80 28 64 28 38 C28 20 50 12 50 12 Z" fill="none" stroke="#FFFFFF" stroke-width="3.5"/>
+  <ellipse cx="50" cy="22" rx="12" ry="9" fill="#FFFFFF"/>
+  <path d="M40 30 L40 62 M60 30 L60 62" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" fill="none"/>
+  <path d="M40 46 C44 40 56 40 60 46" fill="none" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M40 62 L38 76 L44 76 M60 62 L58 76 L64 76" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>
+</svg>''',
+
+    "Tesla": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" fill="#CC0000"/>
+  <path d="M50 26 L50 78" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round"/>
+  <path d="M26 22 C38 28 62 28 74 22" fill="none" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round"/>
+  <path d="M16 16 C24 20 38 28 42 26" fill="none" stroke="#FFFFFF" stroke-width="5.5" stroke-linecap="round"/>
+  <path d="M84 16 C76 20 62 28 58 26" fill="none" stroke="#FFFFFF" stroke-width="5.5" stroke-linecap="round"/>
+</svg>''',
+
+    "Dacia": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" fill="#1D3461"/>
+  <path d="M18 22 L50 22 L50 78 L18 78 Z" fill="#FFFFFF"/>
+  <path d="M50 22 L78 22 L50 50 L78 78 L50 78 Z" fill="#FFFFFF"/>
+  <path d="M24 28 L44 28 L44 72 L24 72 Z" fill="#1D3461"/>
+  <path d="M50 28 L66 50 L50 72 Z" fill="#1D3461"/>
+</svg>''',
+
+    "Toyota": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" fill="#EB0A1E"/>
+  <ellipse cx="50" cy="55" rx="42" ry="26" fill="none" stroke="#FFFFFF" stroke-width="5"/>
+  <ellipse cx="50" cy="55" rx="18" ry="26" fill="none" stroke="#FFFFFF" stroke-width="5"/>
+  <ellipse cx="50" cy="30" rx="28" ry="13" fill="none" stroke="#FFFFFF" stroke-width="4"/>
+</svg>''',
+
+    "Volkswagen": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <circle cx="50" cy="50" r="50" fill="#001E50"/>
+  <circle cx="50" cy="50" r="42" fill="none" stroke="#FFFFFF" stroke-width="2"/>
+  <path d="M28 28 L40 62 L50 40 L60 62 L72 28" fill="none" stroke="#FFFFFF" stroke-width="5.5" stroke-linejoin="round" stroke-linecap="round"/>
+  <line x1="36" y1="48" x2="64" y2="48" stroke="#FFFFFF" stroke-width="2"/>
+</svg>''',
+
+    "Citroen": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" fill="#C51C22"/>
+  <path d="M20 34 L50 18 L80 34 L70 42 L50 30 L30 42 Z" fill="#FFFFFF"/>
+  <path d="M20 58 L50 42 L80 58 L70 66 L50 54 L30 66 Z" fill="#FFFFFF"/>
+</svg>''',
+
+    "Citroen_accent": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" fill="#C51C22"/>
+  <path d="M20 34 L50 18 L80 34 L70 42 L50 30 L30 42 Z" fill="#FFFFFF"/>
+  <path d="M20 58 L50 42 L80 58 L70 66 L50 54 L30 66 Z" fill="#FFFFFF"/>
+</svg>''',
+
+    "Hyundai": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" fill="#002C5F"/>
+  <ellipse cx="50" cy="50" rx="46" ry="30" fill="none" stroke="#FFFFFF" stroke-width="4" transform="rotate(-12 50 50)"/>
+  <text x="50" y="57" font-family="Arial Black, sans-serif" font-size="38" font-weight="900" fill="#FFFFFF" text-anchor="middle">H</text>
+</svg>''',
+
+    "Kia": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" fill="#05141F"/>
+  <ellipse cx="50" cy="50" rx="46" ry="28" fill="none" stroke="#FFFFFF" stroke-width="3"/>
+  <text x="50" y="58" font-family="Arial Narrow, Arial, sans-serif" font-size="22" font-weight="900" fill="#FFFFFF" letter-spacing="5" text-anchor="middle">KIA</text>
+</svg>''',
+
+    "BMW": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <circle cx="50" cy="50" r="48" fill="#000000" stroke="#8A8D8F" stroke-width="2"/>
+  <circle cx="50" cy="50" r="36" fill="#FFFFFF"/>
+  <path d="M50 14 A36 36 0 0 1 86 50 L50 50 Z" fill="#1C6CB4"/>
+  <path d="M50 50 L14 50 A36 36 0 0 1 50 14 Z" fill="#FFFFFF"/>
+  <path d="M50 50 L50 86 A36 36 0 0 1 14 50 Z" fill="#1C6CB4"/>
+  <path d="M50 50 L86 50 A36 36 0 0 1 50 86 Z" fill="#FFFFFF"/>
+  <circle cx="50" cy="50" r="36" fill="none" stroke="#8A8D8F" stroke-width="1.5"/>
+  <text x="50" y="12" font-family="sans-serif" font-size="8" font-weight="bold" fill="#FFFFFF" text-anchor="middle" letter-spacing="1">BMW</text>
+</svg>''',
+
+    "Mercedes-Benz": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <circle cx="50" cy="50" r="48" fill="#1A1A1A" stroke="#C0C0C0" stroke-width="2"/>
+  <circle cx="50" cy="50" r="40" fill="none" stroke="#9B9B9B" stroke-width="1.5"/>
+  <line x1="50" y1="12" x2="50" y2="50" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
+  <line x1="50" y1="50" x2="17" y2="70" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
+  <line x1="50" y1="50" x2="83" y2="70" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="50" cy="50" r="5" fill="#FFFFFF"/>
+</svg>''',
+
+    "Audi": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" fill="#1A1A1A"/>
+  <circle cx="19" cy="50" r="14" fill="none" stroke="#FFFFFF" stroke-width="4"/>
+  <circle cx="37" cy="50" r="14" fill="none" stroke="#FFFFFF" stroke-width="4"/>
+  <circle cx="63" cy="50" r="14" fill="none" stroke="#FFFFFF" stroke-width="4"/>
+  <circle cx="81" cy="50" r="14" fill="none" stroke="#FFFFFF" stroke-width="4"/>
+</svg>''',
+
+    "MG Motor": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" fill="#B41A24"/>
+  <polygon points="50,5 82,18 95,50 82,82 50,95 18,82 5,50 18,18" fill="none" stroke="#FFFFFF" stroke-width="4"/>
+  <text x="50" y="62" font-family="Arial Black, sans-serif" font-size="32" font-weight="900" fill="#FFFFFF" text-anchor="middle">MG</text>
+</svg>''',
+
+    "Volvo": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" fill="#003057"/>
+  <circle cx="44" cy="56" r="32" fill="none" stroke="#FFFFFF" stroke-width="5"/>
+  <line x1="66" y1="34" x2="88" y2="12" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round"/>
+  <polygon points="88,12 74,12 88,26" fill="#FFFFFF"/>
+  <line x1="15" y1="56" x2="73" y2="56" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round"/>
+</svg>''',
+
+    "Nissan": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" fill="#C71F28"/>
+  <circle cx="50" cy="50" r="44" fill="none" stroke="#FFFFFF" stroke-width="4"/>
+  <rect x="6" y="41" width="88" height="18" fill="#C71F28"/>
+  <rect x="6" y="41" width="88" height="18" fill="none" stroke="#FFFFFF" stroke-width="3"/>
+  <text x="50" y="56" font-family="Arial Narrow, Arial, sans-serif" font-size="13" font-weight="900" fill="#FFFFFF" letter-spacing="2" text-anchor="middle">NISSAN</text>
+</svg>''',
+
+    "Skoda": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <circle cx="50" cy="50" r="50" fill="#4BA82E"/>
+  <circle cx="50" cy="50" r="42" fill="#1A1A1A"/>
+  <path d="M30 30 C50 20 72 36 72 50 C72 64 50 72 38 62 L50 50 Z" fill="#4BA82E"/>
+  <circle cx="44" cy="41" r="4" fill="#1A1A1A"/>
+</svg>''',
+
+    "Cupra": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" fill="#0A0A0A"/>
+  <polygon points="50,10 88,32 88,68 50,90 12,68 12,32" fill="none" stroke="#C7832A" stroke-width="4"/>
+  <path d="M30 35 L70 35 L50 70 Z" fill="none" stroke="#C7832A" stroke-width="3"/>
+  <text x="50" y="55" font-family="Arial Black, sans-serif" font-size="12" font-weight="900" fill="#C7832A" letter-spacing="2" text-anchor="middle">CUPRA</text>
+</svg>''',
+
+    "BYD": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" fill="#1A1A2E"/>
+  <ellipse cx="50" cy="50" rx="46" ry="28" fill="none" stroke="#E8E8E8" stroke-width="3.5"/>
+  <text x="50" y="57" font-family="Arial Black, sans-serif" font-size="22" font-weight="900" fill="#E8E8E8" letter-spacing="4" text-anchor="middle">BYD</text>
+</svg>''',
+
+    "Ford": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" fill="#003776"/>
+  <ellipse cx="50" cy="50" rx="46" ry="30" fill="#003776" stroke="#FFFFFF" stroke-width="3.5"/>
+  <ellipse cx="50" cy="50" rx="40" ry="24" fill="none" stroke="#6AABFF" stroke-width="1.5"/>
+  <text x="50" y="59" font-family="Times New Roman, Georgia, serif" font-size="28" font-weight="bold" font-style="italic" fill="#FFFFFF" text-anchor="middle">Ford</text>
+</svg>''',
+
+    "Fiat": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" rx="50" fill="#CC2222"/>
+  <path d="M50 12 C50 12 72 20 72 38 C72 64 60 80 50 88 C40 80 28 64 28 38 C28 20 50 12 50 12 Z" fill="none" stroke="#FFFFFF" stroke-width="3.5"/>
+  <text x="50" y="60" font-family="Arial Black, sans-serif" font-size="20" font-weight="900" fill="#FFFFFF" letter-spacing="3" text-anchor="middle">FIAT</text>
+</svg>''',
+}
+
+# Alias pour les marques avec caracteres speciaux
+BRAND_LOGOS_SVG["Citroën"] = BRAND_LOGOS_SVG["Citroen"]
+
+
+# ── Palette de couleurs par marque ────────────────────────────────────────────
+
+def _brand_colors(brand_name):
+    palette = {
+        "Renault":       ("#FCD000", "#FFE55A", "#1A1A1A"),
+        "Peugeot":       ("#002D72", "#3E6DB4", "#F0F0F0"),
+        "Tesla":         ("#CC0000", "#FF4444", "#1A1A1A"),
+        "Dacia":         ("#1D3461", "#2A4A8A", "#F0F0F0"),
+        "Toyota":        ("#EB0A1E", "#FF4455", "#1A1A1A"),
+        "Volkswagen":    ("#001E50", "#1E4DB4", "#FFFFFF"),
+        "Citroën":       ("#C51C22", "#E83238", "#FFFFFF"),
+        "Hyundai":       ("#002C5F", "#1A5EA8", "#F8F8F8"),
+        "Kia":           ("#05141F", "#0A2840", "#E8E8E8"),
+        "BMW":           ("#1C6CB4", "#3E8FDB", "#F8F8F8"),
+        "Mercedes-Benz": ("#2A2A2A", "#555555", "#C0C0C0"),
+        "Audi":          ("#1A1A1A", "#404040", "#E8E8E8"),
+        "MG Motor":      ("#B41A24", "#D93040", "#F8F8F8"),
+        "Volvo":         ("#003057", "#005093", "#F0F0F0"),
+        "Nissan":        ("#C71F28", "#E03040", "#FFFFFF"),
+        "Skoda":         ("#4BA82E", "#68C948", "#1A1A1A"),
+        "Cupra":         ("#C7832A", "#E09A40", "#0A0A0A"),
+        "BYD":           ("#1A3C8C", "#2E5EC8", "#E8E8E8"),
+        "Ford":          ("#003776", "#1A5BA8", "#FFFFFF"),
+        "Fiat":          ("#CC2222", "#E03838", "#FFFFFF"),
+    }
+    return palette.get(brand_name, ("#0D9488", "#2DD4BF", "#F8F8F8"))
+
+
+# ── Generateur de silhouettes de vehicules SVG ────────────────────────────────
+
+def generate_model_svg(brand_name, model_name, category="Berline", fuel_type="ELECTRIC"):
+    """
+    Genere une silhouette SVG vectorielle reconnaissable par categorie.
+    Viewbox 320x160.
+    """
+    c1, c2, c_text = _brand_colors(brand_name)
+    is_ev     = fuel_type == "ELECTRIC"
+    is_hybrid = "HYBRID" in fuel_type
+
+    if is_ev:
+        badge_color, badge_text = "#22C55E", "ELECTRIQUE"
+    elif is_hybrid:
+        badge_color, badge_text = "#38BDF8", "HYBRIDE"
+    else:
+        badge_color, badge_text = "#F59E0B", "THERMIQUE"
+
+    cat = (category or "").upper()
+
+    if "SUV" in cat or "CUV" in cat or "CROSSOVER" in cat:
+        body   = "M 36 130 L 36 78 C 36 68 44 58 60 54 L 80 48 L 230 48 L 256 56 C 272 62 284 74 284 86 L 284 130 Z"
+        window = "M 76 54 L 94 58 L 212 58 L 238 60 L 250 82 L 76 82 Z"
+        w1x, w2x, wy, wr = 82, 248, 130, 20
+        hood   = "M 54 86 L 284 86"
+    elif "BERLINE" in cat or "COMPACTE" in cat:
+        body   = "M 36 130 L 36 88 C 38 74 54 60 78 54 L 108 46 L 198 46 L 230 52 C 258 58 284 76 284 92 L 284 130 Z"
+        window = "M 88 54 L 106 50 L 190 50 L 218 56 L 232 78 L 86 78 Z"
+        w1x, w2x, wy, wr = 84, 248, 130, 19
+        hood   = "M 52 84 L 284 84"
+    elif "CITADINE" in cat:
+        body   = "M 40 130 L 40 84 C 42 70 58 58 82 54 L 104 48 L 200 48 L 224 54 C 256 62 278 78 278 92 L 278 130 Z"
+        window = "M 90 56 L 108 50 L 194 50 L 216 58 L 224 80 L 88 80 Z"
+        w1x, w2x, wy, wr = 86, 240, 130, 19
+        hood   = "M 58 86 L 278 86"
+    elif "BREAK" in cat:
+        body   = "M 30 130 L 30 82 C 32 68 48 56 76 52 L 100 46 L 240 46 L 280 52 L 290 78 L 290 130 Z"
+        window = "M 84 54 L 100 50 L 232 50 L 270 56 L 270 78 L 82 78 Z"
+        w1x, w2x, wy, wr = 82, 254, 130, 19
+        hood   = "M 50 82 L 290 82"
+    else:
+        # Berline par defaut
+        body   = "M 36 130 L 36 88 C 38 74 54 60 78 54 L 108 46 L 198 46 L 230 52 C 258 58 284 76 284 92 L 284 130 Z"
+        window = "M 88 54 L 106 50 L 190 50 L 218 56 L 232 78 L 86 78 Z"
+        w1x, w2x, wy, wr = 84, 248, 130, 19
+        hood   = "M 52 84 L 284 84"
+
+    label = f"{brand_name} {model_name[:12]}"
+
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 160">
+  <defs>
+    <linearGradient id="bg{w1x}" x1="0" y1="0" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#16181C"/>
+      <stop offset="100%" stop-color="#1E2028"/>
+    </linearGradient>
+    <linearGradient id="body{w1x}" x1="0" y1="0" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="{c1}"/>
+      <stop offset="60%" stop-color="{c1}" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="{c2}" stop-opacity="0.7"/>
+    </linearGradient>
+    <linearGradient id="glass{w1x}" x1="0" y1="0" x2="0" y2="100%">
+      <stop offset="0%" stop-color="#60A5FA" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#1E40AF" stop-opacity="0.4"/>
+    </linearGradient>
+    <filter id="sha{w1x}">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <rect width="320" height="160" rx="12" fill="url(#bg{w1x})"/>
+  <line x1="20" y1="134" x2="300" y2="134" stroke="#2D3748" stroke-width="1.5" stroke-dasharray="8,6"/>
+  <ellipse cx="160" cy="136" rx="120" ry="8" fill="#000000" opacity="0.35"/>
+  <path d="{body}" fill="url(#body{w1x})" filter="url(#sha{w1x})"/>
+  <path d="{hood}" stroke="{c2}" stroke-width="1.5" stroke-opacity="0.6" fill="none"/>
+  <path d="{window}" fill="url(#glass{w1x})" opacity="0.85"/>
+  <line x1="160" y1="50" x2="160" y2="80" stroke="#0A1628" stroke-width="2.5"/>
+  <circle cx="{w1x}" cy="{wy}" r="{wr}" fill="#111318" stroke="#4A5568" stroke-width="3"/>
+  <circle cx="{w1x}" cy="{wy}" r="{wr - 6}" fill="none" stroke="#2D3748" stroke-width="1.5"/>
+  <circle cx="{w1x}" cy="{wy}" r="{wr // 2}" fill="#2D3748"/>
+  <circle cx="{w1x}" cy="{wy}" r="4" fill="{c2}"/>
+  <circle cx="{w2x}" cy="{wy}" r="{wr}" fill="#111318" stroke="#4A5568" stroke-width="3"/>
+  <circle cx="{w2x}" cy="{wy}" r="{wr - 6}" fill="none" stroke="#2D3748" stroke-width="1.5"/>
+  <circle cx="{w2x}" cy="{wy}" r="{wr // 2}" fill="#2D3748"/>
+  <circle cx="{w2x}" cy="{wy}" r="4" fill="{c2}"/>
+  <ellipse cx="{w1x + wr + 8}" cy="100" rx="6" ry="4" fill="#FEFCBF" opacity="0.85"/>
+  <ellipse cx="{w1x + wr + 4}" cy="100" rx="3" ry="2" fill="#FFFFFF"/>
+  <ellipse cx="{w2x - wr - 6}" cy="100" rx="6" ry="4" fill="#FF3B30" opacity="0.8"/>
+  <rect x="10" y="10" width="130" height="22" rx="5" fill="#000000" fill-opacity="0.55"/>
+  <text x="75" y="25" font-family="-apple-system,Arial,sans-serif" font-size="11" font-weight="800" fill="{c_text}" text-anchor="middle">{label}</text>
+  <rect x="210" y="10" width="100" height="22" rx="11" fill="rgba(0,0,0,0.55)" stroke="{badge_color}" stroke-width="1.5"/>
+  <text x="260" y="25" font-family="sans-serif" font-size="9.5" font-weight="700" fill="{badge_color}" text-anchor="middle">{badge_text}</text>
+  <text x="160" y="152" font-family="sans-serif" font-size="9" fill="#6B7280" text-anchor="middle">{category.upper()}</text>
+</svg>'''
+
+
+# ── Donnees du catalogue ──────────────────────────────────────────────────────
 
 CATALOG_DATA = [
     # 1. RENAULT
-    {
-        "brand": "Renault",
-        "models": [
-            {
-                "name": "Megane E-Tech",
-                "category": "Compacte",
-                "motorisations": [
-                    {"name": "EV40 Boost Charge 130 ch", "fuelType": "ELECTRIC", "consumptionWltp": 15.4, "powerHp": 130, "batteryCapacityKwh": 40.0},
-                    {"name": "EV60 Optimum Charge 220 ch", "fuelType": "ELECTRIC", "consumptionWltp": 16.1, "powerHp": 220, "batteryCapacityKwh": 60.0}
-                ],
-                "finitions": ["Equilibre", "Techno", "Iconic"],
-                "variants": [
-                    {"finition": "Equilibre", "motorisation": "EV40 Boost Charge 130 ch", "price": 34000.0, "loa": 260.0, "lld": 240.0, "insurance": 650.0, "maintenance": 250.0, "resale": 16000.0},
-                    {"finition": "Techno", "motorisation": "EV60 Optimum Charge 220 ch", "price": 40000.0, "loa": 310.0, "lld": 290.0, "insurance": 720.0, "maintenance": 260.0, "resale": 19500.0},
-                    {"finition": "Iconic", "motorisation": "EV60 Optimum Charge 220 ch", "price": 43000.0, "loa": 345.0, "lld": 320.0, "insurance": 760.0, "maintenance": 270.0, "resale": 21000.0}
-                ]
-            },
-            {
-                "name": "Scenic E-Tech",
-                "category": "SUV",
-                "motorisations": [
-                    {"name": "Autonomie Confort 170 ch", "fuelType": "ELECTRIC", "consumptionWltp": 16.3, "powerHp": 170, "batteryCapacityKwh": 60.0},
-                    {"name": "Grande Autonomie 220 ch", "fuelType": "ELECTRIC", "consumptionWltp": 16.8, "powerHp": 220, "batteryCapacityKwh": 87.0}
-                ],
-                "finitions": ["Evolution", "Techno", "Esprit Alpine", "Iconic"],
-                "variants": [
-                    {"finition": "Evolution", "motorisation": "Autonomie Confort 170 ch", "price": 39990.0, "loa": 320.0, "lld": 300.0, "insurance": 700.0, "maintenance": 260.0, "resale": 19000.0},
-                    {"finition": "Techno", "motorisation": "Grande Autonomie 220 ch", "price": 46990.0, "loa": 390.0, "lld": 370.0, "insurance": 780.0, "maintenance": 280.0, "resale": 23000.0},
-                    {"finition": "Esprit Alpine", "motorisation": "Grande Autonomie 220 ch", "price": 49490.0, "loa": 420.0, "lld": 395.0, "insurance": 810.0, "maintenance": 290.0, "resale": 24500.0},
-                    {"finition": "Iconic", "motorisation": "Grande Autonomie 220 ch", "price": 52490.0, "loa": 450.0, "lld": 425.0, "insurance": 850.0, "maintenance": 300.0, "resale": 26000.0}
-                ]
-            },
-            {
-                "name": "R5 E-Tech",
-                "category": "Citadine",
-                "motorisations": [
-                    {"name": "Autonomie Urbaine 120 ch", "fuelType": "ELECTRIC", "consumptionWltp": 14.8, "powerHp": 120, "batteryCapacityKwh": 40.0},
-                    {"name": "Autonomie Confort 150 ch", "fuelType": "ELECTRIC", "consumptionWltp": 15.2, "powerHp": 150, "batteryCapacityKwh": 52.0}
-                ],
-                "finitions": ["Evolution", "Techno", "Iconic Cinq"],
-                "variants": [
-                    {"finition": "Evolution", "motorisation": "Autonomie Urbaine 120 ch", "price": 25000.0, "loa": 180.0, "lld": 165.0, "insurance": 520.0, "maintenance": 200.0, "resale": 13000.0},
-                    {"finition": "Techno", "motorisation": "Autonomie Confort 150 ch", "price": 31490.0, "loa": 240.0, "lld": 220.0, "insurance": 580.0, "maintenance": 220.0, "resale": 16500.0},
-                    {"finition": "Iconic Cinq", "motorisation": "Autonomie Confort 150 ch", "price": 33490.0, "loa": 265.0, "lld": 245.0, "insurance": 610.0, "maintenance": 230.0, "resale": 17800.0}
-                ]
-            },
-            {
-                "name": "Clio E-Tech Hybrid",
-                "category": "Citadine",
-                "motorisations": [
-                    {"name": "E-Tech Full Hybrid 145", "fuelType": "HYBRID", "consumptionWltp": 4.2, "powerHp": 145, "batteryCapacityKwh": 1.2}
-                ],
-                "finitions": ["Evolution", "Techno", "Esprit Alpine"],
-                "variants": [
-                    {"finition": "Evolution", "motorisation": "E-Tech Full Hybrid 145", "price": 23800.0, "loa": 185.0, "lld": 170.0, "insurance": 550.0, "maintenance": 360.0, "resale": 12000.0},
-                    {"finition": "Techno", "motorisation": "E-Tech Full Hybrid 145", "price": 25800.0, "loa": 210.0, "lld": 195.0, "insurance": 580.0, "maintenance": 370.0, "resale": 13500.0},
-                    {"finition": "Esprit Alpine", "motorisation": "E-Tech Full Hybrid 145", "price": 27600.0, "loa": 235.0, "lld": 215.0, "insurance": 610.0, "maintenance": 380.0, "resale": 14500.0}
-                ]
-            }
-        ]
-    },
+    {"brand": "Renault", "models": [
+        {"name": "Megane E-Tech", "category": "Compacte",
+         "motorisations": [
+             {"name": "EV40 Boost Charge 130 ch", "fuelType": "ELECTRIC", "consumptionWltp": 15.4, "powerHp": 130, "batteryCapacityKwh": 40.0},
+             {"name": "EV60 Optimum Charge 220 ch", "fuelType": "ELECTRIC", "consumptionWltp": 16.1, "powerHp": 220, "batteryCapacityKwh": 60.0},
+         ],
+         "finitions": ["Equilibre", "Techno", "Iconic"],
+         "variants": [
+             {"finition": "Equilibre", "motorisation": "EV40 Boost Charge 130 ch",  "price": 34000, "loa": 260, "lld": 240, "insurance": 650, "maintenance": 250, "resale": 16000},
+             {"finition": "Techno",    "motorisation": "EV60 Optimum Charge 220 ch", "price": 40000, "loa": 310, "lld": 290, "insurance": 720, "maintenance": 260, "resale": 19500},
+             {"finition": "Iconic",    "motorisation": "EV60 Optimum Charge 220 ch", "price": 43000, "loa": 345, "lld": 320, "insurance": 760, "maintenance": 270, "resale": 21000},
+         ]},
+        {"name": "Scenic E-Tech", "category": "SUV",
+         "motorisations": [
+             {"name": "Autonomie Confort 170 ch",  "fuelType": "ELECTRIC", "consumptionWltp": 16.3, "powerHp": 170, "batteryCapacityKwh": 60.0},
+             {"name": "Grande Autonomie 220 ch",   "fuelType": "ELECTRIC", "consumptionWltp": 16.8, "powerHp": 220, "batteryCapacityKwh": 87.0},
+         ],
+         "finitions": ["Evolution", "Techno", "Esprit Alpine", "Iconic"],
+         "variants": [
+             {"finition": "Evolution",     "motorisation": "Autonomie Confort 170 ch", "price": 39990, "loa": 320, "lld": 300, "insurance": 700, "maintenance": 260, "resale": 19000},
+             {"finition": "Techno",        "motorisation": "Grande Autonomie 220 ch",  "price": 46990, "loa": 390, "lld": 370, "insurance": 780, "maintenance": 280, "resale": 23000},
+             {"finition": "Esprit Alpine", "motorisation": "Grande Autonomie 220 ch",  "price": 49490, "loa": 420, "lld": 395, "insurance": 810, "maintenance": 290, "resale": 24500},
+             {"finition": "Iconic",        "motorisation": "Grande Autonomie 220 ch",  "price": 52490, "loa": 450, "lld": 425, "insurance": 850, "maintenance": 300, "resale": 26000},
+         ]},
+        {"name": "R5 E-Tech", "category": "Citadine",
+         "motorisations": [
+             {"name": "Autonomie Urbaine 120 ch",  "fuelType": "ELECTRIC", "consumptionWltp": 14.8, "powerHp": 120, "batteryCapacityKwh": 40.0},
+             {"name": "Autonomie Confort 150 ch",  "fuelType": "ELECTRIC", "consumptionWltp": 15.2, "powerHp": 150, "batteryCapacityKwh": 52.0},
+         ],
+         "finitions": ["Evolution", "Techno", "Iconic Cinq"],
+         "variants": [
+             {"finition": "Evolution",   "motorisation": "Autonomie Urbaine 120 ch", "price": 25000, "loa": 180, "lld": 165, "insurance": 520, "maintenance": 200, "resale": 13000},
+             {"finition": "Techno",      "motorisation": "Autonomie Confort 150 ch", "price": 31490, "loa": 240, "lld": 220, "insurance": 580, "maintenance": 220, "resale": 16500},
+             {"finition": "Iconic Cinq", "motorisation": "Autonomie Confort 150 ch", "price": 33490, "loa": 265, "lld": 245, "insurance": 610, "maintenance": 230, "resale": 17800},
+         ]},
+        {"name": "Clio E-Tech Hybrid", "category": "Citadine",
+         "motorisations": [
+             {"name": "E-Tech Full Hybrid 145", "fuelType": "HYBRID", "consumptionWltp": 4.2, "powerHp": 145, "batteryCapacityKwh": 1.2},
+         ],
+         "finitions": ["Evolution", "Techno", "Esprit Alpine"],
+         "variants": [
+             {"finition": "Evolution",     "motorisation": "E-Tech Full Hybrid 145", "price": 23800, "loa": 185, "lld": 170, "insurance": 550, "maintenance": 360, "resale": 12000},
+             {"finition": "Techno",        "motorisation": "E-Tech Full Hybrid 145", "price": 25800, "loa": 210, "lld": 195, "insurance": 580, "maintenance": 370, "resale": 13500},
+             {"finition": "Esprit Alpine", "motorisation": "E-Tech Full Hybrid 145", "price": 27600, "loa": 235, "lld": 215, "insurance": 610, "maintenance": 380, "resale": 14500},
+         ]},
+    ]},
 
     # 2. PEUGEOT
-    {
-        "brand": "Peugeot",
-        "models": [
-            {
-                "name": "e-208",
-                "category": "Citadine",
-                "motorisations": [
-                    {"name": "Électrique 156 ch (54 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 14.4, "powerHp": 156, "batteryCapacityKwh": 54.0},
-                    {"name": "Hybrid 100 e-DCS6", "fuelType": "HYBRID", "consumptionWltp": 4.5, "powerHp": 100, "batteryCapacityKwh": 0.9}
-                ],
-                "finitions": ["Style", "Allure", "GT"],
-                "variants": [
-                    {"finition": "Style", "motorisation": "Électrique 156 ch (54 kWh)", "price": 33550.0, "loa": 230.0, "lld": 210.0, "insurance": 580.0, "maintenance": 230.0, "resale": 16000.0},
-                    {"finition": "Allure", "motorisation": "Électrique 156 ch (54 kWh)", "price": 35100.0, "loa": 250.0, "lld": 230.0, "insurance": 600.0, "maintenance": 240.0, "resale": 17200.0},
-                    {"finition": "GT", "motorisation": "Électrique 156 ch (54 kWh)", "price": 37300.0, "loa": 280.0, "lld": 260.0, "insurance": 640.0, "maintenance": 250.0, "resale": 18500.0},
-                    {"finition": "Style", "motorisation": "Hybrid 100 e-DCS6", "price": 24200.0, "loa": 190.0, "lld": 175.0, "insurance": 550.0, "maintenance": 360.0, "resale": 12500.0},
-                    {"finition": "GT", "motorisation": "Hybrid 100 e-DCS6", "price": 27800.0, "loa": 230.0, "lld": 210.0, "insurance": 590.0, "maintenance": 380.0, "resale": 14500.0}
-                ]
-            },
-            {
-                "name": "e-2008",
-                "category": "SUV",
-                "motorisations": [
-                    {"name": "Électrique 156 ch (54 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 15.3, "powerHp": 156, "batteryCapacityKwh": 54.0},
-                    {"name": "Hybrid 136 e-DCS6", "fuelType": "HYBRID", "consumptionWltp": 4.9, "powerHp": 136, "batteryCapacityKwh": 0.9}
-                ],
-                "finitions": ["Allure", "GT"],
-                "variants": [
-                    {"finition": "Allure", "motorisation": "Électrique 156 ch (54 kWh)", "price": 39250.0, "loa": 290.0, "lld": 270.0, "insurance": 660.0, "maintenance": 250.0, "resale": 19000.0},
-                    {"finition": "GT", "motorisation": "Électrique 156 ch (54 kWh)", "price": 41450.0, "loa": 320.0, "lld": 295.0, "insurance": 700.0, "maintenance": 260.0, "resale": 20500.0},
-                    {"finition": "GT", "motorisation": "Hybrid 136 e-DCS6", "price": 32900.0, "loa": 265.0, "lld": 245.0, "insurance": 620.0, "maintenance": 390.0, "resale": 16000.0}
-                ]
-            },
-            {
-                "name": "e-3008",
-                "category": "SUV",
-                "motorisations": [
-                    {"name": "Électrique 210 ch (73 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 16.7, "powerHp": 210, "batteryCapacityKwh": 73.0},
-                    {"name": "Hybrid 136 e-DCS6", "fuelType": "HYBRID", "consumptionWltp": 5.5, "powerHp": 136, "batteryCapacityKwh": 0.9}
-                ],
-                "finitions": ["Allure", "GT"],
-                "variants": [
-                    {"finition": "Allure", "motorisation": "Électrique 210 ch (73 kWh)", "price": 44990.0, "loa": 360.0, "lld": 335.0, "insurance": 750.0, "maintenance": 280.0, "resale": 22000.0},
-                    {"finition": "GT", "motorisation": "Électrique 210 ch (73 kWh)", "price": 49490.0, "loa": 410.0, "lld": 385.0, "insurance": 820.0, "maintenance": 290.0, "resale": 24500.0},
-                    {"finition": "GT", "motorisation": "Hybrid 136 e-DCS6", "price": 42990.0, "loa": 345.0, "lld": 320.0, "insurance": 740.0, "maintenance": 420.0, "resale": 21000.0}
-                ]
-            }
-        ]
-    },
+    {"brand": "Peugeot", "models": [
+        {"name": "e-208", "category": "Citadine",
+         "motorisations": [
+             {"name": "Electrique 156 ch (54 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 14.4, "powerHp": 156, "batteryCapacityKwh": 54.0},
+             {"name": "Hybrid 100 e-DCS6",           "fuelType": "HYBRID",   "consumptionWltp": 4.5,  "powerHp": 100, "batteryCapacityKwh": 0.9},
+         ],
+         "finitions": ["Style", "Allure", "GT"],
+         "variants": [
+             {"finition": "Style",  "motorisation": "Electrique 156 ch (54 kWh)", "price": 33550, "loa": 230, "lld": 210, "insurance": 580, "maintenance": 230, "resale": 16000},
+             {"finition": "Allure", "motorisation": "Electrique 156 ch (54 kWh)", "price": 35100, "loa": 250, "lld": 230, "insurance": 600, "maintenance": 240, "resale": 17200},
+             {"finition": "GT",     "motorisation": "Electrique 156 ch (54 kWh)", "price": 37300, "loa": 280, "lld": 260, "insurance": 640, "maintenance": 250, "resale": 18500},
+             {"finition": "Style",  "motorisation": "Hybrid 100 e-DCS6",          "price": 24200, "loa": 190, "lld": 175, "insurance": 550, "maintenance": 360, "resale": 12500},
+             {"finition": "GT",     "motorisation": "Hybrid 100 e-DCS6",          "price": 27800, "loa": 230, "lld": 210, "insurance": 590, "maintenance": 380, "resale": 14500},
+         ]},
+        {"name": "e-2008", "category": "SUV",
+         "motorisations": [
+             {"name": "Electrique 156 ch (54 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 15.3, "powerHp": 156, "batteryCapacityKwh": 54.0},
+             {"name": "Hybrid 136 e-DCS6",           "fuelType": "HYBRID",   "consumptionWltp": 4.9,  "powerHp": 136, "batteryCapacityKwh": 0.9},
+         ],
+         "finitions": ["Allure", "GT"],
+         "variants": [
+             {"finition": "Allure", "motorisation": "Electrique 156 ch (54 kWh)", "price": 39250, "loa": 290, "lld": 270, "insurance": 660, "maintenance": 250, "resale": 19000},
+             {"finition": "GT",     "motorisation": "Electrique 156 ch (54 kWh)", "price": 41450, "loa": 320, "lld": 295, "insurance": 700, "maintenance": 260, "resale": 20500},
+             {"finition": "GT",     "motorisation": "Hybrid 136 e-DCS6",          "price": 32900, "loa": 265, "lld": 245, "insurance": 620, "maintenance": 390, "resale": 16000},
+         ]},
+        {"name": "e-3008", "category": "SUV",
+         "motorisations": [
+             {"name": "Electrique 210 ch (73 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 16.7, "powerHp": 210, "batteryCapacityKwh": 73.0},
+             {"name": "Hybrid 136 e-DCS6",           "fuelType": "HYBRID",   "consumptionWltp": 5.5,  "powerHp": 136, "batteryCapacityKwh": 0.9},
+         ],
+         "finitions": ["Allure", "GT"],
+         "variants": [
+             {"finition": "Allure", "motorisation": "Electrique 210 ch (73 kWh)", "price": 44990, "loa": 360, "lld": 335, "insurance": 750, "maintenance": 280, "resale": 22000},
+             {"finition": "GT",     "motorisation": "Electrique 210 ch (73 kWh)", "price": 49490, "loa": 410, "lld": 385, "insurance": 820, "maintenance": 290, "resale": 24500},
+             {"finition": "GT",     "motorisation": "Hybrid 136 e-DCS6",          "price": 42990, "loa": 345, "lld": 320, "insurance": 740, "maintenance": 420, "resale": 21000},
+         ]},
+    ]},
 
     # 3. TESLA
-    {
-        "brand": "Tesla",
-        "models": [
-            {
-                "name": "Model 3",
-                "category": "Berline",
-                "motorisations": [
-                    {"name": "Propulsion RWD", "fuelType": "ELECTRIC", "consumptionWltp": 13.2, "powerHp": 283, "batteryCapacityKwh": 60.0},
-                    {"name": "Grande Autonomie AWD", "fuelType": "ELECTRIC", "consumptionWltp": 14.0, "powerHp": 498, "batteryCapacityKwh": 78.0},
-                    {"name": "Performance AWD", "fuelType": "ELECTRIC", "consumptionWltp": 16.7, "powerHp": 627, "batteryCapacityKwh": 78.0}
-                ],
-                "finitions": ["Standard", "Long Range", "Performance"],
-                "variants": [
-                    {"finition": "Standard", "motorisation": "Propulsion RWD", "price": 41490.0, "loa": 320.0, "lld": 299.0, "insurance": 850.0, "maintenance": 220.0, "resale": 22000.0},
-                    {"finition": "Long Range", "motorisation": "Grande Autonomie AWD", "price": 50990.0, "loa": 420.0, "lld": 395.0, "insurance": 950.0, "maintenance": 250.0, "resale": 27500.0},
-                    {"finition": "Performance", "motorisation": "Performance AWD", "price": 57490.0, "loa": 510.0, "lld": 480.0, "insurance": 1100.0, "maintenance": 280.0, "resale": 31000.0}
-                ]
-            },
-            {
-                "name": "Model Y",
-                "category": "SUV",
-                "motorisations": [
-                    {"name": "Propulsion RWD", "fuelType": "ELECTRIC", "consumptionWltp": 15.7, "powerHp": 299, "batteryCapacityKwh": 60.0},
-                    {"name": "Grande Autonomie AWD", "fuelType": "ELECTRIC", "consumptionWltp": 16.9, "powerHp": 514, "batteryCapacityKwh": 78.0}
-                ],
-                "finitions": ["Standard", "Long Range"],
-                "variants": [
-                    {"finition": "Standard", "motorisation": "Propulsion RWD", "price": 44990.0, "loa": 360.0, "lld": 330.0, "insurance": 900.0, "maintenance": 240.0, "resale": 24000.0},
-                    {"finition": "Long Range", "motorisation": "Grande Autonomie AWD", "price": 52990.0, "loa": 450.0, "lld": 415.0, "insurance": 980.0, "maintenance": 260.0, "resale": 28500.0}
-                ]
-            },
-            {
-                "name": "Model S",
-                "category": "Berline",
-                "motorisations": [
-                    {"name": "Dual Motor AWD 670 ch", "fuelType": "ELECTRIC", "consumptionWltp": 17.5, "powerHp": 670, "batteryCapacityKwh": 100.0},
-                    {"name": "Tri-Motor Plaid 1020 ch", "fuelType": "ELECTRIC", "consumptionWltp": 18.7, "powerHp": 1020, "batteryCapacityKwh": 100.0}
-                ],
-                "finitions": ["Grande Autonomie", "Plaid"],
-                "variants": [
-                    {"finition": "Grande Autonomie", "motorisation": "Dual Motor AWD 670 ch", "price": 95990.0, "loa": 890.0, "lld": 820.0, "insurance": 1400.0, "maintenance": 350.0, "resale": 50000.0},
-                    {"finition": "Plaid", "motorisation": "Tri-Motor Plaid 1020 ch", "price": 110990.0, "loa": 1090.0, "lld": 990.0, "insurance": 1800.0, "maintenance": 450.0, "resale": 60000.0}
-                ]
-            }
-        ]
-    },
+    {"brand": "Tesla", "models": [
+        {"name": "Model 3", "category": "Berline",
+         "motorisations": [
+             {"name": "Propulsion RWD",       "fuelType": "ELECTRIC", "consumptionWltp": 13.2, "powerHp": 283,  "batteryCapacityKwh": 60.0},
+             {"name": "Grande Autonomie AWD",  "fuelType": "ELECTRIC", "consumptionWltp": 14.0, "powerHp": 498,  "batteryCapacityKwh": 78.0},
+             {"name": "Performance AWD",       "fuelType": "ELECTRIC", "consumptionWltp": 16.7, "powerHp": 627,  "batteryCapacityKwh": 78.0},
+         ],
+         "finitions": ["Standard", "Long Range", "Performance"],
+         "variants": [
+             {"finition": "Standard",    "motorisation": "Propulsion RWD",       "price": 41490, "loa": 320, "lld": 299, "insurance": 850,  "maintenance": 220, "resale": 22000},
+             {"finition": "Long Range",  "motorisation": "Grande Autonomie AWD",  "price": 50990, "loa": 420, "lld": 395, "insurance": 950,  "maintenance": 250, "resale": 27500},
+             {"finition": "Performance", "motorisation": "Performance AWD",       "price": 57490, "loa": 510, "lld": 480, "insurance": 1100, "maintenance": 280, "resale": 31000},
+         ]},
+        {"name": "Model Y", "category": "SUV",
+         "motorisations": [
+             {"name": "Propulsion RWD",      "fuelType": "ELECTRIC", "consumptionWltp": 15.7, "powerHp": 299, "batteryCapacityKwh": 60.0},
+             {"name": "Grande Autonomie AWD", "fuelType": "ELECTRIC", "consumptionWltp": 16.9, "powerHp": 514, "batteryCapacityKwh": 78.0},
+         ],
+         "finitions": ["Standard", "Long Range"],
+         "variants": [
+             {"finition": "Standard",   "motorisation": "Propulsion RWD",       "price": 44990, "loa": 360, "lld": 330, "insurance": 900, "maintenance": 240, "resale": 24000},
+             {"finition": "Long Range", "motorisation": "Grande Autonomie AWD",  "price": 52990, "loa": 450, "lld": 415, "insurance": 980, "maintenance": 260, "resale": 28500},
+         ]},
+        {"name": "Model S", "category": "Berline",
+         "motorisations": [
+             {"name": "Dual Motor AWD 670 ch",   "fuelType": "ELECTRIC", "consumptionWltp": 17.5, "powerHp": 670,  "batteryCapacityKwh": 100.0},
+             {"name": "Tri-Motor Plaid 1020 ch",  "fuelType": "ELECTRIC", "consumptionWltp": 18.7, "powerHp": 1020, "batteryCapacityKwh": 100.0},
+         ],
+         "finitions": ["Grande Autonomie", "Plaid"],
+         "variants": [
+             {"finition": "Grande Autonomie", "motorisation": "Dual Motor AWD 670 ch",   "price": 95990,  "loa": 890,  "lld": 820,  "insurance": 1400, "maintenance": 350, "resale": 50000},
+             {"finition": "Plaid",            "motorisation": "Tri-Motor Plaid 1020 ch", "price": 110990, "loa": 1090, "lld": 990,  "insurance": 1800, "maintenance": 450, "resale": 60000},
+         ]},
+    ]},
 
     # 4. DACIA
-    {
-        "brand": "Dacia",
-        "models": [
-            {
-                "name": "Spring",
-                "category": "Citadine",
-                "motorisations": [
-                    {"name": "Electric 45 ch", "fuelType": "ELECTRIC", "consumptionWltp": 13.9, "powerHp": 45, "batteryCapacityKwh": 26.8},
-                    {"name": "Electric 65 ch", "fuelType": "ELECTRIC", "consumptionWltp": 14.5, "powerHp": 65, "batteryCapacityKwh": 26.8}
-                ],
-                "finitions": ["Essential", "Extreme"],
-                "variants": [
-                    {"finition": "Essential", "motorisation": "Electric 45 ch", "price": 18900.0, "loa": 120.0, "lld": 99.0, "insurance": 420.0, "maintenance": 180.0, "resale": 9500.0},
-                    {"finition": "Extreme", "motorisation": "Electric 65 ch", "price": 20900.0, "loa": 145.0, "lld": 125.0, "insurance": 460.0, "maintenance": 190.0, "resale": 11000.0}
-                ]
-            },
-            {
-                "name": "Duster Hybrid",
-                "category": "SUV",
-                "motorisations": [
-                    {"name": "Hybrid 140 ch", "fuelType": "HYBRID", "consumptionWltp": 4.9, "powerHp": 140, "batteryCapacityKwh": 1.2}
-                ],
-                "finitions": ["Expression", "Journey"],
-                "variants": [
-                    {"finition": "Expression", "motorisation": "Hybrid 140 ch", "price": 26600.0, "loa": 210.0, "lld": 190.0, "insurance": 520.0, "maintenance": 340.0, "resale": 14000.0},
-                    {"finition": "Journey", "motorisation": "Hybrid 140 ch", "price": 28100.0, "loa": 235.0, "lld": 210.0, "insurance": 560.0, "maintenance": 350.0, "resale": 15500.0}
-                ]
-            },
-            {
-                "name": "Jogger Hybrid",
-                "category": "Break",
-                "motorisations": [
-                    {"name": "Hybrid 140 ch", "fuelType": "HYBRID", "consumptionWltp": 4.8, "powerHp": 140, "batteryCapacityKwh": 1.2}
-                ],
-                "finitions": ["Expression", "Extreme"],
-                "variants": [
-                    {"finition": "Expression", "motorisation": "Hybrid 140 ch", "price": 25200.0, "loa": 200.0, "lld": 180.0, "insurance": 510.0, "maintenance": 330.0, "resale": 13000.0},
-                    {"finition": "Extreme", "motorisation": "Hybrid 140 ch", "price": 27200.0, "loa": 225.0, "lld": 205.0, "insurance": 540.0, "maintenance": 340.0, "resale": 14500.0}
-                ]
-            }
-        ]
-    },
+    {"brand": "Dacia", "models": [
+        {"name": "Spring", "category": "Citadine",
+         "motorisations": [
+             {"name": "Electric 45 ch", "fuelType": "ELECTRIC", "consumptionWltp": 13.9, "powerHp": 45, "batteryCapacityKwh": 26.8},
+             {"name": "Electric 65 ch", "fuelType": "ELECTRIC", "consumptionWltp": 14.5, "powerHp": 65, "batteryCapacityKwh": 26.8},
+         ],
+         "finitions": ["Essential", "Extreme"],
+         "variants": [
+             {"finition": "Essential", "motorisation": "Electric 45 ch", "price": 18900, "loa": 120, "lld": 99,  "insurance": 420, "maintenance": 180, "resale": 9500},
+             {"finition": "Extreme",   "motorisation": "Electric 65 ch", "price": 20900, "loa": 145, "lld": 125, "insurance": 460, "maintenance": 190, "resale": 11000},
+         ]},
+        {"name": "Duster Hybrid", "category": "SUV",
+         "motorisations": [
+             {"name": "Hybrid 140 ch", "fuelType": "HYBRID", "consumptionWltp": 4.9, "powerHp": 140, "batteryCapacityKwh": 1.2},
+         ],
+         "finitions": ["Expression", "Journey"],
+         "variants": [
+             {"finition": "Expression", "motorisation": "Hybrid 140 ch", "price": 26600, "loa": 210, "lld": 190, "insurance": 520, "maintenance": 340, "resale": 14000},
+             {"finition": "Journey",    "motorisation": "Hybrid 140 ch", "price": 28100, "loa": 235, "lld": 210, "insurance": 560, "maintenance": 350, "resale": 15500},
+         ]},
+        {"name": "Jogger Hybrid", "category": "Break",
+         "motorisations": [
+             {"name": "Hybrid 140 ch", "fuelType": "HYBRID", "consumptionWltp": 4.8, "powerHp": 140, "batteryCapacityKwh": 1.2},
+         ],
+         "finitions": ["Expression", "Extreme"],
+         "variants": [
+             {"finition": "Expression", "motorisation": "Hybrid 140 ch", "price": 25200, "loa": 200, "lld": 180, "insurance": 510, "maintenance": 330, "resale": 13000},
+             {"finition": "Extreme",    "motorisation": "Hybrid 140 ch", "price": 27200, "loa": 225, "lld": 205, "insurance": 540, "maintenance": 340, "resale": 14500},
+         ]},
+    ]},
 
     # 5. TOYOTA
-    {
-        "brand": "Toyota",
-        "models": [
-            {
-                "name": "Yaris Hybrid",
-                "category": "Citadine",
-                "motorisations": [
-                    {"name": "116h Dynamic Force", "fuelType": "HYBRID", "consumptionWltp": 3.8, "powerHp": 116, "batteryCapacityKwh": 0.8},
-                    {"name": "130h Dynamic Force", "fuelType": "HYBRID", "consumptionWltp": 4.2, "powerHp": 130, "batteryCapacityKwh": 0.8}
-                ],
-                "finitions": ["Dynamic", "GR Sport"],
-                "variants": [
-                    {"finition": "Dynamic", "motorisation": "116h Dynamic Force", "price": 23950.0, "loa": 189.0, "lld": 175.0, "insurance": 540.0, "maintenance": 350.0, "resale": 13000.0},
-                    {"finition": "GR Sport", "motorisation": "130h Dynamic Force", "price": 28450.0, "loa": 239.0, "lld": 219.0, "insurance": 600.0, "maintenance": 370.0, "resale": 16000.0}
-                ]
-            },
-            {
-                "name": "Yaris Cross",
-                "category": "SUV",
-                "motorisations": [
-                    {"name": "116h Hybrid 2WD", "fuelType": "HYBRID", "consumptionWltp": 4.4, "powerHp": 116, "batteryCapacityKwh": 0.8},
-                    {"name": "130h Hybrid AWD-i", "fuelType": "HYBRID", "consumptionWltp": 4.8, "powerHp": 130, "batteryCapacityKwh": 0.8}
-                ],
-                "finitions": ["Dynamic", "Collection"],
-                "variants": [
-                    {"finition": "Dynamic", "motorisation": "116h Hybrid 2WD", "price": 28200.0, "loa": 220.0, "lld": 200.0, "insurance": 580.0, "maintenance": 360.0, "resale": 15500.0},
-                    {"finition": "Collection", "motorisation": "130h Hybrid AWD-i", "price": 34700.0, "loa": 290.0, "lld": 270.0, "insurance": 650.0, "maintenance": 390.0, "resale": 19000.0}
-                ]
-            },
-            {
-                "name": "bZ4X",
-                "category": "SUV",
-                "motorisations": [
-                    {"name": "Pure 204 ch 2WD", "fuelType": "ELECTRIC", "consumptionWltp": 16.7, "powerHp": 204, "batteryCapacityKwh": 71.4}
-                ],
-                "finitions": ["Pure", "Origin"],
-                "variants": [
-                    {"finition": "Pure", "motorisation": "Pure 204 ch 2WD", "price": 39900.0, "loa": 340.0, "lld": 310.0, "insurance": 720.0, "maintenance": 260.0, "resale": 20000.0},
-                    {"finition": "Origin", "motorisation": "Pure 204 ch 2WD", "price": 45500.0, "loa": 395.0, "lld": 370.0, "insurance": 790.0, "maintenance": 270.0, "resale": 23000.0}
-                ]
-            }
-        ]
-    },
+    {"brand": "Toyota", "models": [
+        {"name": "Yaris Hybrid", "category": "Citadine",
+         "motorisations": [
+             {"name": "116h Dynamic Force", "fuelType": "HYBRID", "consumptionWltp": 3.8, "powerHp": 116, "batteryCapacityKwh": 0.8},
+             {"name": "130h Dynamic Force", "fuelType": "HYBRID", "consumptionWltp": 4.2, "powerHp": 130, "batteryCapacityKwh": 0.8},
+         ],
+         "finitions": ["Dynamic", "GR Sport"],
+         "variants": [
+             {"finition": "Dynamic",  "motorisation": "116h Dynamic Force", "price": 23950, "loa": 189, "lld": 175, "insurance": 540, "maintenance": 350, "resale": 13000},
+             {"finition": "GR Sport", "motorisation": "130h Dynamic Force", "price": 28450, "loa": 239, "lld": 219, "insurance": 600, "maintenance": 370, "resale": 16000},
+         ]},
+        {"name": "Yaris Cross", "category": "SUV",
+         "motorisations": [
+             {"name": "116h Hybrid 2WD",   "fuelType": "HYBRID", "consumptionWltp": 4.4, "powerHp": 116, "batteryCapacityKwh": 0.8},
+             {"name": "130h Hybrid AWD-i",  "fuelType": "HYBRID", "consumptionWltp": 4.8, "powerHp": 130, "batteryCapacityKwh": 0.8},
+         ],
+         "finitions": ["Dynamic", "Collection"],
+         "variants": [
+             {"finition": "Dynamic",    "motorisation": "116h Hybrid 2WD",  "price": 28200, "loa": 220, "lld": 200, "insurance": 580, "maintenance": 360, "resale": 15500},
+             {"finition": "Collection", "motorisation": "130h Hybrid AWD-i", "price": 34700, "loa": 290, "lld": 270, "insurance": 650, "maintenance": 390, "resale": 19000},
+         ]},
+        {"name": "bZ4X", "category": "SUV",
+         "motorisations": [
+             {"name": "Pure 204 ch 2WD", "fuelType": "ELECTRIC", "consumptionWltp": 16.7, "powerHp": 204, "batteryCapacityKwh": 71.4},
+         ],
+         "finitions": ["Pure", "Origin"],
+         "variants": [
+             {"finition": "Pure",   "motorisation": "Pure 204 ch 2WD", "price": 39900, "loa": 340, "lld": 310, "insurance": 720, "maintenance": 260, "resale": 20000},
+             {"finition": "Origin", "motorisation": "Pure 204 ch 2WD", "price": 45500, "loa": 395, "lld": 370, "insurance": 790, "maintenance": 270, "resale": 23000},
+         ]},
+    ]},
 
     # 6. VOLKSWAGEN
-    {
-        "brand": "Volkswagen",
-        "models": [
-            {
-                "name": "ID.3",
-                "category": "Compacte",
-                "motorisations": [
-                    {"name": "Pro 204 ch (59 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 15.3, "powerHp": 204, "batteryCapacityKwh": 59.0},
-                    {"name": "Pro S 204 ch (77 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 15.7, "powerHp": 204, "batteryCapacityKwh": 77.0}
-                ],
-                "finitions": ["Life Max", "Style"],
-                "variants": [
-                    {"finition": "Life Max", "motorisation": "Pro 204 ch (59 kWh)", "price": 37990.0, "loa": 299.0, "lld": 279.0, "insurance": 680.0, "maintenance": 250.0, "resale": 19000.0},
-                    {"finition": "Style", "motorisation": "Pro S 204 ch (77 kWh)", "price": 44310.0, "loa": 370.0, "lld": 345.0, "insurance": 760.0, "maintenance": 270.0, "resale": 23000.0}
-                ]
-            },
-            {
-                "name": "ID.4",
-                "category": "SUV",
-                "motorisations": [
-                    {"name": "Pro 286 ch (77 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 16.2, "powerHp": 286, "batteryCapacityKwh": 77.0},
-                    {"name": "GTX 340 ch AWD", "fuelType": "ELECTRIC", "consumptionWltp": 17.5, "powerHp": 340, "batteryCapacityKwh": 77.0}
-                ],
-                "finitions": ["Life Max", "GTX"],
-                "variants": [
-                    {"finition": "Life Max", "motorisation": "Pro 286 ch (77 kWh)", "price": 45990.0, "loa": 380.0, "lld": 350.0, "insurance": 790.0, "maintenance": 280.0, "resale": 24000.0},
-                    {"finition": "GTX", "motorisation": "GTX 340 ch AWD", "price": 57900.0, "loa": 520.0, "lld": 485.0, "insurance": 960.0, "maintenance": 320.0, "resale": 30500.0}
-                ]
-            },
-            {
-                "name": "Golf eHybrid",
-                "category": "Compacte",
-                "motorisations": [
-                    {"name": "1.5 TSI eHybrid 204 ch", "fuelType": "HYBRID", "consumptionWltp": 0.9, "powerHp": 204, "batteryCapacityKwh": 19.7}
-                ],
-                "finitions": ["Style", "GTE"],
-                "variants": [
-                    {"finition": "Style", "motorisation": "1.5 TSI eHybrid 204 ch", "price": 43500.0, "loa": 360.0, "lld": 330.0, "insurance": 730.0, "maintenance": 410.0, "resale": 22000.0},
-                    {"finition": "GTE", "motorisation": "1.5 TSI eHybrid 204 ch", "price": 48200.0, "loa": 410.0, "lld": 380.0, "insurance": 820.0, "maintenance": 440.0, "resale": 25000.0}
-                ]
-            }
-        ]
-    },
+    {"brand": "Volkswagen", "models": [
+        {"name": "ID.3", "category": "Compacte",
+         "motorisations": [
+             {"name": "Pro 204 ch (59 kWh)",  "fuelType": "ELECTRIC", "consumptionWltp": 15.3, "powerHp": 204, "batteryCapacityKwh": 59.0},
+             {"name": "Pro S 204 ch (77 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 15.7, "powerHp": 204, "batteryCapacityKwh": 77.0},
+         ],
+         "finitions": ["Life Max", "Style"],
+         "variants": [
+             {"finition": "Life Max", "motorisation": "Pro 204 ch (59 kWh)",  "price": 37990, "loa": 299, "lld": 279, "insurance": 680, "maintenance": 250, "resale": 19000},
+             {"finition": "Style",    "motorisation": "Pro S 204 ch (77 kWh)", "price": 44310, "loa": 370, "lld": 345, "insurance": 760, "maintenance": 270, "resale": 23000},
+         ]},
+        {"name": "ID.4", "category": "SUV",
+         "motorisations": [
+             {"name": "Pro 286 ch (77 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 16.2, "powerHp": 286, "batteryCapacityKwh": 77.0},
+             {"name": "GTX 340 ch AWD",       "fuelType": "ELECTRIC", "consumptionWltp": 17.5, "powerHp": 340, "batteryCapacityKwh": 77.0},
+         ],
+         "finitions": ["Life Max", "GTX"],
+         "variants": [
+             {"finition": "Life Max", "motorisation": "Pro 286 ch (77 kWh)", "price": 45990, "loa": 380, "lld": 350, "insurance": 790, "maintenance": 280, "resale": 24000},
+             {"finition": "GTX",      "motorisation": "GTX 340 ch AWD",       "price": 57900, "loa": 520, "lld": 485, "insurance": 960, "maintenance": 320, "resale": 30500},
+         ]},
+        {"name": "Golf eHybrid", "category": "Compacte",
+         "motorisations": [
+             {"name": "1.5 TSI eHybrid 204 ch", "fuelType": "HYBRID", "consumptionWltp": 0.9, "powerHp": 204, "batteryCapacityKwh": 19.7},
+         ],
+         "finitions": ["Style", "GTE"],
+         "variants": [
+             {"finition": "Style", "motorisation": "1.5 TSI eHybrid 204 ch", "price": 43500, "loa": 360, "lld": 330, "insurance": 730, "maintenance": 410, "resale": 22000},
+             {"finition": "GTE",   "motorisation": "1.5 TSI eHybrid 204 ch", "price": 48200, "loa": 410, "lld": 380, "insurance": 820, "maintenance": 440, "resale": 25000},
+         ]},
+    ]},
 
-    # 7. CITROËN
-    {
-        "brand": "Citroën",
-        "models": [
-            {
-                "name": "ë-C3",
-                "category": "Citadine",
-                "motorisations": [
-                    {"name": "Électrique 113 ch (44 kWh LFP)", "fuelType": "ELECTRIC", "consumptionWltp": 14.1, "powerHp": 113, "batteryCapacityKwh": 44.0}
-                ],
-                "finitions": ["You", "Max"],
-                "variants": [
-                    {"finition": "You", "motorisation": "Électrique 113 ch (44 kWh LFP)", "price": 23300.0, "loa": 149.0, "lld": 129.0, "insurance": 480.0, "maintenance": 200.0, "resale": 12000.0},
-                    {"finition": "Max", "motorisation": "Électrique 113 ch (44 kWh LFP)", "price": 27800.0, "loa": 189.0, "lld": 169.0, "insurance": 520.0, "maintenance": 210.0, "resale": 14500.0}
-                ]
-            },
-            {
-                "name": "ë-C4",
-                "category": "Berline",
-                "motorisations": [
-                    {"name": "Électrique 136 ch (50 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 15.3, "powerHp": 136, "batteryCapacityKwh": 50.0},
-                    {"name": "Électrique 156 ch (54 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 14.8, "powerHp": 156, "batteryCapacityKwh": 54.0}
-                ],
-                "finitions": ["Plus", "Max"],
-                "variants": [
-                    {"finition": "Plus", "motorisation": "Électrique 136 ch (50 kWh)", "price": 35740.0, "loa": 259.0, "lld": 239.0, "insurance": 610.0, "maintenance": 230.0, "resale": 17500.0},
-                    {"finition": "Max", "motorisation": "Électrique 156 ch (54 kWh)", "price": 39300.0, "loa": 299.0, "lld": 279.0, "insurance": 660.0, "maintenance": 240.0, "resale": 19500.0}
-                ]
-            },
-            {
-                "name": "C5 Aircross Hybrid",
-                "category": "SUV",
-                "motorisations": [
-                    {"name": "Hybrid 136 ë-DCS6", "fuelType": "HYBRID", "consumptionWltp": 5.4, "powerHp": 136, "batteryCapacityKwh": 0.9}
-                ],
-                "finitions": ["Plus", "Max"],
-                "variants": [
-                    {"finition": "Plus", "motorisation": "Hybrid 136 ë-DCS6", "price": 37800.0, "loa": 290.0, "lld": 270.0, "insurance": 680.0, "maintenance": 410.0, "resale": 18500.0},
-                    {"finition": "Max", "motorisation": "Hybrid 136 ë-DCS6", "price": 41200.0, "loa": 330.0, "lld": 305.0, "insurance": 720.0, "maintenance": 430.0, "resale": 20500.0}
-                ]
-            }
-        ]
-    },
+    # 7. CITROEN
+    {"brand": "Citroën", "models": [
+        {"name": "e-C3", "category": "Citadine",
+         "motorisations": [
+             {"name": "Electrique 113 ch (44 kWh LFP)", "fuelType": "ELECTRIC", "consumptionWltp": 14.1, "powerHp": 113, "batteryCapacityKwh": 44.0},
+         ],
+         "finitions": ["You", "Max"],
+         "variants": [
+             {"finition": "You", "motorisation": "Electrique 113 ch (44 kWh LFP)", "price": 23300, "loa": 149, "lld": 129, "insurance": 480, "maintenance": 200, "resale": 12000},
+             {"finition": "Max", "motorisation": "Electrique 113 ch (44 kWh LFP)", "price": 27800, "loa": 189, "lld": 169, "insurance": 520, "maintenance": 210, "resale": 14500},
+         ]},
+        {"name": "e-C4", "category": "Berline",
+         "motorisations": [
+             {"name": "Electrique 136 ch (50 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 15.3, "powerHp": 136, "batteryCapacityKwh": 50.0},
+             {"name": "Electrique 156 ch (54 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 14.8, "powerHp": 156, "batteryCapacityKwh": 54.0},
+         ],
+         "finitions": ["Plus", "Max"],
+         "variants": [
+             {"finition": "Plus", "motorisation": "Electrique 136 ch (50 kWh)", "price": 35740, "loa": 259, "lld": 239, "insurance": 610, "maintenance": 230, "resale": 17500},
+             {"finition": "Max",  "motorisation": "Electrique 156 ch (54 kWh)", "price": 39300, "loa": 299, "lld": 279, "insurance": 660, "maintenance": 240, "resale": 19500},
+         ]},
+        {"name": "C5 Aircross Hybrid", "category": "SUV",
+         "motorisations": [
+             {"name": "Hybrid 136 e-DCS6", "fuelType": "HYBRID", "consumptionWltp": 5.4, "powerHp": 136, "batteryCapacityKwh": 0.9},
+         ],
+         "finitions": ["Plus", "Max"],
+         "variants": [
+             {"finition": "Plus", "motorisation": "Hybrid 136 e-DCS6", "price": 37800, "loa": 290, "lld": 270, "insurance": 680, "maintenance": 410, "resale": 18500},
+             {"finition": "Max",  "motorisation": "Hybrid 136 e-DCS6", "price": 41200, "loa": 330, "lld": 305, "insurance": 720, "maintenance": 430, "resale": 20500},
+         ]},
+    ]},
 
     # 8. HYUNDAI
-    {
-        "brand": "Hyundai",
-        "models": [
-            {
-                "name": "Ioniq 5",
-                "category": "Crossover",
-                "motorisations": [
-                    {"name": "Intuitive 229 ch (84 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 16.8, "powerHp": 229, "batteryCapacityKwh": 84.0},
-                    {"name": "HTRAC AWD 325 ch (84 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 18.2, "powerHp": 325, "batteryCapacityKwh": 84.0}
-                ],
-                "finitions": ["Intuitive", "Executive"],
-                "variants": [
-                    {"finition": "Intuitive", "motorisation": "Intuitive 229 ch (84 kWh)", "price": 46800.0, "loa": 380.0, "lld": 350.0, "insurance": 790.0, "maintenance": 270.0, "resale": 24000.0},
-                    {"finition": "Executive", "motorisation": "HTRAC AWD 325 ch (84 kWh)", "price": 60500.0, "loa": 530.0, "lld": 490.0, "insurance": 960.0, "maintenance": 310.0, "resale": 32000.0}
-                ]
-            },
-            {
-                "name": "Kona Electric",
-                "category": "SUV",
-                "motorisations": [
-                    {"name": "Standard 156 ch (48.4 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 14.6, "powerHp": 156, "batteryCapacityKwh": 48.4},
-                    {"name": "Long Range 217 ch (65.4 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 15.1, "powerHp": 217, "batteryCapacityKwh": 65.4}
-                ],
-                "finitions": ["Intuitive", "Creative"],
-                "variants": [
-                    {"finition": "Intuitive", "motorisation": "Standard 156 ch (48.4 kWh)", "price": 37900.0, "loa": 290.0, "lld": 270.0, "insurance": 640.0, "maintenance": 240.0, "resale": 19000.0},
-                    {"finition": "Creative", "motorisation": "Long Range 217 ch (65.4 kWh)", "price": 44400.0, "loa": 360.0, "lld": 335.0, "insurance": 730.0, "maintenance": 260.0, "resale": 23000.0}
-                ]
-            },
-            {
-                "name": "Tucson Hybrid",
-                "category": "SUV",
-                "motorisations": [
-                    {"name": "1.6 T-GDI Hybrid 215 ch", "fuelType": "HYBRID", "consumptionWltp": 5.6, "powerHp": 215, "batteryCapacityKwh": 1.49}
-                ],
-                "finitions": ["Intuitive", "N Line Executive"],
-                "variants": [
-                    {"finition": "Intuitive", "motorisation": "1.6 T-GDI Hybrid 215 ch", "price": 38900.0, "loa": 310.0, "lld": 290.0, "insurance": 690.0, "maintenance": 420.0, "resale": 20000.0},
-                    {"finition": "N Line Executive", "motorisation": "1.6 T-GDI Hybrid 215 ch", "price": 46800.0, "loa": 395.0, "lld": 365.0, "insurance": 780.0, "maintenance": 450.0, "resale": 24000.0}
-                ]
-            }
-        ]
-    },
+    {"brand": "Hyundai", "models": [
+        {"name": "Ioniq 5", "category": "Crossover",
+         "motorisations": [
+             {"name": "Intuitive 229 ch (84 kWh)",  "fuelType": "ELECTRIC", "consumptionWltp": 16.8, "powerHp": 229, "batteryCapacityKwh": 84.0},
+             {"name": "HTRAC AWD 325 ch (84 kWh)",  "fuelType": "ELECTRIC", "consumptionWltp": 18.2, "powerHp": 325, "batteryCapacityKwh": 84.0},
+         ],
+         "finitions": ["Intuitive", "Executive"],
+         "variants": [
+             {"finition": "Intuitive", "motorisation": "Intuitive 229 ch (84 kWh)", "price": 46800, "loa": 380, "lld": 350, "insurance": 790, "maintenance": 270, "resale": 24000},
+             {"finition": "Executive", "motorisation": "HTRAC AWD 325 ch (84 kWh)", "price": 60500, "loa": 530, "lld": 490, "insurance": 960, "maintenance": 310, "resale": 32000},
+         ]},
+        {"name": "Kona Electric", "category": "SUV",
+         "motorisations": [
+             {"name": "Standard 156 ch (48.4 kWh)",  "fuelType": "ELECTRIC", "consumptionWltp": 14.6, "powerHp": 156, "batteryCapacityKwh": 48.4},
+             {"name": "Long Range 217 ch (65.4 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 15.1, "powerHp": 217, "batteryCapacityKwh": 65.4},
+         ],
+         "finitions": ["Intuitive", "Creative"],
+         "variants": [
+             {"finition": "Intuitive", "motorisation": "Standard 156 ch (48.4 kWh)",   "price": 37900, "loa": 290, "lld": 270, "insurance": 640, "maintenance": 240, "resale": 19000},
+             {"finition": "Creative",  "motorisation": "Long Range 217 ch (65.4 kWh)", "price": 44400, "loa": 360, "lld": 335, "insurance": 730, "maintenance": 260, "resale": 23000},
+         ]},
+        {"name": "Tucson Hybrid", "category": "SUV",
+         "motorisations": [
+             {"name": "1.6 T-GDI Hybrid 215 ch", "fuelType": "HYBRID", "consumptionWltp": 5.6, "powerHp": 215, "batteryCapacityKwh": 1.49},
+         ],
+         "finitions": ["Intuitive", "N Line Executive"],
+         "variants": [
+             {"finition": "Intuitive",       "motorisation": "1.6 T-GDI Hybrid 215 ch", "price": 38900, "loa": 310, "lld": 290, "insurance": 690, "maintenance": 420, "resale": 20000},
+             {"finition": "N Line Executive", "motorisation": "1.6 T-GDI Hybrid 215 ch", "price": 46800, "loa": 395, "lld": 365, "insurance": 780, "maintenance": 450, "resale": 24000},
+         ]},
+    ]},
 
     # 9. KIA
-    {
-        "brand": "Kia",
-        "models": [
-            {
-                "name": "EV6",
-                "category": "Crossover",
-                "motorisations": [
-                    {"name": "229 ch 2WD (77.4 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 16.5, "powerHp": 229, "batteryCapacityKwh": 77.4},
-                    {"name": "325 ch AWD (77.4 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 17.8, "powerHp": 325, "batteryCapacityKwh": 77.4}
-                ],
-                "finitions": ["Air Design", "GT-line"],
-                "variants": [
-                    {"finition": "Air Design", "motorisation": "229 ch 2WD (77.4 kWh)", "price": 49690.0, "loa": 390.0, "lld": 365.0, "insurance": 820.0, "maintenance": 280.0, "resale": 26000.0},
-                    {"finition": "GT-line", "motorisation": "325 ch AWD (77.4 kWh)", "price": 57690.0, "loa": 480.0, "lld": 445.0, "insurance": 920.0, "maintenance": 310.0, "resale": 30500.0}
-                ]
-            },
-            {
-                "name": "Niro EV",
-                "category": "Crossover",
-                "motorisations": [
-                    {"name": "Électrique 204 ch (64.8 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 16.2, "powerHp": 204, "batteryCapacityKwh": 64.8}
-                ],
-                "finitions": ["Motion", "Active", "Premium"],
-                "variants": [
-                    {"finition": "Motion", "motorisation": "Électrique 204 ch (64.8 kWh)", "price": 40490.0, "loa": 310.0, "lld": 290.0, "insurance": 690.0, "maintenance": 250.0, "resale": 20000.0},
-                    {"finition": "Premium", "motorisation": "Électrique 204 ch (64.8 kWh)", "price": 47090.0, "loa": 380.0, "lld": 355.0, "insurance": 770.0, "maintenance": 270.0, "resale": 24000.0}
-                ]
-            },
-            {
-                "name": "Sportage Hybrid",
-                "category": "SUV",
-                "motorisations": [
-                    {"name": "1.6 T-GDi Hybrid 215 ch", "fuelType": "HYBRID", "consumptionWltp": 5.6, "powerHp": 215, "batteryCapacityKwh": 1.49}
-                ],
-                "finitions": ["Active", "GT-line Premium"],
-                "variants": [
-                    {"finition": "Active", "motorisation": "1.6 T-GDi Hybrid 215 ch", "price": 39990.0, "loa": 320.0, "lld": 295.0, "insurance": 700.0, "maintenance": 420.0, "resale": 20500.0},
-                    {"finition": "GT-line Premium", "motorisation": "1.6 T-GDi Hybrid 215 ch", "price": 47490.0, "loa": 395.0, "lld": 370.0, "insurance": 790.0, "maintenance": 450.0, "resale": 24500.0}
-                ]
-            }
-        ]
-    },
+    {"brand": "Kia", "models": [
+        {"name": "EV6", "category": "Crossover",
+         "motorisations": [
+             {"name": "229 ch 2WD (77.4 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 16.5, "powerHp": 229, "batteryCapacityKwh": 77.4},
+             {"name": "325 ch AWD (77.4 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 17.8, "powerHp": 325, "batteryCapacityKwh": 77.4},
+         ],
+         "finitions": ["Air Design", "GT-line"],
+         "variants": [
+             {"finition": "Air Design", "motorisation": "229 ch 2WD (77.4 kWh)", "price": 49690, "loa": 390, "lld": 365, "insurance": 820, "maintenance": 280, "resale": 26000},
+             {"finition": "GT-line",    "motorisation": "325 ch AWD (77.4 kWh)", "price": 58690, "loa": 510, "lld": 475, "insurance": 950, "maintenance": 310, "resale": 31000},
+         ]},
+        {"name": "EV9", "category": "SUV",
+         "motorisations": [
+             {"name": "Rear-wheel 160 kW (99.8 kWh)",  "fuelType": "ELECTRIC", "consumptionWltp": 21.2, "powerHp": 217, "batteryCapacityKwh": 99.8},
+             {"name": "All-wheel 283 kW (99.8 kWh)",   "fuelType": "ELECTRIC", "consumptionWltp": 22.1, "powerHp": 385, "batteryCapacityKwh": 99.8},
+         ],
+         "finitions": ["Earth", "GT-line"],
+         "variants": [
+             {"finition": "Earth",   "motorisation": "Rear-wheel 160 kW (99.8 kWh)", "price": 74990, "loa": 680, "lld": 640, "insurance": 1100, "maintenance": 310, "resale": 40000},
+             {"finition": "GT-line", "motorisation": "All-wheel 283 kW (99.8 kWh)",  "price": 84990, "loa": 780, "lld": 730, "insurance": 1250, "maintenance": 340, "resale": 45000},
+         ]},
+        {"name": "Sportage PHEV", "category": "SUV",
+         "motorisations": [
+             {"name": "PHEV 265 ch AWD", "fuelType": "PLUGIN_HYBRID", "consumptionWltp": 1.1, "powerHp": 265, "batteryCapacityKwh": 13.8},
+         ],
+         "finitions": ["GT-line", "GT-line Premium"],
+         "variants": [
+             {"finition": "GT-line",         "motorisation": "PHEV 265 ch AWD", "price": 45490, "loa": 385, "lld": 360, "insurance": 770, "maintenance": 430, "resale": 23000},
+             {"finition": "GT-line Premium", "motorisation": "PHEV 265 ch AWD", "price": 48990, "loa": 420, "lld": 390, "insurance": 820, "maintenance": 450, "resale": 25000},
+         ]},
+    ]},
 
     # 10. BMW
-    {
-        "brand": "BMW",
-        "models": [
-            {
-                "name": "i4 Gran Coupé",
-                "category": "Berline",
-                "motorisations": [
-                    {"name": "eDrive35 (67 kWh - 286 ch)", "fuelType": "ELECTRIC", "consumptionWltp": 15.8, "powerHp": 286, "batteryCapacityKwh": 67.0},
-                    {"name": "eDrive40 (81 kWh - 340 ch)", "fuelType": "ELECTRIC", "consumptionWltp": 16.1, "powerHp": 340, "batteryCapacityKwh": 81.0}
-                ],
-                "finitions": ["Base", "M Sport"],
-                "variants": [
-                    {"finition": "Base", "motorisation": "eDrive35 (67 kWh - 286 ch)", "price": 57550.0, "loa": 490.0, "lld": 450.0, "insurance": 1050.0, "maintenance": 320.0, "resale": 31000.0},
-                    {"finition": "M Sport", "motorisation": "eDrive40 (81 kWh - 340 ch)", "price": 68200.0, "loa": 590.0, "lld": 550.0, "insurance": 1250.0, "maintenance": 360.0, "resale": 38000.0}
-                ]
-            },
-            {
-                "name": "iX1",
-                "category": "SUV",
-                "motorisations": [
-                    {"name": "eDrive20 (64.7 kWh - 204 ch)", "fuelType": "ELECTRIC", "consumptionWltp": 15.4, "powerHp": 204, "batteryCapacityKwh": 64.7},
-                    {"name": "xDrive30 (64.7 kWh - 313 ch)", "fuelType": "ELECTRIC", "consumptionWltp": 16.8, "powerHp": 313, "batteryCapacityKwh": 64.7}
-                ],
-                "finitions": ["Base", "M Sport"],
-                "variants": [
-                    {"finition": "Base", "motorisation": "eDrive20 (64.7 kWh - 204 ch)", "price": 46900.0, "loa": 390.0, "lld": 360.0, "insurance": 820.0, "maintenance": 280.0, "resale": 25000.0},
-                    {"finition": "M Sport", "motorisation": "xDrive30 (64.7 kWh - 313 ch)", "price": 60550.0, "loa": 530.0, "lld": 490.0, "insurance": 1050.0, "maintenance": 330.0, "resale": 33000.0}
-                ]
-            },
-            {
-                "name": "Série 3 330e",
-                "category": "Berline",
-                "motorisations": [
-                    {"name": "330e PHEV 292 ch", "fuelType": "HYBRID", "consumptionWltp": 1.4, "powerHp": 292, "batteryCapacityKwh": 19.5}
-                ],
-                "finitions": ["Base", "M Sport"],
-                "variants": [
-                    {"finition": "Base", "motorisation": "330e PHEV 292 ch", "price": 59900.0, "loa": 520.0, "lld": 480.0, "insurance": 1100.0, "maintenance": 490.0, "resale": 32000.0},
-                    {"finition": "M Sport", "motorisation": "330e PHEV 292 ch", "price": 65450.0, "loa": 570.0, "lld": 530.0, "insurance": 1200.0, "maintenance": 520.0, "resale": 36000.0}
-                ]
-            }
-        ]
-    },
+    {"brand": "BMW", "models": [
+        {"name": "iX1", "category": "SUV",
+         "motorisations": [
+             {"name": "xDrive30 313 ch (66 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 17.3, "powerHp": 313, "batteryCapacityKwh": 66.5},
+         ],
+         "finitions": ["xLine", "M Sport"],
+         "variants": [
+             {"finition": "xLine",  "motorisation": "xDrive30 313 ch (66 kWh)", "price": 56500, "loa": 490, "lld": 455, "insurance": 900,  "maintenance": 290, "resale": 30000},
+             {"finition": "M Sport","motorisation": "xDrive30 313 ch (66 kWh)", "price": 62000, "loa": 560, "lld": 520, "insurance": 980,  "maintenance": 310, "resale": 33000},
+         ]},
+        {"name": "i4", "category": "Berline",
+         "motorisations": [
+             {"name": "eDrive40 340 ch (84 kWh)",   "fuelType": "ELECTRIC", "consumptionWltp": 17.4, "powerHp": 340, "batteryCapacityKwh": 83.9},
+             {"name": "M50 xDrive 544 ch (84 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 19.8, "powerHp": 544, "batteryCapacityKwh": 83.9},
+         ],
+         "finitions": ["Gran Coupe", "M50"],
+         "variants": [
+             {"finition": "Gran Coupe", "motorisation": "eDrive40 340 ch (84 kWh)",   "price": 64800, "loa": 590, "lld": 550, "insurance": 1000, "maintenance": 320, "resale": 35000},
+             {"finition": "M50",        "motorisation": "M50 xDrive 544 ch (84 kWh)", "price": 80400, "loa": 760, "lld": 710, "insurance": 1300, "maintenance": 380, "resale": 44000},
+         ]},
+        {"name": "iX3", "category": "SUV",
+         "motorisations": [
+             {"name": "286 ch (80 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 18.0, "powerHp": 286, "batteryCapacityKwh": 80.0},
+         ],
+         "finitions": ["Impressive", "M Sport"],
+         "variants": [
+             {"finition": "Impressive", "motorisation": "286 ch (80 kWh)", "price": 69900, "loa": 650, "lld": 610, "insurance": 1050, "maintenance": 330, "resale": 38000},
+             {"finition": "M Sport",    "motorisation": "286 ch (80 kWh)", "price": 75200, "loa": 710, "lld": 665, "insurance": 1150, "maintenance": 350, "resale": 41000},
+         ]},
+    ]},
 
     # 11. MERCEDES-BENZ
-    {
-        "brand": "Mercedes-Benz",
-        "models": [
-            {
-                "name": "EQA",
-                "category": "SUV",
-                "motorisations": [
-                    {"name": "250+ (70.5 kWh - 190 ch)", "fuelType": "ELECTRIC", "consumptionWltp": 15.4, "powerHp": 190, "batteryCapacityKwh": 70.5}
-                ],
-                "finitions": ["Progressive Line", "AMG Line"],
-                "variants": [
-                    {"finition": "Progressive Line", "motorisation": "250+ (70.5 kWh - 190 ch)", "price": 46950.0, "loa": 395.0, "lld": 370.0, "insurance": 850.0, "maintenance": 290.0, "resale": 25000.0},
-                    {"finition": "AMG Line", "motorisation": "250+ (70.5 kWh - 190 ch)", "price": 50950.0, "loa": 440.0, "lld": 410.0, "insurance": 920.0, "maintenance": 310.0, "resale": 27500.0}
-                ]
-            },
-            {
-                "name": "EQE Berline",
-                "category": "Berline",
-                "motorisations": [
-                    {"name": "300 (89 kWh - 245 ch)", "fuelType": "ELECTRIC", "consumptionWltp": 16.5, "powerHp": 245, "batteryCapacityKwh": 89.0},
-                    {"name": "350+ (96 kWh - 292 ch)", "fuelType": "ELECTRIC", "consumptionWltp": 16.2, "powerHp": 292, "batteryCapacityKwh": 96.0}
-                ],
-                "finitions": ["Electric Art", "AMG Line"],
-                "variants": [
-                    {"finition": "Electric Art", "motorisation": "300 (89 kWh - 245 ch)", "price": 69900.0, "loa": 650.0, "lld": 600.0, "insurance": 1250.0, "maintenance": 380.0, "resale": 38000.0},
-                    {"finition": "AMG Line", "motorisation": "350+ (96 kWh - 292 ch)", "price": 79200.0, "loa": 740.0, "lld": 690.0, "insurance": 1400.0, "maintenance": 420.0, "resale": 44000.0}
-                ]
-            },
-            {
-                "name": "Classe A 250 e",
-                "category": "Compacte",
-                "motorisations": [
-                    {"name": "250 e Plug-in Hybrid 218 ch", "fuelType": "HYBRID", "consumptionWltp": 1.1, "powerHp": 218, "batteryCapacityKwh": 15.6}
-                ],
-                "finitions": ["Progressive Line", "AMG Line"],
-                "variants": [
-                    {"finition": "Progressive Line", "motorisation": "250 e Plug-in Hybrid 218 ch", "price": 46500.0, "loa": 395.0, "lld": 365.0, "insurance": 820.0, "maintenance": 440.0, "resale": 24500.0},
-                    {"finition": "AMG Line", "motorisation": "250 e Plug-in Hybrid 218 ch", "price": 50150.0, "loa": 435.0, "lld": 405.0, "insurance": 890.0, "maintenance": 460.0, "resale": 27000.0}
-                ]
-            }
-        ]
-    },
+    {"brand": "Mercedes-Benz", "models": [
+        {"name": "EQA", "category": "SUV",
+         "motorisations": [
+             {"name": "250+ 190 ch (70.5 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 16.1, "powerHp": 190, "batteryCapacityKwh": 70.5},
+         ],
+         "finitions": ["AMG Line", "Edition 1"],
+         "variants": [
+             {"finition": "AMG Line",  "motorisation": "250+ 190 ch (70.5 kWh)", "price": 55200, "loa": 480, "lld": 445, "insurance": 900,  "maintenance": 300, "resale": 30000},
+             {"finition": "Edition 1", "motorisation": "250+ 190 ch (70.5 kWh)", "price": 59900, "loa": 540, "lld": 500, "insurance": 960,  "maintenance": 320, "resale": 33000},
+         ]},
+        {"name": "EQB", "category": "SUV",
+         "motorisations": [
+             {"name": "300 4MATIC 228 ch (70.5 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 18.0, "powerHp": 228, "batteryCapacityKwh": 70.5},
+         ],
+         "finitions": ["AMG Line", "Edition 1"],
+         "variants": [
+             {"finition": "AMG Line",  "motorisation": "300 4MATIC 228 ch (70.5 kWh)", "price": 65100, "loa": 590, "lld": 550, "insurance": 1000, "maintenance": 330, "resale": 36000},
+             {"finition": "Edition 1", "motorisation": "300 4MATIC 228 ch (70.5 kWh)", "price": 70000, "loa": 660, "lld": 620, "insurance": 1100, "maintenance": 360, "resale": 39000},
+         ]},
+        {"name": "EQC", "category": "SUV",
+         "motorisations": [
+             {"name": "400 4MATIC 408 ch (80 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 22.2, "powerHp": 408, "batteryCapacityKwh": 80.0},
+         ],
+         "finitions": ["AMG Line", "Edition 1886"],
+         "variants": [
+             {"finition": "AMG Line",     "motorisation": "400 4MATIC 408 ch (80 kWh)", "price": 79900, "loa": 750, "lld": 700, "insurance": 1200, "maintenance": 370, "resale": 44000},
+             {"finition": "Edition 1886", "motorisation": "400 4MATIC 408 ch (80 kWh)", "price": 86000, "loa": 820, "lld": 770, "insurance": 1350, "maintenance": 400, "resale": 48000},
+         ]},
+    ]},
 
     # 12. AUDI
-    {
-        "brand": "Audi",
-        "models": [
-            {
-                "name": "Q4 e-tron",
-                "category": "SUV",
-                "motorisations": [
-                    {"name": "45 e-tron (77 kWh - 286 ch)", "fuelType": "ELECTRIC", "consumptionWltp": 16.6, "powerHp": 286, "batteryCapacityKwh": 77.0},
-                    {"name": "55 e-tron quattro (77 kWh - 340 ch)", "fuelType": "ELECTRIC", "consumptionWltp": 17.8, "powerHp": 340, "batteryCapacityKwh": 77.0}
-                ],
-                "finitions": ["Design", "S line"],
-                "variants": [
-                    {"finition": "Design", "motorisation": "45 e-tron (77 kWh - 286 ch)", "price": 46900.0, "loa": 399.0, "lld": 370.0, "insurance": 820.0, "maintenance": 280.0, "resale": 26000.0},
-                    {"finition": "S line", "motorisation": "55 e-tron quattro (77 kWh - 340 ch)", "price": 63900.0, "loa": 560.0, "lld": 520.0, "insurance": 1050.0, "maintenance": 330.0, "resale": 35000.0}
-                ]
-            },
-            {
-                "name": "Q8 e-tron",
-                "category": "SUV",
-                "motorisations": [
-                    {"name": "55 e-tron quattro (106 kWh - 408 ch)", "fuelType": "ELECTRIC", "consumptionWltp": 20.6, "powerHp": 408, "batteryCapacityKwh": 106.0}
-                ],
-                "finitions": ["S line", "Avus"],
-                "variants": [
-                    {"finition": "S line", "motorisation": "55 e-tron quattro (106 kWh - 408 ch)", "price": 96700.0, "loa": 890.0, "lld": 820.0, "insurance": 1450.0, "maintenance": 420.0, "resale": 52000.0},
-                    {"finition": "Avus", "motorisation": "55 e-tron quattro (106 kWh - 408 ch)", "price": 105500.0, "loa": 980.0, "lld": 910.0, "insurance": 1600.0, "maintenance": 450.0, "resale": 58000.0}
-                ]
-            },
-            {
-                "name": "A3 Sportback TFSI e",
-                "category": "Compacte",
-                "motorisations": [
-                    {"name": "40 TFSI e 204 ch S tronic", "fuelType": "HYBRID", "consumptionWltp": 1.1, "powerHp": 204, "batteryCapacityKwh": 19.7}
-                ],
-                "finitions": ["Design", "S line"],
-                "variants": [
-                    {"finition": "Design", "motorisation": "40 TFSI e 204 ch S tronic", "price": 44800.0, "loa": 370.0, "lld": 340.0, "insurance": 760.0, "maintenance": 420.0, "resale": 23500.0},
-                    {"finition": "S line", "motorisation": "40 TFSI e 204 ch S tronic", "price": 49300.0, "loa": 420.0, "lld": 385.0, "insurance": 830.0, "maintenance": 450.0, "resale": 26500.0}
-                ]
-            }
-        ]
-    },
+    {"brand": "Audi", "models": [
+        {"name": "Q4 e-tron", "category": "SUV",
+         "motorisations": [
+             {"name": "35 e-tron 170 ch (55 kWh)",         "fuelType": "ELECTRIC", "consumptionWltp": 16.2, "powerHp": 170, "batteryCapacityKwh": 55.0},
+             {"name": "40 e-tron 204 ch (82 kWh)",         "fuelType": "ELECTRIC", "consumptionWltp": 17.0, "powerHp": 204, "batteryCapacityKwh": 82.0},
+             {"name": "50 e-tron quattro 299 ch (82 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 19.1, "powerHp": 299, "batteryCapacityKwh": 82.0},
+         ],
+         "finitions": ["Business", "S line", "Edition Sport"],
+         "variants": [
+             {"finition": "Business",     "motorisation": "35 e-tron 170 ch (55 kWh)",         "price": 45900, "loa": 380, "lld": 355, "insurance": 790,  "maintenance": 280, "resale": 25000},
+             {"finition": "S line",       "motorisation": "40 e-tron 204 ch (82 kWh)",         "price": 56900, "loa": 500, "lld": 470, "insurance": 930,  "maintenance": 310, "resale": 31000},
+             {"finition": "Edition Sport","motorisation": "50 e-tron quattro 299 ch (82 kWh)", "price": 65900, "loa": 620, "lld": 580, "insurance": 1050, "maintenance": 340, "resale": 37000},
+         ]},
+        {"name": "e-tron GT", "category": "Berline",
+         "motorisations": [
+             {"name": "quattro 476 ch (93 kWh)",      "fuelType": "ELECTRIC", "consumptionWltp": 19.6, "powerHp": 476, "batteryCapacityKwh": 93.4},
+             {"name": "RS e-tron GT 646 ch (93 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 21.0, "powerHp": 646, "batteryCapacityKwh": 93.4},
+         ],
+         "finitions": ["quattro", "RS"],
+         "variants": [
+             {"finition": "quattro", "motorisation": "quattro 476 ch (93 kWh)",      "price": 110900, "loa": 1050, "lld": 980,  "insurance": 1600, "maintenance": 450, "resale": 62000},
+             {"finition": "RS",      "motorisation": "RS e-tron GT 646 ch (93 kWh)", "price": 152000, "loa": 1490, "lld": 1390, "insurance": 2200, "maintenance": 600, "resale": 88000},
+         ]},
+        {"name": "A6 e-tron", "category": "Berline",
+         "motorisations": [
+             {"name": "Sportback 271 ch (94.9 kWh)",         "fuelType": "ELECTRIC", "consumptionWltp": 15.5, "powerHp": 271, "batteryCapacityKwh": 94.9},
+             {"name": "Sportback quattro 367 ch (94.9 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 16.5, "powerHp": 367, "batteryCapacityKwh": 94.9},
+         ],
+         "finitions": ["Business", "S line"],
+         "variants": [
+             {"finition": "Business", "motorisation": "Sportback 271 ch (94.9 kWh)",         "price": 74900, "loa": 700, "lld": 650, "insurance": 1100, "maintenance": 340, "resale": 42000},
+             {"finition": "S line",   "motorisation": "Sportback quattro 367 ch (94.9 kWh)", "price": 88900, "loa": 850, "lld": 795, "insurance": 1300, "maintenance": 380, "resale": 50000},
+         ]},
+    ]},
 
     # 13. MG MOTOR
-    {
-        "brand": "MG Motor",
-        "models": [
-            {
-                "name": "MG4 Electric",
-                "category": "Compacte",
-                "motorisations": [
-                    {"name": "Standard 170 ch (51 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 17.0, "powerHp": 170, "batteryCapacityKwh": 51.0},
-                    {"name": "Comfort 204 ch (64 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 16.0, "powerHp": 204, "batteryCapacityKwh": 64.0},
-                    {"name": "XPOWER AWD 435 ch (64 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 18.7, "powerHp": 435, "batteryCapacityKwh": 64.0}
-                ],
-                "finitions": ["Standard", "Comfort", "Luxury", "XPOWER"],
-                "variants": [
-                    {"finition": "Standard", "motorisation": "Standard 170 ch (51 kWh)", "price": 29990.0, "loa": 199.0, "lld": 179.0, "insurance": 560.0, "maintenance": 210.0, "resale": 14000.0},
-                    {"finition": "Comfort", "motorisation": "Comfort 204 ch (64 kWh)", "price": 33990.0, "loa": 239.0, "lld": 219.0, "insurance": 620.0, "maintenance": 230.0, "resale": 16500.0},
-                    {"finition": "Luxury", "motorisation": "Comfort 204 ch (64 kWh)", "price": 35990.0, "loa": 259.0, "lld": 239.0, "insurance": 650.0, "maintenance": 240.0, "resale": 18000.0},
-                    {"finition": "XPOWER", "motorisation": "XPOWER AWD 435 ch (64 kWh)", "price": 40490.0, "loa": 320.0, "lld": 295.0, "insurance": 820.0, "maintenance": 270.0, "resale": 21000.0}
-                ]
-            },
-            {
-                "name": "MG ZS EV",
-                "category": "SUV",
-                "motorisations": [
-                    {"name": "Autonomie Étendue 156 ch (70 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 17.8, "powerHp": 156, "batteryCapacityKwh": 70.0}
-                ],
-                "finitions": ["Comfort", "Luxury"],
-                "variants": [
-                    {"finition": "Comfort", "motorisation": "Autonomie Étendue 156 ch (70 kWh)", "price": 37990.0, "loa": 270.0, "lld": 249.0, "insurance": 640.0, "maintenance": 240.0, "resale": 18500.0},
-                    {"finition": "Luxury", "motorisation": "Autonomie Étendue 156 ch (70 kWh)", "price": 39990.0, "loa": 295.0, "lld": 270.0, "insurance": 680.0, "maintenance": 250.0, "resale": 20000.0}
-                ]
-            },
-            {
-                "name": "MG3 Hybrid+",
-                "category": "Citadine",
-                "motorisations": [
-                    {"name": "Hybrid+ 195 ch", "fuelType": "HYBRID", "consumptionWltp": 4.4, "powerHp": 195, "batteryCapacityKwh": 1.83}
-                ],
-                "finitions": ["Standard", "Luxury"],
-                "variants": [
-                    {"finition": "Standard", "motorisation": "Hybrid+ 195 ch", "price": 19990.0, "loa": 149.0, "lld": 135.0, "insurance": 470.0, "maintenance": 310.0, "resale": 10500.0},
-                    {"finition": "Luxury", "motorisation": "Hybrid+ 195 ch", "price": 23490.0, "loa": 179.0, "lld": 160.0, "insurance": 520.0, "maintenance": 330.0, "resale": 12500.0}
-                ]
-            }
-        ]
-    },
+    {"brand": "MG Motor", "models": [
+        {"name": "MG4", "category": "Compacte",
+         "motorisations": [
+             {"name": "Standard 170 ch (51 kWh)",   "fuelType": "ELECTRIC", "consumptionWltp": 15.0, "powerHp": 170, "batteryCapacityKwh": 51.0},
+             {"name": "Long Range 203 ch (64 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 16.4, "powerHp": 203, "batteryCapacityKwh": 64.0},
+         ],
+         "finitions": ["Standard", "Luxury"],
+         "variants": [
+             {"finition": "Standard", "motorisation": "Standard 170 ch (51 kWh)",   "price": 25990, "loa": 199, "lld": 179, "insurance": 520, "maintenance": 210, "resale": 14000},
+             {"finition": "Luxury",   "motorisation": "Long Range 203 ch (64 kWh)", "price": 32990, "loa": 270, "lld": 249, "insurance": 600, "maintenance": 230, "resale": 18000},
+         ]},
+        {"name": "MG ZS EV", "category": "SUV",
+         "motorisations": [
+             {"name": "Comfort 177 ch (51 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 15.7, "powerHp": 177, "batteryCapacityKwh": 51.0},
+             {"name": "Luxury 177 ch (72 kWh)",  "fuelType": "ELECTRIC", "consumptionWltp": 16.8, "powerHp": 177, "batteryCapacityKwh": 72.0},
+         ],
+         "finitions": ["Comfort", "Luxury"],
+         "variants": [
+             {"finition": "Comfort", "motorisation": "Comfort 177 ch (51 kWh)", "price": 29990, "loa": 229, "lld": 210, "insurance": 570, "maintenance": 220, "resale": 16000},
+             {"finition": "Luxury",  "motorisation": "Luxury 177 ch (72 kWh)",  "price": 36490, "loa": 290, "lld": 269, "insurance": 640, "maintenance": 240, "resale": 20000},
+         ]},
+    ]},
 
-    # 14. FIAT
-    {
-        "brand": "Fiat",
-        "models": [
-            {
-                "name": "500e",
-                "category": "Citadine",
-                "motorisations": [
-                    {"name": "Électrique 95 ch (24 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 13.0, "powerHp": 95, "batteryCapacityKwh": 23.8},
-                    {"name": "Électrique 118 ch (42 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 14.0, "powerHp": 118, "batteryCapacityKwh": 42.0}
-                ],
-                "finitions": ["Pop", "La Prima"],
-                "variants": [
-                    {"finition": "Pop", "motorisation": "Électrique 95 ch (24 kWh)", "price": 30400.0, "loa": 179.0, "lld": 159.0, "insurance": 520.0, "maintenance": 200.0, "resale": 14500.0},
-                    {"finition": "La Prima", "motorisation": "Électrique 118 ch (42 kWh)", "price": 37900.0, "loa": 269.0, "lld": 249.0, "insurance": 610.0, "maintenance": 220.0, "resale": 18500.0}
-                ]
-            },
-            {
-                "name": "600e",
-                "category": "Crossover",
-                "motorisations": [
-                    {"name": "Électrique 156 ch (54 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 15.1, "powerHp": 156, "batteryCapacityKwh": 54.0},
-                    {"name": "Hybrid 100 ch", "fuelType": "HYBRID", "consumptionWltp": 4.9, "powerHp": 100, "batteryCapacityKwh": 0.9}
-                ],
-                "finitions": ["Red", "La Prima"],
-                "variants": [
-                    {"finition": "Red", "motorisation": "Électrique 156 ch (54 kWh)", "price": 35900.0, "loa": 249.0, "lld": 229.0, "insurance": 620.0, "maintenance": 230.0, "resale": 18000.0},
-                    {"finition": "La Prima", "motorisation": "Électrique 156 ch (54 kWh)", "price": 40900.0, "loa": 299.0, "lld": 279.0, "insurance": 680.0, "maintenance": 240.0, "resale": 20500.0},
-                    {"finition": "Red", "motorisation": "Hybrid 100 ch", "price": 24900.0, "loa": 189.0, "lld": 169.0, "insurance": 540.0, "maintenance": 360.0, "resale": 13000.0}
-                ]
-            },
-            {
-                "name": "Panda Hybrid",
-                "category": "Citadine",
-                "motorisations": [
-                    {"name": "1.0 GSE Hybrid 70 ch", "fuelType": "HYBRID", "consumptionWltp": 4.8, "powerHp": 70, "batteryCapacityKwh": 0.5}
-                ],
-                "finitions": ["Base", "Cross"],
-                "variants": [
-                    {"finition": "Base", "motorisation": "1.0 GSE Hybrid 70 ch", "price": 15900.0, "loa": 109.0, "lld": 99.0, "insurance": 420.0, "maintenance": 300.0, "resale": 8500.0},
-                    {"finition": "Cross", "motorisation": "1.0 GSE Hybrid 70 ch", "price": 18500.0, "loa": 139.0, "lld": 125.0, "insurance": 460.0, "maintenance": 320.0, "resale": 10000.0}
-                ]
-            }
-        ]
-    },
+    # 14. VOLVO
+    {"brand": "Volvo", "models": [
+        {"name": "EX30", "category": "SUV",
+         "motorisations": [
+             {"name": "Single Motor 272 ch (69 kWh)",          "fuelType": "ELECTRIC", "consumptionWltp": 16.5, "powerHp": 272, "batteryCapacityKwh": 69.0},
+             {"name": "Twin Motor Performance 428 ch (69 kWh)","fuelType": "ELECTRIC", "consumptionWltp": 18.1, "powerHp": 428, "batteryCapacityKwh": 69.0},
+         ],
+         "finitions": ["Core", "Plus", "Ultra"],
+         "variants": [
+             {"finition": "Core",  "motorisation": "Single Motor 272 ch (69 kWh)",          "price": 36990, "loa": 299, "lld": 279, "insurance": 680, "maintenance": 260, "resale": 20000},
+             {"finition": "Plus",  "motorisation": "Single Motor 272 ch (69 kWh)",          "price": 43990, "loa": 369, "lld": 339, "insurance": 760, "maintenance": 280, "resale": 24000},
+             {"finition": "Ultra", "motorisation": "Twin Motor Performance 428 ch (69 kWh)","price": 51990, "loa": 459, "lld": 425, "insurance": 870, "maintenance": 310, "resale": 29000},
+         ]},
+        {"name": "XC40 Recharge", "category": "SUV",
+         "motorisations": [
+             {"name": "Single Motor 231 ch (69 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 18.0, "powerHp": 231, "batteryCapacityKwh": 69.0},
+             {"name": "Twin Motor 408 ch (79 kWh)",   "fuelType": "ELECTRIC", "consumptionWltp": 19.5, "powerHp": 408, "batteryCapacityKwh": 79.0},
+         ],
+         "finitions": ["Core", "Plus", "Ultra"],
+         "variants": [
+             {"finition": "Core",  "motorisation": "Single Motor 231 ch (69 kWh)", "price": 47990, "loa": 410, "lld": 385, "insurance": 820,  "maintenance": 290, "resale": 27000},
+             {"finition": "Plus",  "motorisation": "Single Motor 231 ch (69 kWh)", "price": 53990, "loa": 475, "lld": 445, "insurance": 900,  "maintenance": 310, "resale": 30000},
+             {"finition": "Ultra", "motorisation": "Twin Motor 408 ch (79 kWh)",   "price": 62990, "loa": 590, "lld": 555, "insurance": 1000, "maintenance": 340, "resale": 36000},
+         ]},
+    ]},
 
-    # 15. VOLVO
-    {
-        "brand": "Volvo",
-        "models": [
-            {
-                "name": "EX30",
-                "category": "SUV",
-                "motorisations": [
-                    {"name": "Single Motor (51 kWh LFP - 272 ch)", "fuelType": "ELECTRIC", "consumptionWltp": 16.7, "powerHp": 272, "batteryCapacityKwh": 51.0},
-                    {"name": "Single Motor Extended Range (69 kWh - 272 ch)", "fuelType": "ELECTRIC", "consumptionWltp": 17.0, "powerHp": 272, "batteryCapacityKwh": 69.0},
-                    {"name": "Twin Motor Performance (69 kWh - 428 ch)", "fuelType": "ELECTRIC", "consumptionWltp": 17.5, "powerHp": 428, "batteryCapacityKwh": 69.0}
-                ],
-                "finitions": ["Core", "Plus", "Ultra"],
-                "variants": [
-                    {"finition": "Core", "motorisation": "Single Motor (51 kWh LFP - 272 ch)", "price": 37500.0, "loa": 290.0, "lld": 270.0, "insurance": 690.0, "maintenance": 250.0, "resale": 20000.0},
-                    {"finition": "Plus", "motorisation": "Single Motor Extended Range (69 kWh - 272 ch)", "price": 45000.0, "loa": 370.0, "lld": 345.0, "insurance": 780.0, "maintenance": 270.0, "resale": 24000.0},
-                    {"finition": "Ultra", "motorisation": "Twin Motor Performance (69 kWh - 428 ch)", "price": 52200.0, "loa": 450.0, "lld": 420.0, "insurance": 910.0, "maintenance": 300.0, "resale": 28000.0}
-                ]
-            },
-            {
-                "name": "EX40 Recharge",
-                "category": "SUV",
-                "motorisations": [
-                    {"name": "Single Motor RWD (69 kWh - 238 ch)", "fuelType": "ELECTRIC", "consumptionWltp": 16.6, "powerHp": 238, "batteryCapacityKwh": 69.0}
-                ],
-                "finitions": ["Plus", "Ultimate"],
-                "variants": [
-                    {"finition": "Plus", "motorisation": "Single Motor RWD (69 kWh - 238 ch)", "price": 46990.0, "loa": 395.0, "lld": 370.0, "insurance": 820.0, "maintenance": 280.0, "resale": 25000.0},
-                    {"finition": "Ultimate", "motorisation": "Single Motor RWD (69 kWh - 238 ch)", "price": 53600.0, "loa": 460.0, "lld": 430.0, "insurance": 890.0, "maintenance": 300.0, "resale": 28500.0}
-                ]
-            },
-            {
-                "name": "XC60 T6 Recharge",
-                "category": "SUV",
-                "motorisations": [
-                    {"name": "T6 AWD Plug-in Hybrid 350 ch", "fuelType": "HYBRID", "consumptionWltp": 1.0, "powerHp": 350, "batteryCapacityKwh": 18.8}
-                ],
-                "finitions": ["Plus Dark", "Ultimate Dark"],
-                "variants": [
-                    {"finition": "Plus Dark", "motorisation": "T6 AWD Plug-in Hybrid 350 ch", "price": 73600.0, "loa": 690.0, "lld": 640.0, "insurance": 1280.0, "maintenance": 520.0, "resale": 40000.0},
-                    {"finition": "Ultimate Dark", "motorisation": "T6 AWD Plug-in Hybrid 350 ch", "price": 81900.0, "loa": 780.0, "lld": 730.0, "insurance": 1420.0, "maintenance": 560.0, "resale": 45000.0}
-                ]
-            }
-        ]
-    },
+    # 15. NISSAN
+    {"brand": "Nissan", "models": [
+        {"name": "Leaf", "category": "Compacte",
+         "motorisations": [
+             {"name": "Acenta 150 ch (40 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 15.0, "powerHp": 150, "batteryCapacityKwh": 40.0},
+             {"name": "e+ 217 ch (62 kWh)",     "fuelType": "ELECTRIC", "consumptionWltp": 16.4, "powerHp": 217, "batteryCapacityKwh": 62.0},
+         ],
+         "finitions": ["Acenta", "N-Connecta", "Tekna"],
+         "variants": [
+             {"finition": "Acenta",     "motorisation": "Acenta 150 ch (40 kWh)", "price": 34890, "loa": 270, "lld": 250, "insurance": 590, "maintenance": 230, "resale": 18000},
+             {"finition": "N-Connecta", "motorisation": "Acenta 150 ch (40 kWh)", "price": 38890, "loa": 320, "lld": 295, "insurance": 650, "maintenance": 240, "resale": 20000},
+             {"finition": "Tekna",      "motorisation": "e+ 217 ch (62 kWh)",     "price": 44890, "loa": 390, "lld": 360, "insurance": 730, "maintenance": 260, "resale": 24000},
+         ]},
+        {"name": "Ariya", "category": "SUV",
+         "motorisations": [
+             {"name": "87 kWh 242 ch 2WD",    "fuelType": "ELECTRIC", "consumptionWltp": 18.0, "powerHp": 242, "batteryCapacityKwh": 87.0},
+             {"name": "87 kWh 306 ch e-4ORCE","fuelType": "ELECTRIC", "consumptionWltp": 20.4, "powerHp": 306, "batteryCapacityKwh": 87.0},
+         ],
+         "finitions": ["Engage", "Evolve+"],
+         "variants": [
+             {"finition": "Engage",  "motorisation": "87 kWh 242 ch 2WD",     "price": 59990, "loa": 550, "lld": 510, "insurance": 950,  "maintenance": 300, "resale": 33000},
+             {"finition": "Evolve+", "motorisation": "87 kWh 306 ch e-4ORCE", "price": 68990, "loa": 650, "lld": 610, "insurance": 1080, "maintenance": 330, "resale": 38000},
+         ]},
+    ]},
 
-    # 16. NISSAN
-    {
-        "brand": "Nissan",
-        "models": [
-            {
-                "name": "Ariya",
-                "category": "Crossover",
-                "motorisations": [
-                    {"name": "Advance 218 ch (63 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 17.6, "powerHp": 218, "batteryCapacityKwh": 63.0},
-                    {"name": "Evolve 242 ch (87 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 18.2, "powerHp": 242, "batteryCapacityKwh": 87.0}
-                ],
-                "finitions": ["Advance", "Evolve"],
-                "variants": [
-                    {"finition": "Advance", "motorisation": "Advance 218 ch (63 kWh)", "price": 39900.0, "loa": 320.0, "lld": 299.0, "insurance": 730.0, "maintenance": 260.0, "resale": 20500.0},
-                    {"finition": "Evolve", "motorisation": "Evolve 242 ch (87 kWh)", "price": 50400.0, "loa": 440.0, "lld": 410.0, "insurance": 860.0, "maintenance": 290.0, "resale": 27000.0}
-                ]
-            },
-            {
-                "name": "Leaf",
-                "category": "Compacte",
-                "motorisations": [
-                    {"name": "Acenta 150 ch (40 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 17.1, "powerHp": 150, "batteryCapacityKwh": 40.0}
-                ],
-                "finitions": ["Acenta", "N-Connecta"],
-                "variants": [
-                    {"finition": "Acenta", "motorisation": "Acenta 150 ch (40 kWh)", "price": 36900.0, "loa": 269.0, "lld": 249.0, "insurance": 620.0, "maintenance": 240.0, "resale": 16000.0},
-                    {"finition": "N-Connecta", "motorisation": "Acenta 150 ch (40 kWh)", "price": 38600.0, "loa": 289.0, "lld": 269.0, "insurance": 650.0, "maintenance": 250.0, "resale": 17500.0}
-                ]
-            },
-            {
-                "name": "Qashqai e-POWER",
-                "category": "SUV",
-                "motorisations": [
-                    {"name": "e-POWER 190 ch", "fuelType": "HYBRID", "consumptionWltp": 5.1, "powerHp": 190, "batteryCapacityKwh": 2.1}
-                ],
-                "finitions": ["Acenta", "Tekna"],
-                "variants": [
-                    {"finition": "Acenta", "motorisation": "e-POWER 190 ch", "price": 38700.0, "loa": 310.0, "lld": 290.0, "insurance": 680.0, "maintenance": 410.0, "resale": 20000.0},
-                    {"finition": "Tekna", "motorisation": "e-POWER 190 ch", "price": 43900.0, "loa": 365.0, "lld": 340.0, "insurance": 750.0, "maintenance": 440.0, "resale": 23500.0}
-                ]
-            }
-        ]
-    },
+    # 16. SKODA
+    {"brand": "Skoda", "models": [
+        {"name": "Enyaq", "category": "SUV",
+         "motorisations": [
+             {"name": "60 204 ch (62 kWh)",    "fuelType": "ELECTRIC", "consumptionWltp": 16.2, "powerHp": 204, "batteryCapacityKwh": 62.0},
+             {"name": "80 204 ch (82 kWh)",    "fuelType": "ELECTRIC", "consumptionWltp": 17.2, "powerHp": 204, "batteryCapacityKwh": 82.0},
+             {"name": "80x 4x4 265 ch (82 kWh)","fuelType": "ELECTRIC","consumptionWltp": 18.5,"powerHp": 265, "batteryCapacityKwh": 82.0},
+         ],
+         "finitions": ["Selection", "Sportline", "L&K"],
+         "variants": [
+             {"finition": "Selection",  "motorisation": "60 204 ch (62 kWh)",     "price": 38990, "loa": 320, "lld": 295, "insurance": 680, "maintenance": 260, "resale": 21000},
+             {"finition": "Sportline",  "motorisation": "80 204 ch (82 kWh)",     "price": 50490, "loa": 440, "lld": 410, "insurance": 840, "maintenance": 290, "resale": 28000},
+             {"finition": "L&K",        "motorisation": "80x 4x4 265 ch (82 kWh)","price": 57490, "loa": 520, "lld": 480, "insurance": 940, "maintenance": 310, "resale": 32000},
+         ]},
+        {"name": "Octavia iV", "category": "Break",
+         "motorisations": [
+             {"name": "1.4 TSI iV 245 ch PHEV", "fuelType": "PLUGIN_HYBRID", "consumptionWltp": 1.0, "powerHp": 245, "batteryCapacityKwh": 13.0},
+         ],
+         "finitions": ["Selection", "Sportline"],
+         "variants": [
+             {"finition": "Selection", "motorisation": "1.4 TSI iV 245 ch PHEV", "price": 40290, "loa": 340, "lld": 315, "insurance": 710, "maintenance": 400, "resale": 22000},
+             {"finition": "Sportline", "motorisation": "1.4 TSI iV 245 ch PHEV", "price": 44990, "loa": 390, "lld": 360, "insurance": 770, "maintenance": 420, "resale": 25000},
+         ]},
+    ]},
 
-    # 17. SKODA
-    {
-        "brand": "Skoda",
-        "models": [
-            {
-                "name": "Enyaq iV",
-                "category": "SUV",
-                "motorisations": [
-                    {"name": "85 (77 kWh - 286 ch)", "fuelType": "ELECTRIC", "consumptionWltp": 14.8, "powerHp": 286, "batteryCapacityKwh": 77.0},
-                    {"name": "85x 4x4 (77 kWh - 286 ch)", "fuelType": "ELECTRIC", "consumptionWltp": 15.8, "powerHp": 286, "batteryCapacityKwh": 77.0}
-                ],
-                "finitions": ["Selection", "Sportline"],
-                "variants": [
-                    {"finition": "Selection", "motorisation": "85 (77 kWh - 286 ch)", "price": 46990.0, "loa": 380.0, "lld": 350.0, "insurance": 760.0, "maintenance": 270.0, "resale": 24500.0},
-                    {"finition": "Sportline", "motorisation": "85x 4x4 (77 kWh - 286 ch)", "price": 56980.0, "loa": 480.0, "lld": 445.0, "insurance": 890.0, "maintenance": 310.0, "resale": 29500.0}
-                ]
-            },
-            {
-                "name": "Enyaq Coupé",
-                "category": "SUV Coupé",
-                "motorisations": [
-                    {"name": "85 (77 kWh - 286 ch)", "fuelType": "ELECTRIC", "consumptionWltp": 14.4, "powerHp": 286, "batteryCapacityKwh": 77.0},
-                    {"name": "RS 4x4 (77 kWh - 340 ch)", "fuelType": "ELECTRIC", "consumptionWltp": 16.1, "powerHp": 340, "batteryCapacityKwh": 77.0}
-                ],
-                "finitions": ["Selection", "RS"],
-                "variants": [
-                    {"finition": "Selection", "motorisation": "85 (77 kWh - 286 ch)", "price": 49990.0, "loa": 410.0, "lld": 380.0, "insurance": 790.0, "maintenance": 280.0, "resale": 26000.0},
-                    {"finition": "RS", "motorisation": "RS 4x4 (77 kWh - 340 ch)", "price": 63780.0, "loa": 550.0, "lld": 510.0, "insurance": 1020.0, "maintenance": 340.0, "resale": 33500.0}
-                ]
-            },
-            {
-                "name": "Octavia Combi iV",
-                "category": "Break",
-                "motorisations": [
-                    {"name": "1.5 TSI PHEV 204 ch DSG", "fuelType": "HYBRID", "consumptionWltp": 1.0, "powerHp": 204, "batteryCapacityKwh": 19.7}
-                ],
-                "finitions": ["Selection", "Sportline"],
-                "variants": [
-                    {"finition": "Selection", "motorisation": "1.5 TSI PHEV 204 ch DSG", "price": 41500.0, "loa": 340.0, "lld": 315.0, "insurance": 700.0, "maintenance": 390.0, "resale": 21500.0},
-                    {"finition": "Sportline", "motorisation": "1.5 TSI PHEV 204 ch DSG", "price": 46200.0, "loa": 390.0, "lld": 360.0, "insurance": 770.0, "maintenance": 420.0, "resale": 24500.0}
-                ]
-            }
-        ]
-    },
+    # 17. CUPRA
+    {"brand": "Cupra", "models": [
+        {"name": "Born", "category": "Compacte",
+         "motorisations": [
+             {"name": "e-Boost 231 ch (59 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 15.5, "powerHp": 231, "batteryCapacityKwh": 59.0},
+             {"name": "e-Boost 231 ch (77 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 16.0, "powerHp": 231, "batteryCapacityKwh": 77.0},
+         ],
+         "finitions": ["V1", "V2", "V3"],
+         "variants": [
+             {"finition": "V1", "motorisation": "e-Boost 231 ch (59 kWh)", "price": 38290, "loa": 310, "lld": 290, "insurance": 680, "maintenance": 260, "resale": 21000},
+             {"finition": "V2", "motorisation": "e-Boost 231 ch (59 kWh)", "price": 41490, "loa": 360, "lld": 335, "insurance": 730, "maintenance": 270, "resale": 23000},
+             {"finition": "V3", "motorisation": "e-Boost 231 ch (77 kWh)", "price": 47290, "loa": 420, "lld": 390, "insurance": 810, "maintenance": 290, "resale": 26500},
+         ]},
+        {"name": "Formentor e-Hybrid", "category": "SUV",
+         "motorisations": [
+             {"name": "1.5 e-Hybrid 204 ch", "fuelType": "PLUGIN_HYBRID", "consumptionWltp": 1.0, "powerHp": 204, "batteryCapacityKwh": 12.8},
+             {"name": "1.5 e-Hybrid 272 ch", "fuelType": "PLUGIN_HYBRID", "consumptionWltp": 0.9, "powerHp": 272, "batteryCapacityKwh": 12.8},
+         ],
+         "finitions": ["VZ", "VZ Adrenaline"],
+         "variants": [
+             {"finition": "VZ",            "motorisation": "1.5 e-Hybrid 204 ch", "price": 39990, "loa": 330, "lld": 310, "insurance": 720, "maintenance": 400, "resale": 22000},
+             {"finition": "VZ Adrenaline", "motorisation": "1.5 e-Hybrid 272 ch", "price": 49490, "loa": 430, "lld": 400, "insurance": 850, "maintenance": 430, "resale": 27500},
+         ]},
+    ]},
 
-    # 18. CUPRA
-    {
-        "brand": "Cupra",
-        "models": [
-            {
-                "name": "Born",
-                "category": "Compacte",
-                "motorisations": [
-                    {"name": "V 204 ch (58 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 15.5, "powerHp": 204, "batteryCapacityKwh": 58.0},
-                    {"name": "e-Boost 231 ch (77 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 15.9, "powerHp": 231, "batteryCapacityKwh": 77.0},
-                    {"name": "VZ 326 ch (79 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 16.4, "powerHp": 326, "batteryCapacityKwh": 79.0}
-                ],
-                "finitions": ["V", "VZ"],
-                "variants": [
-                    {"finition": "V", "motorisation": "V 204 ch (58 kWh)", "price": 39990.0, "loa": 299.0, "lld": 279.0, "insurance": 710.0, "maintenance": 250.0, "resale": 20500.0},
-                    {"finition": "V", "motorisation": "e-Boost 231 ch (77 kWh)", "price": 45490.0, "loa": 360.0, "lld": 335.0, "insurance": 780.0, "maintenance": 270.0, "resale": 23500.0},
-                    {"finition": "VZ", "motorisation": "VZ 326 ch (79 kWh)", "price": 48990.0, "loa": 410.0, "lld": 380.0, "insurance": 890.0, "maintenance": 290.0, "resale": 26000.0}
-                ]
-            },
-            {
-                "name": "Formentor e-HYBRID",
-                "category": "CUV",
-                "motorisations": [
-                    {"name": "1.5 e-HYBRID 204 ch DSG", "fuelType": "HYBRID", "consumptionWltp": 1.1, "powerHp": 204, "batteryCapacityKwh": 19.7},
-                    {"name": "VZ 1.5 e-HYBRID 272 ch DSG", "fuelType": "HYBRID", "consumptionWltp": 1.3, "powerHp": 272, "batteryCapacityKwh": 19.7}
-                ],
-                "finitions": ["V", "VZ"],
-                "variants": [
-                    {"finition": "V", "motorisation": "1.5 e-HYBRID 204 ch DSG", "price": 44900.0, "loa": 360.0, "lld": 330.0, "insurance": 760.0, "maintenance": 420.0, "resale": 23500.0},
-                    {"finition": "VZ", "motorisation": "VZ 1.5 e-HYBRID 272 ch DSG", "price": 54200.0, "loa": 450.0, "lld": 420.0, "insurance": 920.0, "maintenance": 460.0, "resale": 29000.0}
-                ]
-            },
-            {
-                "name": "Tavascan",
-                "category": "SUV Coupé",
-                "motorisations": [
-                    {"name": "Endurance 286 ch (77 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 15.6, "powerHp": 286, "batteryCapacityKwh": 77.0},
-                    {"name": "VZ 340 ch AWD (77 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 16.8, "powerHp": 340, "batteryCapacityKwh": 77.0}
-                ],
-                "finitions": ["Endurance", "VZ"],
-                "variants": [
-                    {"finition": "Endurance", "motorisation": "Endurance 286 ch (77 kWh)", "price": 46990.0, "loa": 390.0, "lld": 360.0, "insurance": 820.0, "maintenance": 280.0, "resale": 25500.0},
-                    {"finition": "VZ", "motorisation": "VZ 340 ch AWD (77 kWh)", "price": 57990.0, "loa": 490.0, "lld": 455.0, "insurance": 960.0, "maintenance": 320.0, "resale": 31500.0}
-                ]
-            }
-        ]
-    },
+    # 18. BYD
+    {"brand": "BYD", "models": [
+        {"name": "Atto 3", "category": "SUV",
+         "motorisations": [
+             {"name": "204 ch (60.5 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 15.4, "powerHp": 204, "batteryCapacityKwh": 60.5},
+         ],
+         "finitions": ["Comfort", "Boost"],
+         "variants": [
+             {"finition": "Comfort", "motorisation": "204 ch (60.5 kWh)", "price": 37990, "loa": 299, "lld": 279, "insurance": 680, "maintenance": 240, "resale": 21000},
+             {"finition": "Boost",   "motorisation": "204 ch (60.5 kWh)", "price": 41990, "loa": 345, "lld": 320, "insurance": 730, "maintenance": 250, "resale": 23000},
+         ]},
+        {"name": "Seal", "category": "Berline",
+         "motorisations": [
+             {"name": "313 ch RWD (82.5 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 16.4, "powerHp": 313, "batteryCapacityKwh": 82.5},
+             {"name": "530 ch AWD (82.5 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 18.0, "powerHp": 530, "batteryCapacityKwh": 82.5},
+         ],
+         "finitions": ["Comfort", "Excellence"],
+         "variants": [
+             {"finition": "Comfort",   "motorisation": "313 ch RWD (82.5 kWh)", "price": 44990, "loa": 370, "lld": 345, "insurance": 790, "maintenance": 270, "resale": 25000},
+             {"finition": "Excellence","motorisation": "530 ch AWD (82.5 kWh)", "price": 52990, "loa": 465, "lld": 435, "insurance": 900, "maintenance": 300, "resale": 30000},
+         ]},
+    ]},
 
-    # 19. BYD
-    {
-        "brand": "BYD",
-        "models": [
-            {
-                "name": "Atto 3",
-                "category": "SUV",
-                "motorisations": [
-                    {"name": "Comfort 204 ch (60.4 kWh Blade)", "fuelType": "ELECTRIC", "consumptionWltp": 16.0, "powerHp": 204, "batteryCapacityKwh": 60.4}
-                ],
-                "finitions": ["Comfort", "Design"],
-                "variants": [
-                    {"finition": "Comfort", "motorisation": "Comfort 204 ch (60.4 kWh Blade)", "price": 37990.0, "loa": 290.0, "lld": 269.0, "insurance": 650.0, "maintenance": 230.0, "resale": 19000.0},
-                    {"finition": "Design", "motorisation": "Comfort 204 ch (60.4 kWh Blade)", "price": 39990.0, "loa": 315.0, "lld": 290.0, "insurance": 690.0, "maintenance": 240.0, "resale": 20500.0}
-                ]
-            },
-            {
-                "name": "Dolphin",
-                "category": "Compacte",
-                "motorisations": [
-                    {"name": "Comfort 204 ch (60.4 kWh Blade)", "fuelType": "ELECTRIC", "consumptionWltp": 15.9, "powerHp": 204, "batteryCapacityKwh": 60.4}
-                ],
-                "finitions": ["Comfort", "Design"],
-                "variants": [
-                    {"finition": "Comfort", "motorisation": "Comfort 204 ch (60.4 kWh Blade)", "price": 33990.0, "loa": 240.0, "lld": 220.0, "insurance": 590.0, "maintenance": 220.0, "resale": 16500.0},
-                    {"finition": "Design", "motorisation": "Comfort 204 ch (60.4 kWh Blade)", "price": 35990.0, "loa": 265.0, "lld": 245.0, "insurance": 620.0, "maintenance": 230.0, "resale": 18000.0}
-                ]
-            },
-            {
-                "name": "Seal",
-                "category": "Berline",
-                "motorisations": [
-                    {"name": "Design RWD 313 ch (82.5 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 16.6, "powerHp": 313, "batteryCapacityKwh": 82.5},
-                    {"name": "Excellence AWD 530 ch (82.5 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 18.2, "powerHp": 530, "batteryCapacityKwh": 82.5}
-                ],
-                "finitions": ["Design", "Excellence"],
-                "variants": [
-                    {"finition": "Design", "motorisation": "Design RWD 313 ch (82.5 kWh)", "price": 46990.0, "loa": 390.0, "lld": 360.0, "insurance": 850.0, "maintenance": 270.0, "resale": 25500.0},
-                    {"finition": "Excellence", "motorisation": "Excellence AWD 530 ch (82.5 kWh)", "price": 49990.0, "loa": 430.0, "lld": 399.0, "insurance": 960.0, "maintenance": 290.0, "resale": 27500.0}
-                ]
-            }
-        ]
-    },
+    # 19. FORD
+    {"brand": "Ford", "models": [
+        {"name": "Mustang Mach-E", "category": "SUV",
+         "motorisations": [
+             {"name": "Standard 269 ch (75 kWh)",       "fuelType": "ELECTRIC", "consumptionWltp": 18.0, "powerHp": 269, "batteryCapacityKwh": 75.0},
+             {"name": "Extended Range 294 ch (98 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 19.5, "powerHp": 294, "batteryCapacityKwh": 98.7},
+         ],
+         "finitions": ["Select", "Premium", "GT"],
+         "variants": [
+             {"finition": "Select",  "motorisation": "Standard 269 ch (75 kWh)",       "price": 46800, "loa": 390, "lld": 360, "insurance": 800,  "maintenance": 280, "resale": 26000},
+             {"finition": "Premium", "motorisation": "Extended Range 294 ch (98 kWh)", "price": 59200, "loa": 530, "lld": 490, "insurance": 960,  "maintenance": 310, "resale": 33000},
+             {"finition": "GT",      "motorisation": "Extended Range 294 ch (98 kWh)", "price": 67200, "loa": 630, "lld": 585, "insurance": 1080, "maintenance": 340, "resale": 38000},
+         ]},
+        {"name": "Explorer Electric", "category": "SUV",
+         "motorisations": [
+             {"name": "286 ch (79 kWh)",    "fuelType": "ELECTRIC", "consumptionWltp": 18.5, "powerHp": 286, "batteryCapacityKwh": 79.0},
+             {"name": "340 ch AWD (79 kWh)","fuelType": "ELECTRIC", "consumptionWltp": 20.2, "powerHp": 340, "batteryCapacityKwh": 79.0},
+         ],
+         "finitions": ["Select", "Premium"],
+         "variants": [
+             {"finition": "Select",  "motorisation": "286 ch (79 kWh)",    "price": 47000, "loa": 395, "lld": 365, "insurance": 810, "maintenance": 290, "resale": 26000},
+             {"finition": "Premium", "motorisation": "340 ch AWD (79 kWh)","price": 54000, "loa": 480, "lld": 445, "insurance": 910, "maintenance": 320, "resale": 30000},
+         ]},
+    ]},
 
-    # 20. FORD
-    {
-        "brand": "Ford",
-        "models": [
-            {
-                "name": "Mustang Mach-E",
-                "category": "SUV",
-                "motorisations": [
-                    {"name": "RWD Standard Range 269 ch (72 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 17.3, "powerHp": 269, "batteryCapacityKwh": 72.0},
-                    {"name": "RWD Extended Range 294 ch (91 kWh)", "fuelType": "ELECTRIC", "consumptionWltp": 17.8, "powerHp": 294, "batteryCapacityKwh": 91.0}
-                ],
-                "finitions": ["Mach-E", "Premium"],
-                "variants": [
-                    {"finition": "Mach-E", "motorisation": "RWD Standard Range 269 ch (72 kWh)", "price": 46990.0, "loa": 395.0, "lld": 365.0, "insurance": 820.0, "maintenance": 280.0, "resale": 25000.0},
-                    {"finition": "Premium", "motorisation": "RWD Extended Range 294 ch (91 kWh)", "price": 54990.0, "loa": 470.0, "lld": 435.0, "insurance": 910.0, "maintenance": 300.0, "resale": 29500.0}
-                ]
-            },
-            {
-                "name": "Puma EcoBoost Hybrid",
-                "category": "SUV",
-                "motorisations": [
-                    {"name": "1.0 EcoBoost Hybrid 125 ch mHEV", "fuelType": "HYBRID", "consumptionWltp": 5.4, "powerHp": 125, "batteryCapacityKwh": 0.4}
-                ],
-                "finitions": ["Titanium", "ST-Line X"],
-                "variants": [
-                    {"finition": "Titanium", "motorisation": "1.0 EcoBoost Hybrid 125 ch mHEV", "price": 27490.0, "loa": 210.0, "lld": 190.0, "insurance": 560.0, "maintenance": 380.0, "resale": 14500.0},
-                    {"finition": "ST-Line X", "motorisation": "1.0 EcoBoost Hybrid 125 ch mHEV", "price": 31390.0, "loa": 255.0, "lld": 235.0, "insurance": 610.0, "maintenance": 400.0, "resale": 16800.0}
-                ]
-            },
-            {
-                "name": "Kuga PHEV",
-                "category": "SUV",
-                "motorisations": [
-                    {"name": "2.5 Duratec PHEV 243 ch", "fuelType": "HYBRID", "consumptionWltp": 1.2, "powerHp": 243, "batteryCapacityKwh": 14.4}
-                ],
-                "finitions": ["Titanium", "ST-Line X"],
-                "variants": [
-                    {"finition": "Titanium", "motorisation": "2.5 Duratec PHEV 243 ch", "price": 43500.0, "loa": 360.0, "lld": 330.0, "insurance": 760.0, "maintenance": 440.0, "resale": 23000.0},
-                    {"finition": "ST-Line X", "motorisation": "2.5 Duratec PHEV 243 ch", "price": 48500.0, "loa": 410.0, "lld": 380.0, "insurance": 830.0, "maintenance": 470.0, "resale": 26000.0}
-                ]
-            }
-        ]
-    }
+    # 20. FIAT
+    {"brand": "Fiat", "models": [
+        {"name": "500e", "category": "Citadine",
+         "motorisations": [
+             {"name": "Icon 118 ch (42 kWh)",   "fuelType": "ELECTRIC", "consumptionWltp": 14.2, "powerHp": 118, "batteryCapacityKwh": 42.0},
+             {"name": "La Prima 118 ch (42 kWh)","fuelType": "ELECTRIC","consumptionWltp": 14.5, "powerHp": 118, "batteryCapacityKwh": 42.0},
+         ],
+         "finitions": ["Action", "Icon", "La Prima"],
+         "variants": [
+             {"finition": "Action",   "motorisation": "Icon 118 ch (42 kWh)",    "price": 26350, "loa": 199, "lld": 180, "insurance": 510, "maintenance": 210, "resale": 14000},
+             {"finition": "Icon",     "motorisation": "Icon 118 ch (42 kWh)",    "price": 31350, "loa": 250, "lld": 230, "insurance": 570, "maintenance": 220, "resale": 17000},
+             {"finition": "La Prima", "motorisation": "La Prima 118 ch (42 kWh)","price": 35950, "loa": 299, "lld": 275, "insurance": 630, "maintenance": 230, "resale": 20000},
+         ]},
+        {"name": "Panda Hybrid", "category": "Citadine",
+         "motorisations": [
+             {"name": "1.0 Mild Hybrid 70 ch", "fuelType": "HYBRID", "consumptionWltp": 5.0, "powerHp": 70, "batteryCapacityKwh": 0.2},
+         ],
+         "finitions": ["Pop", "Sport"],
+         "variants": [
+             {"finition": "Pop",   "motorisation": "1.0 Mild Hybrid 70 ch", "price": 19200, "loa": 149, "lld": 135, "insurance": 440, "maintenance": 320, "resale": 10500},
+             {"finition": "Sport", "motorisation": "1.0 Mild Hybrid 70 ch", "price": 21700, "loa": 179, "lld": 159, "insurance": 480, "maintenance": 330, "resale": 12000},
+         ]},
+    ]},
 ]
+
+
+# ── Logique de seeding ────────────────────────────────────────────────────────
+
+def _get_or_create(list_fn, create_fn, match_key, name, update_fn=None):
+    """Tente create_fn ; en cas d'echec recupere l'objet existant par name."""
+    try:
+        return create_fn()
+    except Exception:
+        try:
+            items = list_fn()
+        except Exception:
+            return None
+        obj = next((i for i in items if i.get(match_key, "").lower() == name.lower()), None)
+        if obj and update_fn:
+            try:
+                update_fn(obj["id"])
+            except Exception:
+                pass
+        return obj
+
+
+def seed_brand(brand_data, stats_lock, stats):
+    """Traite une marque : logo + modeles + motorisations + finitions + variantes."""
+    brand_name = brand_data["brand"]
+
+    # 1. Logo
+    brand_svg = BRAND_LOGOS_SVG.get(brand_name) or (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
+        f'<rect width="100" height="100" fill="#18181b"/>'
+        f'<text x="50" y="62" font-size="26" font-weight="bold" fill="#fff" text-anchor="middle">'
+        f'{brand_name[:3].upper()}</text></svg>'
+    )
+    logo_key = f"logo_{brand_name.lower().replace(' ', '_').replace('-', '_')}"
+    logo_url = upload_svg(brand_svg, logo_key, folder="brands")
+    print(f"[Brand] {brand_name} — logo -> {logo_url or '(echec)'}")
+
+    # 2. Creer/retrouver la marque
+    brand_obj = _get_or_create(
+        list_fn=lambda: api_get("/brands"),
+        create_fn=lambda: api_post("/brands", {"name": brand_name, "logoUrl": logo_url}),
+        match_key="name", name=brand_name,
+        update_fn=lambda bid: api_put(f"/brands/{bid}", {"name": brand_name, "logoUrl": logo_url}),
+    )
+    if not brand_obj:
+        print(f"  [!] Impossible de creer/trouver la marque {brand_name}", file=sys.stderr)
+        return
+    brand_id = brand_obj["id"]
+    with stats_lock:
+        stats["brands"] += 1
+
+    # 3. Modeles
+    for model_data in brand_data.get("models", []):
+        model_name = model_data["name"]
+        model_cat  = model_data.get("category", "Berline")
+        mots_list  = model_data.get("motorisations", [])
+        fuel_types = [m.get("fuelType", "PETROL") for m in mots_list]
+        dominant   = ("ELECTRIC" if "ELECTRIC" in fuel_types
+                      else "HYBRID" if any("HYBRID" in f for f in fuel_types)
+                      else "PETROL")
+
+        model_key = f"model_{brand_name}_{model_name}".lower().replace(" ", "_").replace("/", "_").replace("-", "_")
+        model_svg = generate_model_svg(brand_name, model_name, model_cat, fuel_type=dominant)
+        model_url = upload_svg(model_svg, model_key, folder="models")
+
+        model_obj = _get_or_create(
+            list_fn=lambda: api_get("/models", params={"brandId": brand_id}),
+            create_fn=lambda: api_post("/models",
+                                       {"name": model_name, "imageUrl": model_url, "category": model_cat},
+                                       params={"brandId": brand_id}),
+            match_key="name", name=model_name,
+            update_fn=lambda mid: api_put(f"/models/{mid}",
+                                          {"name": model_name, "imageUrl": model_url, "category": model_cat}),
+        )
+        if not model_obj:
+            print(f"  [!] Impossible de creer/trouver le modele {model_name}", file=sys.stderr)
+            continue
+        model_id = model_obj["id"]
+        with stats_lock:
+            stats["models"] += 1
+        print(f"  [Model] {model_name} ({model_cat}) -> id={model_id}")
+
+        # 4. Motorisations
+        mot_id_map = {}
+        for mot in mots_list:
+            mot_name = mot["name"]
+            mot_obj = _get_or_create(
+                list_fn=lambda: api_get("/motorisations", params={"modelId": model_id}),
+                create_fn=lambda m=mot: api_post("/motorisations", m, params={"modelId": model_id}),
+                match_key="name", name=mot_name,
+            )
+            if mot_obj:
+                mot_id_map[mot_name] = mot_obj["id"]
+                with stats_lock:
+                    stats["motorisations"] += 1
+
+        # 5. Finitions en parallele
+        fin_names = model_data.get("finitions", [])
+
+        def process_finition(fin_name, _model_id=model_id, _dominant=dominant):
+            fin_key = (f"fin_{brand_name}_{model_name}_{fin_name}"
+                       .lower().replace(" ", "_").replace("/", "_").replace("-", "_"))
+            fin_svg = generate_model_svg(brand_name, f"{model_name} {fin_name}", model_cat, fuel_type=_dominant)
+            fin_url = upload_svg(fin_svg, fin_key, folder="finitions")
+            fin_payload = {"name": fin_name, "imageUrl": fin_url}
+            fin_obj = _get_or_create(
+                list_fn=lambda: api_get("/finitions", params={"modelId": _model_id}),
+                create_fn=lambda: api_post("/finitions", fin_payload, params={"modelId": _model_id}),
+                match_key="name", name=fin_name,
+                update_fn=lambda fid: api_put(f"/finitions/{fid}", fin_payload),
+            )
+            return fin_name, fin_obj
+
+        fin_id_map = {}
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS_UPLOAD) as ex:
+            futures = {ex.submit(process_finition, fn): fn for fn in fin_names}
+            for fut in as_completed(futures):
+                fn, fobj = fut.result()
+                if fobj:
+                    fin_id_map[fn] = fobj["id"]
+                    with stats_lock:
+                        stats["finitions"] += 1
+
+        # 6. Variantes tarifees
+        for var in model_data.get("variants", []):
+            fin_id = fin_id_map.get(var["finition"])
+            mot_id = mot_id_map.get(var["motorisation"])
+            if not fin_id or not mot_id:
+                continue
+            payload = {
+                "purchasePrice":          var.get("price", 0.0),
+                "monthlyLoa":             var.get("loa"),
+                "monthlyLld":             var.get("lld"),
+                "defaultInsuranceCost":   var.get("insurance"),
+                "defaultMaintenanceCost": var.get("maintenance"),
+                "estimatedResaleValue":   var.get("resale"),
+            }
+            try:
+                var_resp = api_post("/variants", payload,
+                                    params={"finitionId": fin_id, "motorisationId": mot_id})
+                with stats_lock:
+                    stats["variants"] += 1
+                print(f"      [$] {var['finition']} x {var['motorisation']} -> {var.get('price')} EUR")
+            except Exception:
+                pass
+
 
 def clear_catalog(target_url=None):
     if target_url:
         configure_api_endpoints(target_url)
-
-    print(f"[*] Nettoyage complet du catalogue sur {API_BASE}...")
+    print(f"[*] Nettoyage du catalogue sur {API_BASE}...")
     try:
         brands = api_get("/brands")
-        print(f"[*] {len(brands)} marques trouvées. Suppression en cours (avec cascade)...")
+        print(f"    {len(brands)} marques a supprimer.")
         for b in brands:
             api_delete(f"/brands/{b['id']}")
-            print(f"    [-] Marque #{b['id']} '{b['name']}' et ses modèles/variantes supprimés.")
-        print("[✓] Catalogue nettoyé avec succès.\n")
+            print(f"    [-] Marque #{b['id']} '{b['name']}' supprimee.")
+        print("[OK] Catalogue nettoye.\n")
     except Exception as e:
-        print(f"[!] Erreur lors du nettoyage : {e}")
+        print(f"[!] Erreur nettoyage : {e}", file=sys.stderr)
+
 
 def seed_catalog(target_url=None, reset=False):
     if target_url:
@@ -1319,192 +1211,62 @@ def seed_catalog(target_url=None, reset=False):
     if reset:
         clear_catalog(target_url)
 
-    print(f"[*] Seeding catalog on {API_BASE} with authentic SVGs and accurate models...")
-    print(f"[*] Upload endpoint: {API_UPLOAD_URL}")
-    
-    total_brands = 0
-    total_models = 0
-    total_motorisations = 0
-    total_finitions = 0
-    total_variants = 0
-    
-    for brand_data in CATALOG_DATA:
-        brand_name = brand_data["brand"]
-        
-        # 1. Téléverser le logo SVG officiel de la marque
-        brand_svg = BRAND_LOGOS_SVG.get(brand_name, f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="#18181b"/><text x="50" y="58" font-size="20" font-weight="bold" fill="#ffffff" text-anchor="middle">{brand_name[:3]}</text></svg>''')
-        uploaded_logo = upload_image_bytes(brand_svg, f"logo_{brand_name.lower().replace(' ', '_')}", folder="brands")
-        print(f"[Upload] Logo '{brand_name}' téléversé -> {uploaded_logo}")
+    print(f"[*] Seeding -> {API_BASE}")
+    print(f"[*] Upload  -> {API_UPLOAD_URL}")
+    print(f"[*] Threads : {MAX_WORKERS_BRAND} marques // {MAX_WORKERS_UPLOAD} finitions/uploads //\n")
 
-        # 2. Créer ou mettre à jour la Marque
-        try:
-            brand_resp = api_post("/brands", {"name": brand_name, "logoUrl": uploaded_logo})
-            brand_id = brand_resp["id"]
-            print(f"[+] Created Brand #{brand_id}: {brand_name}")
-            total_brands += 1
-        except Exception:
-            brands_list = api_get("/brands")
-            brand_obj = next((b for b in brands_list if b["name"].lower() == brand_name.lower()), None)
-            if not brand_obj:
-                print(f"[!] Could not create or find brand: {brand_name}")
-                continue
-            brand_id = brand_obj["id"]
+    stats      = {"brands": 0, "models": 0, "motorisations": 0, "finitions": 0, "variants": 0}
+    stats_lock = threading.Lock()
+
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS_BRAND) as ex:
+        futures = {ex.submit(seed_brand, bd, stats_lock, stats): bd["brand"] for bd in CATALOG_DATA}
+        for fut in as_completed(futures):
+            brand = futures[fut]
             try:
-                api_put(f"/brands/{brand_id}", {"name": brand_name, "logoUrl": uploaded_logo})
-                print(f"[*] Updated existing Brand #{brand_id}: {brand_name} with logo -> {uploaded_logo}")
-            except Exception:
-                print(f"[*] Found existing Brand #{brand_id}: {brand_name}")
-        
-        # 3. Modèles
-        for model_data in brand_data.get("models", []):
-            model_name = model_data["name"]
-            model_cat = model_data.get("category", "Berline")
-            is_ev = any(m.get("fuelType") == "ELECTRIC" for m in model_data.get("motorisations", []))
-            
-            # Générer et téléverser la silhouette exacte du modèle
-            model_svg = generate_model_svg(brand_name, model_name, model_cat, is_ev=is_ev)
-            uploaded_model_img = upload_image_bytes(model_svg, f"model_{brand_name}_{model_name}".lower().replace(' ', '_'), folder="models")
-            print(f"    [Upload] Photo modèle '{model_name}' ({model_cat}) téléversée -> {uploaded_model_img}")
+                fut.result()
+            except Exception as exc:
+                print(f"[!] Erreur marque {brand}: {exc}", file=sys.stderr)
 
-            try:
-                model_resp = api_post(
-                    "/models",
-                    {"name": model_name, "imageUrl": uploaded_model_img, "category": model_cat},
-                    params={"brandId": brand_id}
-                )
-                model_id = model_resp["id"]
-                print(f"    -> [+] Created Model #{model_id}: {model_name} ({model_cat})")
-                total_models += 1
-            except Exception:
-                models_list = api_get("/models", params={"brandId": brand_id})
-                model_obj = next((m for m in models_list if m["name"].lower() == model_name.lower()), None)
-                if not model_obj:
-                    print(f"    -> [!] Could not create/find model: {model_name}")
-                    continue
-                model_id = model_obj["id"]
-                try:
-                    api_put(f"/models/{model_id}", {"name": model_name, "imageUrl": uploaded_model_img, "category": model_cat})
-                    print(f"    -> [*] Updated existing Model #{model_id}: {model_name} with image -> {uploaded_model_img}")
-                except Exception:
-                    print(f"    -> [*] Found existing Model #{model_id}: {model_name}")
-            
-            # 4. Motorisations
-            mot_id_map = {}
-            for mot_data in model_data.get("motorisations", []):
-                mot_name = mot_data["name"]
-                try:
-                    mot_resp = api_post("/motorisations", mot_data, params={"modelId": model_id})
-                    mot_id = mot_resp["id"]
-                    mot_id_map[mot_name] = mot_id
-                    print(f"        [+] Motorisation #{mot_id}: {mot_name} (WLTP: {mot_data['consumptionWltp']})")
-                    total_motorisations += 1
-                except Exception:
-                    mot_list = api_get("/motorisations", params={"modelId": model_id})
-                    mot_obj = next((m for m in mot_list if m["name"].lower() == mot_name.lower()), None)
-                    if mot_obj:
-                        mot_id_map[mot_name] = mot_obj["id"]
-            
-            # 5. Finitions
-            fin_id_map = {}
-            for fin_name in model_data.get("finitions", []):
-                fin_svg = generate_model_svg(brand_name, f"{model_name} {fin_name}", model_cat, is_ev=is_ev)
-                uploaded_fin_img = upload_image_bytes(fin_svg, f"fin_{brand_name}_{model_name}_{fin_name}".lower().replace(' ', '_'), folder="finitions")
-                
-                fin_payload = {
-                    "name": fin_name,
-                    "imageUrl": uploaded_fin_img
-                }
-                
-                try:
-                    fin_resp = api_post("/finitions", fin_payload, params={"modelId": model_id})
-                    fin_id = fin_resp["id"]
-                    fin_id_map[fin_name] = fin_id
-                    print(f"        [+] Finition #{fin_id}: {fin_name}")
-                    total_finitions += 1
-                except Exception:
-                    fin_list = api_get("/finitions", params={"modelId": model_id})
-                    fin_obj = next((f for f in fin_list if f["name"].lower() == fin_name.lower()), None)
-                    if fin_obj:
-                        fin_id = fin_obj["id"]
-                        fin_id_map[fin_name] = fin_id
-                        try:
-                            api_put(f"/finitions/{fin_id}", fin_payload)
-                            print(f"        [*] Updated existing Finition #{fin_id}: {fin_name} with image -> {uploaded_fin_img}")
-                        except Exception:
-                            print(f"        [*] Found existing Finition #{fin_id}: {fin_name}")
-            
-            # 6. Variantes tarifées
-            for var_data in model_data.get("variants", []):
-                fin_name = var_data["finition"]
-                mot_name = var_data["motorisation"]
-                
-                fin_id = fin_id_map.get(fin_name)
-                mot_id = mot_id_map.get(mot_name)
-                
-                if not fin_id or not mot_id:
-                    continue
-                
-                variant_payload = {
-                    "purchasePrice": var_data.get("price", 0.0),
-                    "monthlyLoa": var_data.get("loa"),
-                    "monthlyLld": var_data.get("lld"),
-                    "defaultInsuranceCost": var_data.get("insurance"),
-                    "defaultMaintenanceCost": var_data.get("maintenance"),
-                    "estimatedResaleValue": var_data.get("resale")
-                }
-                
-                try:
-                    var_resp = api_post("/variants", variant_payload, params={"finitionId": fin_id, "motorisationId": mot_id})
-                    print(f"            [$] Variant #{var_resp['id']}: {fin_name} x {mot_name} -> {var_data.get('price')} €")
-                    total_variants += 1
-                except Exception as ex:
-                    pass
+    print("\n" + "=" * 60)
+    print("[OK] Seeding termine !")
+    for k, v in stats.items():
+        print(f"    {k.capitalize():<16}: {v}")
+    print("=" * 60)
 
-    print("\n" + "="*60)
-    print(f"[✓] Seeding completed with authentic manufacturer SVGs!")
-    print(f"    - Brands: {total_brands}")
-    print(f"    - Models: {total_models}")
-    print(f"    - Motorisations: {total_motorisations}")
-    print(f"    - Finitions: {total_finitions}")
-    print(f"    - Priced Variants: {total_variants}")
-    print("="*60)
+
+# ── Entry point ───────────────────────────────────────────────────────────────
 
 def main():
-    import argparse
     parser = argparse.ArgumentParser(
-        description="EcoSwitch Automotive Catalog Seeder",
-        epilog="Exemples:\n  python3 scripts/seed_catalog.py\n  python3 scripts/seed_catalog.py prod\n  python3 scripts/seed_catalog.py prod --reset\n  python3 scripts/seed_catalog.py --url https://ecoswitch-api.up.railway.app",
-        formatter_class=argparse.RawDescriptionHelpFormatter
+        description="EcoSwitch Catalog Seeder v3.0",
+        epilog=(
+            "Exemples :\n"
+            "  python3 scripts/seed_catalog.py\n"
+            "  python3 scripts/seed_catalog.py prod\n"
+            "  python3 scripts/seed_catalog.py prod --reset\n"
+            "  python3 scripts/seed_catalog.py --url https://ecoswitch-api.up.railway.app"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument(
-        "env",
-        nargs="?",
-        default="local",
-        help="Environnement cible ('local', 'prod' ou URL personnalisée). Défaut: 'local'"
-    )
-    parser.add_argument(
-        "--url",
-        "-u",
-        help="URL de base directe de l'API (écrase l'argument env)"
-    )
-    parser.add_argument(
-        "--reset",
-        "--clean",
-        action="store_true",
-        help="Nettoie et supprime toutes les données existantes du catalogue avant de réinjecter"
-    )
+    parser.add_argument("env", nargs="?", default="local",
+                        help="Environnement : 'local', 'prod' ou URL directe. Defaut : local")
+    parser.add_argument("--url", "-u", help="URL directe de l'API (ecrase env)")
+    parser.add_argument("--reset", "--clean", action="store_true",
+                        help="Supprime tout le catalogue avant le seed")
     args = parser.parse_args()
 
     target_url = args.url if args.url else resolve_target_url(args.env)
-    env_name = args.env.upper() if args.env.lower() in ENV_CONFIGS else "CUSTOM"
+    env_name   = args.env.upper() if args.env.lower() in ENV_CONFIGS else "CUSTOM"
+
     print("=" * 60)
-    print(f"[*] EcoSwitch Catalog Seeder")
-    print(f"[*] Environnement cible : {env_name}")
-    print(f"[*] URL de l'API        : {target_url}")
-    if args.reset:
-        print(f"[*] Mode               : RESET & SEED")
-    print("=" * 60)
+    print("  EcoSwitch Catalog Seeder v3.0")
+    print(f"  Environnement : {env_name}")
+    print(f"  API           : {target_url}")
+    print(f"  Mode          : {'RESET & SEED' if args.reset else 'SEED'}")
+    print("=" * 60 + "\n")
+
     seed_catalog(target_url, reset=args.reset)
+
 
 if __name__ == "__main__":
     main()
