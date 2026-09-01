@@ -1182,16 +1182,17 @@ const installPwa = async () => {
   .app-sidebar {
     position: fixed;
     top: 0;
-    left: 0;
+    right: 0;
     bottom: 0;
     width: 290px;
     max-width: 85vw;
     height: 100%;
     z-index: 199;
     background: var(--bg-card);
-    box-shadow: var(--shadow-lg);
-    border-right: 1px solid var(--border-glass);
-    transform: translateX(-100%);
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
+    border-left: 1px solid var(--border-glass);
+    border-right: none;
+    transform: translateX(100%);
     transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
     display: flex;
     flex-direction: column;
