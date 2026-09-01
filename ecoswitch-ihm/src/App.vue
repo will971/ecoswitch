@@ -1154,8 +1154,13 @@ const installPwa = async () => {
     position: sticky;
     top: 0;
     z-index: 90;
-    height: 56px;
-    padding: 0 16px;
+    /* Prise en compte du Notch / Dynamic Island iOS */
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-bottom: 0px;
+    height: calc(56px + env(safe-area-inset-top, 0px));
+    box-sizing: border-box;
     background: var(--bg-card);
     border-bottom: 1px solid var(--border-glass);
     backdrop-filter: blur(16px);
@@ -1191,7 +1196,10 @@ const installPwa = async () => {
     display: flex;
     flex-direction: column;
     overflow-y: auto;
-    padding: 20px 16px;
+    padding-top: max(20px, env(safe-area-inset-top, 0px));
+    padding-bottom: max(20px, env(safe-area-inset-bottom, 0px));
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
   }
 
   .app-sidebar.drawer-open {
@@ -1203,7 +1211,10 @@ const installPwa = async () => {
   }
 
   .app-main {
-    padding: 0 12px 84px 12px;
+    padding-top: 8px;
+    padding-left: max(12px, env(safe-area-inset-left, 0px));
+    padding-right: max(12px, env(safe-area-inset-right, 0px));
+    padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
     overflow-x: clip;
     overflow-y: visible;
   }
@@ -1215,8 +1226,12 @@ const installPwa = async () => {
     left: 0;
     right: 0;
     z-index: 95;
-    height: 60px;
+    /* Prise en compte de la barre d'accueil Home Indicator iOS */
     padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    height: calc(58px + env(safe-area-inset-bottom, 0px));
+    box-sizing: border-box;
     background: var(--bg-card);
     border-top: 1px solid var(--border-glass);
     backdrop-filter: blur(20px);
