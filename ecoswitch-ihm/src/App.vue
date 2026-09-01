@@ -1116,7 +1116,7 @@ const installPwa = async () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 2px;
   background: transparent;
   border: none;
   color: var(--text-dimmed);
@@ -1124,7 +1124,7 @@ const installPwa = async () => {
   font-family: var(--font-sans);
   font-size: 0.65rem;
   font-weight: 600;
-  padding: 6px 0 8px 0;
+  padding: 4px 0 2px 0;
   cursor: pointer;
   transition: all 0.15s ease;
   user-select: none;
@@ -1214,7 +1214,7 @@ const installPwa = async () => {
     padding-top: 8px;
     padding-left: max(12px, env(safe-area-inset-left, 0px));
     padding-right: max(12px, env(safe-area-inset-right, 0px));
-    padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
     overflow-x: clip;
     overflow-y: visible;
   }
@@ -1226,11 +1226,11 @@ const installPwa = async () => {
     left: 0;
     right: 0;
     z-index: 95;
-    /* Prise en compte de la barre d'accueil Home Indicator iOS */
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    /* Positionnement calibré naturel iOS */
+    padding-top: 6px;
+    padding-bottom: max(6px, env(safe-area-inset-bottom, 0px));
     padding-left: env(safe-area-inset-left, 0px);
     padding-right: env(safe-area-inset-right, 0px);
-    height: calc(58px + env(safe-area-inset-bottom, 0px));
     box-sizing: border-box;
     background: var(--bg-card);
     border-top: 1px solid var(--border-glass);
@@ -1238,7 +1238,7 @@ const installPwa = async () => {
     -webkit-backdrop-filter: blur(20px);
     justify-content: space-around;
     align-items: center;
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.05);
   }
 }
 </style>
