@@ -161,6 +161,9 @@ const popularTargetsByFormat = {
 // État local réactif des champs de saisie
 const searchQuery = ref('')
 const selectedFormat = ref('CITY')
+const searchTargetQuery = ref('')
+const showTargetCustomSearch = ref(false)
+const targetAcquisitionType = ref(props.isLeasing ? 'LEASING' : 'PURCHASE')
 const targetMonthlyBudget = ref(250)
 const dailyDistanceCommute = ref(20)
 const hasImminentRepairs = ref(false)
@@ -168,7 +171,7 @@ const imminentRepairAmount = ref(1000)
 const customIncomeExact = ref(false)
 
 // Progression calculée
-const totalEstimatedSteps = computed(() => (props.hasCurrentVehicle ? 10 : 9))
+const totalEstimatedSteps = computed(() => (props.hasCurrentVehicle ? 11 : 10))
 
 const currentStepNumber = computed(() => {
   switch (currentScreen.value) {
@@ -193,8 +196,9 @@ const currentStepNumber = computed(() => {
     case 'C01_CHARGING': return props.hasCurrentVehicle ? 8 : 6
     case 'C02_INCOME': return props.hasCurrentVehicle ? 9 : 7
     case 'C03_FORMAT': return props.hasCurrentVehicle ? 10 : 8
-    case 'C04_BUDGET': return props.hasCurrentVehicle ? 10 : 9
-    case 'FINAL_AUTH': return props.hasCurrentVehicle ? 10 : 9
+    case 'C03_TARGET_VEHICLE': return props.hasCurrentVehicle ? 10 : 9
+    case 'C04_BUDGET': return props.hasCurrentVehicle ? 11 : 10
+    case 'FINAL_AUTH': return props.hasCurrentVehicle ? 11 : 10
     default: return 1
   }
 })
@@ -400,6 +404,83 @@ const selectTargetFormat = (format) => {
     emit('update:customLeasingMonthlyPrice', defaultPick.monthlyLoa)
   }
 
+  navigateTo('C03_TARGET_VEHICLE')
+}
+
+// Candidats recommandés selon le format choisi
+const currentFormatCandidates = computed(() => {
+  return popularTargetsByFormat[selectedFormat.value] || popularTargetsByFormat.CITY
+})
+
+// Recherche dynamique dans le catalogue pour le véhicule cible
+const filteredTargetCatalogVariants = computed(() => {
+  if (!searchTargetQuery.value || searchTargetQuery.value.trim().length < 2) return []
+  const q = searchTargetQuery.value.toLowerCase()
+  return catalogVariants.value.filter(v => 
+    v.brandName?.toLowerCase().includes(q) || 
+    v.modelName?.toLowerCase().includes(q) ||
+    v.finitionName?.toLowerCase().includes(q)
+  ).slice(0, 8)
+})
+
+// Sélection d'un véhicule cible parmi les recommandations rapides
+const pickTargetCandidate = (car) => {
+  props.targetVehicle.name = car.name
+  props.targetVehicle.brand = car.brand || ''
+  props.targetVehicle.fuelType = car.fuelType || 'ELECTRIC'
+  props.targetVehicle.consumption = car.consumption || 15.5
+  props.targetVehicle.purchasePrice = car.purchasePrice || 32000
+  props.targetVehicle.maintenanceCost = car.maintenanceCost || 220
+  props.targetVehicle.annualMileage = props.currentVehicle.annualMileage || 15000
+  props.targetVehicle.resaleValue = 0
+
+  if (car.monthlyLoa) {
+    targetMonthlyBudget.value = car.monthlyLoa
+    if (props.isLeasing) {
+      emit('update:customLeasingMonthlyPrice', car.monthlyLoa)
+    }
+  }
+}
+
+// Sélection d'un véhicule cible depuis la recherche du catalogue
+const selectCatalogTargetVehicle = (v) => {
+  const brand = v.brandName || ''
+  const model = v.modelName || ''
+  const finition = v.finitionName || ''
+  const mot = v.motorisationName || ''
+  const fullName = `${brand} ${model} ${mot} ${finition}`.replace(/\s+/g, ' ').trim()
+
+  props.targetVehicle.name = fullName
+  props.targetVehicle.brand = brand
+  props.targetVehicle.fuelType = v.fuelType || 'ELECTRIC'
+  props.targetVehicle.consumption = v.consumptionWltp || 15.5
+  props.targetVehicle.purchasePrice = v.purchasePrice || 35000
+  props.targetVehicle.maintenanceCost = v.defaultMaintenanceCost || 240
+  props.targetVehicle.annualMileage = props.currentVehicle.annualMileage || 15000
+  props.targetVehicle.resaleValue = 0
+
+  if (v.monthlyLoa) {
+    targetMonthlyBudget.value = v.monthlyLoa
+    if (props.isLeasing) {
+      emit('update:customLeasingMonthlyPrice', v.monthlyLoa)
+    }
+  }
+  searchTargetQuery.value = ''
+}
+
+// Basculer le mode de financement envisagé (Comptant vs Leasing)
+const toggleTargetAcquisition = (type) => {
+  targetAcquisitionType.value = type
+  const isLease = (type === 'LEASING')
+  emit('update:isLeasing', isLease)
+}
+
+// Validation du choix du véhicule cible et passage au budget
+const confirmTargetVehicle = () => {
+  if (!props.targetVehicle.name) {
+    const defaultPick = currentFormatCandidates.value[0]
+    pickTargetCandidate(defaultPick)
+  }
   navigateTo('C04_BUDGET')
 }
 
@@ -1672,6 +1753,167 @@ onMounted(async () => {
       </div>
 
       <!-- ================================================================= -->
+      <!-- TRONC COMMUN : ÉCRAN C-03 bis : CHOIX DU VÉHICULE CIBLE           -->
+      <!-- ================================================================= -->
+      <div v-else-if="currentScreen === 'C03_TARGET_VEHICLE'" class="screen-box animation-fadeIn">
+        <div class="question-header">
+          <span class="question-badge">Véhicule Cible</span>
+          <h2 class="question-title">Quel modèle souhaitez-vous comparer ?</h2>
+          <p class="question-desc">
+            Choisissez un modèle populaire ou cherchez librement dans notre catalogue complet.
+          </p>
+        </div>
+
+        <!-- Mode de financement envisagé : Achat vs Leasing -->
+        <div class="target-mode-pill-box mb-4">
+          <label class="form-label text-xxs uppercase font-semibold text-dimmed mb-1.5 block">
+            Mode d'acquisition envisagé
+          </label>
+          <div class="segmented-control w-100">
+            <button
+              type="button"
+              class="segmented-item flex-1"
+              :class="{ active: !isLeasing }"
+              @click="toggleTargetAcquisition('PURCHASE')"
+            >
+              <span>Achat / Crédit</span>
+            </button>
+            <button
+              type="button"
+              class="segmented-item flex-1"
+              :class="{ active: isLeasing }"
+              @click="toggleTargetAcquisition('LEASING')"
+            >
+              <span>Leasing LOA / LLD</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Modèles recommandés du gabarit sélectionné -->
+        <div class="target-candidates-list mb-4">
+          <label class="form-label text-xxs uppercase font-semibold text-dimmed mb-2 block">
+            Modèles recommandés ({{ selectedFormat === 'CITY' ? 'Citadines' : selectedFormat === 'COMPACT' ? 'Berlines' : 'SUV' }})
+          </label>
+          <div class="options-grid">
+            <button
+              v-for="car in currentFormatCandidates"
+              :key="car.name"
+              type="button"
+              class="option-card-touch target-car-card"
+              :class="{ featured: targetVehicle.name === car.name }"
+              @click="pickTargetCandidate(car)"
+            >
+              <div class="card-icon-bubble teal">⚡</div>
+              <div class="card-content">
+                <div class="flex-between items-center gap-2">
+                  <div class="card-label truncate">{{ car.name }}</div>
+                  <span v-if="car.badge" class="badge badge-small badge-teal shrink-0">{{ car.badge }}</span>
+                </div>
+                <div class="card-sub flex items-center gap-2 mt-0.5">
+                  <span class="font-bold text-teal">
+                    {{ isLeasing && car.monthlyLoa ? `${car.monthlyLoa} €/mois` : `${car.purchasePrice.toLocaleString('fr-FR')} €` }}
+                  </span>
+                  <span class="text-dimmed">&middot; {{ car.consumption }} kWh/100km</span>
+                </div>
+              </div>
+              <Check v-if="targetVehicle.name === car.name" size="20" class="text-teal shrink-0 ml-2" />
+              <ChevronRight v-else size="18" class="chevron-hint" />
+            </button>
+          </div>
+        </div>
+
+        <!-- Moteur de recherche et personnalisation -->
+        <div class="target-search-accordion p-3.5 rounded-xl border-glass bg-card-subtle mb-4">
+          <div class="search-input-wrapper relative mb-3">
+            <label class="form-label text-xxs font-semibold text-main flex items-center gap-1.5 mb-1.5">
+              <Search size="13" class="text-teal" />
+              <span>Rechercher un autre véhicule dans le catalogue</span>
+            </label>
+            <input
+              v-model="searchTargetQuery"
+              type="text"
+              class="form-control text-xs"
+              placeholder="ex: Tesla Model 3, Renault Megane, Peugeot e-208, Cupra, BYD..."
+            />
+
+            <!-- Dropdown résultats de recherche -->
+            <div v-if="filteredTargetCatalogVariants.length > 0" class="search-dropdown card-glass mt-1 animation-fadeIn">
+              <div
+                v-for="v in filteredTargetCatalogVariants"
+                :key="v.id"
+                class="dropdown-item"
+                @click="selectCatalogTargetVehicle(v)"
+              >
+                <div class="flex flex-column min-w-0">
+                  <span class="font-bold text-xs text-main truncate">
+                    {{ v.brandName }} {{ v.modelName }} {{ v.motorisationName || '' }}
+                  </span>
+                  <span class="text-xxs text-dimmed">
+                    {{ v.finitionName || '' }} &middot; {{ v.consumptionWltp || 15.5 }} kWh/100km
+                  </span>
+                </div>
+                <div class="text-right shrink-0 ml-2">
+                  <strong class="text-teal text-xs block">
+                    {{ isLeasing && v.monthlyLoa ? `${v.monthlyLoa} €/m` : `${(v.purchasePrice || 35000).toLocaleString('fr-FR')} €` }}
+                  </strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Saisie manuelle directe du prix ou modèle -->
+          <div class="target-custom-inputs pt-2.5 border-t border-glass">
+            <button
+              type="button"
+              class="btn-text-subtle text-xxs text-muted flex items-center gap-1 mb-2"
+              @click="showTargetCustomSearch = !showTargetCustomSearch"
+            >
+              <SlidersHorizontal size="12" />
+              <span>{{ showTargetCustomSearch ? 'Masquer les réglages manuels ▲' : 'Ajuster manuellement le prix ou le modèle ▼' }}</span>
+            </button>
+
+            <div v-if="showTargetCustomSearch" class="grid-2-fields animation-fadeIn">
+              <div class="form-group mb-2">
+                <label class="form-label text-xxs">Nom du modèle</label>
+                <input v-model="targetVehicle.name" type="text" class="form-control text-xs" />
+              </div>
+              <div class="form-group mb-2">
+                <label class="form-label text-xxs">Prix d'achat TTC (€)</label>
+                <input v-model.number="targetVehicle.purchasePrice" type="number" class="form-control text-xs" />
+              </div>
+              <div class="form-group mb-0">
+                <label class="form-label text-xxs">Consommation (kWh/100km)</label>
+                <input v-model.number="targetVehicle.consumption" type="number" step="0.1" class="form-control text-xs" />
+              </div>
+              <div class="form-group mb-0">
+                <label class="form-label text-xxs">Entretien annuel (€/an)</label>
+                <input v-model.number="targetVehicle.maintenanceCost" type="number" class="form-control text-xs" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Récapitulatif sélection active & Bouton Continuer -->
+        <div class="target-selection-summary p-3 rounded-xl border-glass bg-card mb-4 flex-between items-center">
+          <div class="min-w-0 pr-2">
+            <span class="text-xxs text-dimmed uppercase block font-semibold">Modèle sélectionné</span>
+            <span class="text-xs font-bold text-main truncate block">{{ targetVehicle.name || 'Aucun sélectionné' }}</span>
+            <span class="text-xxs text-teal font-semibold">
+              {{ isLeasing ? 'Financement en Leasing LOA / LLD' : `Prix d'achat : ${(targetVehicle.purchasePrice || 30000).toLocaleString('fr-FR')} €` }}
+            </span>
+          </div>
+          <button
+            type="button"
+            class="btn btn-primary btn-touch shrink-0"
+            @click="confirmTargetVehicle"
+          >
+            <span>Continuer</span>
+            <ArrowRight size="16" />
+          </button>
+        </div>
+      </div>
+
+      <!-- ================================================================= -->
       <!-- TRONC COMMUN : ÉCRAN C-04 : BUDGET MENSUEL MAXIMUM                -->
       <!-- ================================================================= -->
       <div v-else-if="currentScreen === 'C04_BUDGET'" class="screen-box animation-fadeIn">
@@ -2196,6 +2438,60 @@ onMounted(async () => {
 }
 .lacentrale-btn:hover {
   text-decoration: underline;
+}
+
+/* ── CIBLE : SÉLECTION VÉHICULE CIBLE ──────────────────────────────────── */
+.target-car-card {
+  position: relative;
+}
+.target-car-card.featured {
+  border-color: var(--accent-teal);
+  background: var(--accent-teal-soft);
+}
+.target-search-accordion {
+  border-color: var(--border-glass);
+}
+.search-dropdown {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  max-height: 240px;
+  overflow-y: auto;
+  box-shadow: var(--shadow-md);
+  z-index: 50;
+  position: relative;
+}
+.dropdown-item {
+  padding: 9px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-subtle);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.dropdown-item:last-child {
+  border-bottom: none;
+}
+.dropdown-item:hover {
+  background: var(--bg-card-subtle);
+}
+.grid-2-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.target-selection-summary {
+  border-color: rgba(16, 124, 65, 0.25);
+  background: var(--accent-teal-soft);
+}
+.btn-touch {
+  padding: 8px 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  border-radius: var(--radius-md);
 }
 
 /* ── RESPONSIVE & MOBILE POLISH ────────────────────────────────────────── */
