@@ -1,5 +1,6 @@
 package com.example.springbootapp.service;
 
+import com.example.springbootapp.config.CacheConfig;
 import com.example.springbootapp.model.dto.BrandDto;
 import com.example.springbootapp.model.dto.CatalogHierarchyDto;
 import com.example.springbootapp.model.dto.FinitionDto;
@@ -16,6 +17,8 @@ import com.example.springbootapp.repository.FinitionMotorisationRepository;
 import com.example.springbootapp.repository.FinitionRepository;
 import com.example.springbootapp.repository.MotorisationRepository;
 import com.example.springbootapp.repository.VehicleModelRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,6 +57,7 @@ public class CatalogService {
     // 1. BRAND OPERATIONS
     // ==========================================
 
+    @Cacheable(value = CacheConfig.CACHE_CATALOG_BRANDS)
     @Transactional(readOnly = true)
     public List<BrandDto> getAllBrands() {
         List<Brand> brands = brandRepository.findAll();
@@ -77,6 +81,7 @@ public class CatalogService {
                 .orElseThrow(() -> new IllegalArgumentException("Marque introuvable avec l'id : " + id));
     }
 
+    @CacheEvict(value = {CacheConfig.CACHE_CATALOG_BRANDS, CacheConfig.CACHE_CATALOG_MODELS, CacheConfig.CACHE_CATALOG_VARIANTS, CacheConfig.CACHE_CATALOG_HIERARCHY}, allEntries = true)
     public Brand createBrand(Brand brand) {
         if (brand.getName() == null || brand.getName().isBlank()) {
             throw new IllegalArgumentException("Le nom de la marque est obligatoire.");
@@ -89,6 +94,7 @@ public class CatalogService {
         return brandRepository.save(brand);
     }
 
+    @CacheEvict(value = {CacheConfig.CACHE_CATALOG_BRANDS, CacheConfig.CACHE_CATALOG_MODELS, CacheConfig.CACHE_CATALOG_VARIANTS, CacheConfig.CACHE_CATALOG_HIERARCHY}, allEntries = true)
     public Brand updateBrand(Long id, Brand updated) {
         Brand existing = getBrandById(id);
         if (updated.getName() != null && !updated.getName().isBlank()) {
@@ -104,6 +110,7 @@ public class CatalogService {
         return brandRepository.save(existing);
     }
 
+    @CacheEvict(value = {CacheConfig.CACHE_CATALOG_BRANDS, CacheConfig.CACHE_CATALOG_MODELS, CacheConfig.CACHE_CATALOG_VARIANTS, CacheConfig.CACHE_CATALOG_HIERARCHY}, allEntries = true)
     public void deleteBrand(Long id) {
         Brand existing = getBrandById(id);
         brandRepository.delete(existing);
@@ -113,6 +120,7 @@ public class CatalogService {
     // 2. MODEL OPERATIONS
     // ==========================================
 
+    @Cacheable(value = CacheConfig.CACHE_CATALOG_MODELS, key = "#brandId != null ? #brandId : -1L")
     @Transactional(readOnly = true)
     public List<VehicleModelDto> getModels(Long brandId) {
         List<VehicleModel> models = brandId != null
@@ -145,6 +153,7 @@ public class CatalogService {
                 .orElseThrow(() -> new IllegalArgumentException("Modèle introuvable avec l'id : " + id));
     }
 
+    @CacheEvict(value = {CacheConfig.CACHE_CATALOG_BRANDS, CacheConfig.CACHE_CATALOG_MODELS, CacheConfig.CACHE_CATALOG_VARIANTS, CacheConfig.CACHE_CATALOG_HIERARCHY}, allEntries = true)
     public VehicleModel createModel(Long brandId, VehicleModel model) {
         if (model.getName() == null || model.getName().isBlank()) {
             throw new IllegalArgumentException("Le nom du modèle est obligatoire.");
@@ -160,6 +169,7 @@ public class CatalogService {
         return modelRepository.save(model);
     }
 
+    @CacheEvict(value = {CacheConfig.CACHE_CATALOG_BRANDS, CacheConfig.CACHE_CATALOG_MODELS, CacheConfig.CACHE_CATALOG_VARIANTS, CacheConfig.CACHE_CATALOG_HIERARCHY}, allEntries = true)
     public VehicleModel updateModel(Long id, VehicleModel updated) {
         VehicleModel existing = getModelById(id);
         if (updated.getName() != null && !updated.getName().isBlank()) {
@@ -174,6 +184,7 @@ public class CatalogService {
         return modelRepository.save(existing);
     }
 
+    @CacheEvict(value = {CacheConfig.CACHE_CATALOG_BRANDS, CacheConfig.CACHE_CATALOG_MODELS, CacheConfig.CACHE_CATALOG_VARIANTS, CacheConfig.CACHE_CATALOG_HIERARCHY}, allEntries = true)
     public void deleteModel(Long id) {
         VehicleModel existing = getModelById(id);
         modelRepository.delete(existing);
@@ -200,6 +211,7 @@ public class CatalogService {
                 .orElseThrow(() -> new IllegalArgumentException("Motorisation introuvable avec l'id : " + id));
     }
 
+    @CacheEvict(value = {CacheConfig.CACHE_CATALOG_BRANDS, CacheConfig.CACHE_CATALOG_MODELS, CacheConfig.CACHE_CATALOG_VARIANTS, CacheConfig.CACHE_CATALOG_HIERARCHY}, allEntries = true)
     public Motorisation createMotorisation(Long modelId, Motorisation motorisation) {
         if (motorisation.getName() == null || motorisation.getName().isBlank()) {
             throw new IllegalArgumentException("Le nom de la motorisation est obligatoire.");
@@ -216,6 +228,7 @@ public class CatalogService {
         return motorisationRepository.save(motorisation);
     }
 
+    @CacheEvict(value = {CacheConfig.CACHE_CATALOG_BRANDS, CacheConfig.CACHE_CATALOG_MODELS, CacheConfig.CACHE_CATALOG_VARIANTS, CacheConfig.CACHE_CATALOG_HIERARCHY}, allEntries = true)
     public Motorisation updateMotorisation(Long id, Motorisation updated) {
         Motorisation existing = getMotorisationById(id);
         if (updated.getName() != null && !updated.getName().isBlank()) {
@@ -242,6 +255,7 @@ public class CatalogService {
         return motorisationRepository.save(existing);
     }
 
+    @CacheEvict(value = {CacheConfig.CACHE_CATALOG_BRANDS, CacheConfig.CACHE_CATALOG_MODELS, CacheConfig.CACHE_CATALOG_VARIANTS, CacheConfig.CACHE_CATALOG_HIERARCHY}, allEntries = true)
     public void deleteMotorisation(Long id) {
         Motorisation existing = getMotorisationById(id);
         motorisationRepository.delete(existing);
@@ -268,6 +282,7 @@ public class CatalogService {
                 .orElseThrow(() -> new IllegalArgumentException("Finition introuvable avec l'id : " + id));
     }
 
+    @CacheEvict(value = {CacheConfig.CACHE_CATALOG_BRANDS, CacheConfig.CACHE_CATALOG_MODELS, CacheConfig.CACHE_CATALOG_VARIANTS, CacheConfig.CACHE_CATALOG_HIERARCHY}, allEntries = true)
     public Finition createFinition(Long modelId, Finition finition) {
         if (finition.getName() == null || finition.getName().isBlank()) {
             throw new IllegalArgumentException("Le nom de la finition est obligatoire.");
@@ -278,6 +293,7 @@ public class CatalogService {
         return finitionRepository.save(finition);
     }
 
+    @CacheEvict(value = {CacheConfig.CACHE_CATALOG_BRANDS, CacheConfig.CACHE_CATALOG_MODELS, CacheConfig.CACHE_CATALOG_VARIANTS, CacheConfig.CACHE_CATALOG_HIERARCHY}, allEntries = true)
     public Finition updateFinition(Long id, Finition updated) {
         Finition existing = getFinitionById(id);
         if (updated.getName() != null && !updated.getName().isBlank()) {
@@ -289,6 +305,7 @@ public class CatalogService {
         return finitionRepository.save(existing);
     }
 
+    @CacheEvict(value = {CacheConfig.CACHE_CATALOG_BRANDS, CacheConfig.CACHE_CATALOG_MODELS, CacheConfig.CACHE_CATALOG_VARIANTS, CacheConfig.CACHE_CATALOG_HIERARCHY}, allEntries = true)
     public void deleteFinition(Long id) {
         Finition existing = getFinitionById(id);
         finitionRepository.delete(existing);
@@ -298,6 +315,7 @@ public class CatalogService {
     // 5. FINITION MOTORISATION (VARIANTS / PRICING)
     // ==========================================
 
+    @Cacheable(value = CacheConfig.CACHE_CATALOG_VARIANTS, key = "(#modelId != null ? #modelId : 'all') + '-' + (#motorisationId != null ? #motorisationId : 'all') + '-' + (#finitionId != null ? #finitionId : 'all')")
     @Transactional(readOnly = true)
     public List<FinitionMotorisationDto> getVariants(Long modelId, Long motorisationId, Long finitionId) {
         List<FinitionMotorisation> list;
@@ -322,6 +340,7 @@ public class CatalogService {
                 .orElseThrow(() -> new IllegalArgumentException("Variante introuvable avec l'id : " + id));
     }
 
+    @CacheEvict(value = {CacheConfig.CACHE_CATALOG_BRANDS, CacheConfig.CACHE_CATALOG_MODELS, CacheConfig.CACHE_CATALOG_VARIANTS, CacheConfig.CACHE_CATALOG_HIERARCHY}, allEntries = true)
     public FinitionMotorisation createVariant(Long finitionId, Long motorisationId, FinitionMotorisation variant) {
         Finition finition = getFinitionById(finitionId);
         Motorisation motorisation = getMotorisationById(motorisationId);
@@ -347,6 +366,7 @@ public class CatalogService {
         return variantRepository.save(variant);
     }
 
+    @CacheEvict(value = {CacheConfig.CACHE_CATALOG_BRANDS, CacheConfig.CACHE_CATALOG_MODELS, CacheConfig.CACHE_CATALOG_VARIANTS, CacheConfig.CACHE_CATALOG_HIERARCHY}, allEntries = true)
     public FinitionMotorisation updateVariant(Long id, FinitionMotorisation updated) {
         FinitionMotorisation existing = getVariantById(id);
         if (updated.getPurchasePrice() > 0) {
@@ -370,6 +390,7 @@ public class CatalogService {
         return variantRepository.save(existing);
     }
 
+    @CacheEvict(value = {CacheConfig.CACHE_CATALOG_BRANDS, CacheConfig.CACHE_CATALOG_MODELS, CacheConfig.CACHE_CATALOG_VARIANTS, CacheConfig.CACHE_CATALOG_HIERARCHY}, allEntries = true)
     public void deleteVariant(Long id) {
         FinitionMotorisation existing = getVariantById(id);
         variantRepository.delete(existing);
@@ -379,6 +400,7 @@ public class CatalogService {
     // 6. FULL HIERARCHY TREE
     // ==========================================
 
+    @Cacheable(value = CacheConfig.CACHE_CATALOG_HIERARCHY)
     @Transactional(readOnly = true)
     public List<CatalogHierarchyDto> getFullHierarchy() {
         // 1. Charger toutes les marques (1 seule requête SQL)

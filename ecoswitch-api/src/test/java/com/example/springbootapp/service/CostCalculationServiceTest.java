@@ -62,8 +62,8 @@ class CostCalculationServiceTest {
 		double basePrice = 0.25; // 0.25 €/kWh
 		double weightedPrice = costCalculationService.resolveWeightedFuelPrice(electric, basePrice, 0.8); // 80% home, 20% highway
 		
-		// 80% * 0.25 + 20% * 0.65 = 0.20 + 0.13 = 0.33
-		assertEquals(0.33, weightedPrice, 0.001);
+		// 80% * 0.25 + 20% * 0.55 = 0.20 + 0.11 = 0.31
+		assertEquals(0.31, weightedPrice, 0.001);
 	}
 
 	@Test

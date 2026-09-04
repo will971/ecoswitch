@@ -99,6 +99,53 @@ async function apiFetch(path, options = {}) {
   }
 }
 
+// ── In-Memory Client-Side Cache & In-Flight Request Deduplication ─────────
+const clientCache = new Map()
+const inFlightRequests = new Map()
+
+export function invalidateCache(keyPrefix = null) {
+  if (!keyPrefix) {
+    clientCache.clear()
+    return
+  }
+  for (const key of clientCache.keys()) {
+    if (key.startsWith(keyPrefix)) {
+      clientCache.delete(key)
+    }
+  }
+}
+
+export async function cachedFetch(key, ttlMs, fetcher, forceRefresh = false) {
+  const now = Date.now()
+  if (!forceRefresh && clientCache.has(key)) {
+    const entry = clientCache.get(key)
+    if (now < entry.expiresAt) {
+      return entry.data
+    }
+    clientCache.delete(key)
+  }
+
+  if (inFlightRequests.has(key)) {
+    return inFlightRequests.get(key)
+  }
+
+  const promise = (async () => {
+    try {
+      const data = await fetcher()
+      clientCache.set(key, {
+        data,
+        expiresAt: Date.now() + ttlMs
+      })
+      return data
+    } finally {
+      inFlightRequests.delete(key)
+    }
+  })()
+
+  inFlightRequests.set(key, promise)
+  return promise
+}
+
 // ── Auth ──────────────────────────────────────────────────────────────────
 
 export async function apiRegister(email, password, name) {
@@ -211,48 +258,57 @@ export async function apiDeleteUserVehicleProfile(id) {
 
 // ── IA Advisor (Gemini) ───────────────────────────────────────────────────
 
+// ── IA Advisor (Gemini) ───────────────────────────────────────────────────
+
 export async function apiGetAiAdvisorSummary(simulationPayload) {
-  const res = await apiFetch('/comparisons/ai-advisor', {
-    method: 'POST',
-    body: JSON.stringify(simulationPayload)
+  const cacheKey = `ai_advisor_${JSON.stringify(simulationPayload)}`
+  return cachedFetch(cacheKey, 60 * 60 * 1000, async () => {
+    const res = await apiFetch('/comparisons/ai-advisor', {
+      method: 'POST',
+      body: JSON.stringify(simulationPayload)
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || "Impossible de générer l'analyse IA.")
+    return data
   })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || "Impossible de générer l'analyse IA.")
-  return data
 }
 
 // ── Catalog REST Services ──────────────────────────────────────────────────
 
-export async function apiGetCatalogHierarchy() {
-  const res = await apiFetch('/catalog/hierarchy')
-  if (!res.ok) throw new Error("Impossible de charger l'arborescence du catalogue.")
-  const data = await res.json()
-  return (data || []).map(b => ({
-    ...b,
-    logoUrl: formatImageUrl(b.logoUrl),
-    models: (b.models || []).map(m => ({
-      ...m,
-      imageUrl: formatImageUrl(m.imageUrl),
-      finitions: (m.finitions || []).map(f => ({
-        ...f,
-        imageUrl: formatImageUrl(f.imageUrl)
-      })),
-      motorisations: (m.motorisations || []).map(mot => ({
-        ...mot,
-        availableFinitions: (mot.availableFinitions || []).map(af => ({
-          ...af,
-          finitionImageUrl: formatImageUrl(af.finitionImageUrl)
+export async function apiGetCatalogHierarchy(forceRefresh = false) {
+  return cachedFetch('catalog_hierarchy', 10 * 60 * 1000, async () => {
+    const res = await apiFetch('/catalog/hierarchy')
+    if (!res.ok) throw new Error("Impossible de charger l'arborescence du catalogue.")
+    const data = await res.json()
+    return (data || []).map(b => ({
+      ...b,
+      logoUrl: formatImageUrl(b.logoUrl),
+      models: (b.models || []).map(m => ({
+        ...m,
+        imageUrl: formatImageUrl(m.imageUrl),
+        finitions: (m.finitions || []).map(f => ({
+          ...f,
+          imageUrl: formatImageUrl(f.imageUrl)
+        })),
+        motorisations: (m.motorisations || []).map(mot => ({
+          ...mot,
+          availableFinitions: (mot.availableFinitions || []).map(af => ({
+            ...af,
+            finitionImageUrl: formatImageUrl(af.finitionImageUrl)
+          }))
         }))
       }))
     }))
-  }))
+  }, forceRefresh)
 }
 
-export async function apiGetCatalogBrands() {
-  const res = await apiFetch('/catalog/brands')
-  if (!res.ok) throw new Error("Impossible de charger les marques.")
-  const data = await res.json()
-  return (data || []).map(b => ({ ...b, logoUrl: formatImageUrl(b.logoUrl) }))
+export async function apiGetCatalogBrands(forceRefresh = false) {
+  return cachedFetch('catalog_brands', 10 * 60 * 1000, async () => {
+    const res = await apiFetch('/catalog/brands')
+    if (!res.ok) throw new Error("Impossible de charger les marques.")
+    const data = await res.json()
+    return (data || []).map(b => ({ ...b, logoUrl: formatImageUrl(b.logoUrl) }))
+  }, forceRefresh)
 }
 
 export async function apiCreateBrand(brand) {
@@ -262,6 +318,7 @@ export async function apiCreateBrand(brand) {
   })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || "Erreur lors de la création de la marque.")
+  invalidateCache('catalog')
   return data
 }
 
@@ -272,24 +329,29 @@ export async function apiUpdateBrand(id, brand) {
   })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || "Erreur lors de la modification de la marque.")
+  invalidateCache('catalog')
   return data
 }
 
 export async function apiDeleteBrand(id) {
   const res = await apiFetch(`/catalog/brands/${id}`, { method: 'DELETE' })
   if (!res.ok) throw new Error("Impossible de supprimer la marque.")
+  invalidateCache('catalog')
 }
 
-export async function apiGetCatalogModels(brandId = null) {
-  const q = brandId ? `?brandId=${brandId}` : ''
-  const res = await apiFetch(`/catalog/models${q}`)
-  if (!res.ok) throw new Error("Impossible de charger les modèles.")
-  const data = await res.json()
-  return (data || []).map(m => ({
-    ...m,
-    imageUrl: formatImageUrl(m.imageUrl),
-    brandLogoUrl: formatImageUrl(m.brandLogoUrl)
-  }))
+export async function apiGetCatalogModels(brandId = null, forceRefresh = false) {
+  const cacheKey = `catalog_models_${brandId || 'all'}`
+  return cachedFetch(cacheKey, 10 * 60 * 1000, async () => {
+    const q = brandId ? `?brandId=${brandId}` : ''
+    const res = await apiFetch(`/catalog/models${q}`)
+    if (!res.ok) throw new Error("Impossible de charger les modèles.")
+    const data = await res.json()
+    return (data || []).map(m => ({
+      ...m,
+      imageUrl: formatImageUrl(m.imageUrl),
+      brandLogoUrl: formatImageUrl(m.brandLogoUrl)
+    }))
+  }, forceRefresh)
 }
 
 export async function apiCreateModel(brandId, model) {
@@ -299,6 +361,7 @@ export async function apiCreateModel(brandId, model) {
   })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || "Erreur lors de la création du modèle.")
+  invalidateCache('catalog')
   return data
 }
 
@@ -309,19 +372,24 @@ export async function apiUpdateModel(id, model) {
   })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || "Erreur lors de la modification du modèle.")
+  invalidateCache('catalog')
   return data
 }
 
 export async function apiDeleteModel(id) {
   const res = await apiFetch(`/catalog/models/${id}`, { method: 'DELETE' })
   if (!res.ok) throw new Error("Impossible de supprimer le modèle.")
+  invalidateCache('catalog')
 }
 
-export async function apiGetCatalogMotorisations(modelId = null) {
-  const q = modelId ? `?modelId=${modelId}` : ''
-  const res = await apiFetch(`/catalog/motorisations${q}`)
-  if (!res.ok) throw new Error("Impossible de charger les motorisations.")
-  return await res.json()
+export async function apiGetCatalogMotorisations(modelId = null, forceRefresh = false) {
+  const cacheKey = `catalog_motorisations_${modelId || 'all'}`
+  return cachedFetch(cacheKey, 10 * 60 * 1000, async () => {
+    const q = modelId ? `?modelId=${modelId}` : ''
+    const res = await apiFetch(`/catalog/motorisations${q}`)
+    if (!res.ok) throw new Error("Impossible de charger les motorisations.")
+    return await res.json()
+  }, forceRefresh)
 }
 
 export async function apiCreateMotorisation(modelId, motorisation) {
@@ -331,6 +399,7 @@ export async function apiCreateMotorisation(modelId, motorisation) {
   })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || "Erreur lors de la création de la motorisation.")
+  invalidateCache('catalog')
   return data
 }
 
@@ -341,20 +410,25 @@ export async function apiUpdateMotorisation(id, motorisation) {
   })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || "Erreur lors de la modification de la motorisation.")
+  invalidateCache('catalog')
   return data
 }
 
 export async function apiDeleteMotorisation(id) {
   const res = await apiFetch(`/catalog/motorisations/${id}`, { method: 'DELETE' })
   if (!res.ok) throw new Error("Impossible de supprimer la motorisation.")
+  invalidateCache('catalog')
 }
 
-export async function apiGetCatalogFinitions(modelId = null) {
-  const q = modelId ? `?modelId=${modelId}` : ''
-  const res = await apiFetch(`/catalog/finitions${q}`)
-  if (!res.ok) throw new Error("Impossible de charger les finitions.")
-  const data = await res.json()
-  return (data || []).map(f => ({ ...f, imageUrl: formatImageUrl(f.imageUrl) }))
+export async function apiGetCatalogFinitions(modelId = null, forceRefresh = false) {
+  const cacheKey = `catalog_finitions_${modelId || 'all'}`
+  return cachedFetch(cacheKey, 10 * 60 * 1000, async () => {
+    const q = modelId ? `?modelId=${modelId}` : ''
+    const res = await apiFetch(`/catalog/finitions${q}`)
+    if (!res.ok) throw new Error("Impossible de charger les finitions.")
+    const data = await res.json()
+    return (data || []).map(f => ({ ...f, imageUrl: formatImageUrl(f.imageUrl) }))
+  }, forceRefresh)
 }
 
 export async function apiCreateFinition(modelId, finition) {
@@ -364,6 +438,7 @@ export async function apiCreateFinition(modelId, finition) {
   })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || "Erreur lors de la création de la finition.")
+  invalidateCache('catalog')
   return data
 }
 
@@ -374,29 +449,34 @@ export async function apiUpdateFinition(id, finition) {
   })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || "Erreur lors de la modification de la finition.")
+  invalidateCache('catalog')
   return data
 }
 
 export async function apiDeleteFinition(id) {
   const res = await apiFetch(`/catalog/finitions/${id}`, { method: 'DELETE' })
   if (!res.ok) throw new Error("Impossible de supprimer la finition.")
+  invalidateCache('catalog')
 }
 
-export async function apiGetCatalogVariants(modelId = null, motorisationId = null, finitionId = null) {
-  const params = new URLSearchParams()
-  if (modelId) params.append('modelId', modelId)
-  if (motorisationId) params.append('motorisationId', motorisationId)
-  if (finitionId) params.append('finitionId', finitionId)
-  const q = params.toString() ? `?${params.toString()}` : ''
-  const res = await apiFetch(`/catalog/variants${q}`)
-  if (!res.ok) throw new Error("Impossible de charger les tarifs des variantes.")
-  const data = await res.json()
-  return (data || []).map(v => ({
-    ...v,
-    brandLogoUrl: formatImageUrl(v.brandLogoUrl),
-    imageUrl: formatImageUrl(v.imageUrl),
-    finitionImageUrl: formatImageUrl(v.finitionImageUrl)
-  }))
+export async function apiGetCatalogVariants(modelId = null, motorisationId = null, finitionId = null, forceRefresh = false) {
+  const cacheKey = `catalog_variants_${modelId || 'all'}_${motorisationId || 'all'}_${finitionId || 'all'}`
+  return cachedFetch(cacheKey, 10 * 60 * 1000, async () => {
+    const params = new URLSearchParams()
+    if (modelId) params.append('modelId', modelId)
+    if (motorisationId) params.append('motorisationId', motorisationId)
+    if (finitionId) params.append('finitionId', finitionId)
+    const q = params.toString() ? `?${params.toString()}` : ''
+    const res = await apiFetch(`/catalog/variants${q}`)
+    if (!res.ok) throw new Error("Impossible de charger les tarifs des variantes.")
+    const data = await res.json()
+    return (data || []).map(v => ({
+      ...v,
+      brandLogoUrl: formatImageUrl(v.brandLogoUrl),
+      imageUrl: formatImageUrl(v.imageUrl),
+      finitionImageUrl: formatImageUrl(v.finitionImageUrl)
+    }))
+  }, forceRefresh)
 }
 
 export async function apiCreateVariant(finitionId, motorisationId, variant) {
@@ -406,6 +486,7 @@ export async function apiCreateVariant(finitionId, motorisationId, variant) {
   })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || "Erreur lors de l'association tarifaire.")
+  invalidateCache('catalog')
   return data
 }
 
@@ -416,12 +497,14 @@ export async function apiUpdateVariant(id, variant) {
   })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || "Erreur lors de la mise à jour tarifaire.")
+  invalidateCache('catalog')
   return data
 }
 
 export async function apiDeleteVariant(id) {
   const res = await apiFetch(`/catalog/variants/${id}`, { method: 'DELETE' })
   if (!res.ok) throw new Error("Impossible de supprimer la variante.")
+  invalidateCache('catalog')
 }
 
 // ── Upload Image ───────────────────────────────────────────────────────────
@@ -457,8 +540,10 @@ export async function apiCompareCustomProfitability(payload) {
 
 // ── Prix Carburants Live (Open Data + IA) ──────────────────────────────────
 
-export async function apiGetLiveFuelPrices() {
-  const res = await apiFetch('/comparisons/fuel-prices/live')
-  if (!res.ok) throw new Error('Impossible de récupérer les prix des carburants en direct.')
-  return await res.json()
+export async function apiGetLiveFuelPrices(forceRefresh = false) {
+  return cachedFetch('fuel_prices_live', 30 * 60 * 1000, async () => {
+    const res = await apiFetch('/comparisons/fuel-prices/live')
+    if (!res.ok) throw new Error('Impossible de récupérer les prix des carburants en direct.')
+    return await res.json()
+  }, forceRefresh)
 }

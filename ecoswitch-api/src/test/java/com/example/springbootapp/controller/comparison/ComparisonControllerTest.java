@@ -17,6 +17,8 @@ import com.example.springbootapp.business.comparison.ComparisonBusiness;
 
 import com.example.springbootapp.repository.FinitionMotorisationRepository;
 
+import com.example.springbootapp.service.FuelPriceLiveService;
+
 class ComparisonControllerTest {
 
 	private final VehiculeService vehiculeService = Mockito.mock(VehiculeService.class);
@@ -24,7 +26,8 @@ class ComparisonControllerTest {
 	private final CostCalculationService costCalculationService = new CostCalculationService();
 	private final ComparisonBusiness comparisonBusiness = new ComparisonBusiness(vehiculeService, finitionMotorisationRepository, costCalculationService);
 	private final AiAdvisorService aiAdvisorService = Mockito.mock(AiAdvisorService.class);
-	private final ComparisonController comparisonController = new ComparisonController(comparisonBusiness, aiAdvisorService);
+	private final FuelPriceLiveService fuelPriceLiveService = Mockito.mock(FuelPriceLiveService.class);
+	private final ComparisonController comparisonController = new ComparisonController(comparisonBusiness, aiAdvisorService, fuelPriceLiveService);
 
 	@Test
 	void shouldCalculateDirectProfitabilitySuccessfully() {

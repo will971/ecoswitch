@@ -14,6 +14,7 @@ import com.example.springbootapp.controller.comparison.ComparisonController.Dire
 import com.example.springbootapp.controller.comparison.ComparisonController.ProfitabilityComparisonRequest;
 import com.example.springbootapp.controller.comparison.ComparisonController.ProfitabilityComparisonResponse;
 import com.example.springbootapp.controller.comparison.ComparisonController.VehicleProfitability;
+import com.example.springbootapp.model.dto.FinitionMotorisationDto;
 import com.example.springbootapp.model.entity.Brand;
 import com.example.springbootapp.model.entity.Finition;
 import com.example.springbootapp.model.entity.FinitionMotorisation;
@@ -22,6 +23,7 @@ import com.example.springbootapp.model.entity.Motorisation;
 import com.example.springbootapp.model.entity.VehicleModel;
 import com.example.springbootapp.model.entity.Vehicule;
 import com.example.springbootapp.repository.FinitionMotorisationRepository;
+import com.example.springbootapp.service.CatalogService;
 import com.example.springbootapp.service.CostCalculationService;
 import com.example.springbootapp.service.VehiculeService;
 import java.util.Optional;
@@ -34,13 +36,23 @@ public class ComparisonBusiness {
     private final VehiculeService vehiculeService;
     private final FinitionMotorisationRepository finitionMotorisationRepository;
     private final CostCalculationService costCalculationService;
+    private final CatalogService catalogService;
 
     public ComparisonBusiness(VehiculeService vehiculeService,
                               FinitionMotorisationRepository finitionMotorisationRepository,
                               CostCalculationService costCalculationService) {
+        this(vehiculeService, finitionMotorisationRepository, costCalculationService, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ComparisonBusiness(VehiculeService vehiculeService,
+                              FinitionMotorisationRepository finitionMotorisationRepository,
+                              CostCalculationService costCalculationService,
+                              CatalogService catalogService) {
         this.vehiculeService = vehiculeService;
         this.finitionMotorisationRepository = finitionMotorisationRepository;
         this.costCalculationService = costCalculationService;
+        this.catalogService = catalogService;
     }
 
     public ProfitabilityComparisonResponse compareProfitability(ProfitabilityComparisonRequest request) {
@@ -388,6 +400,31 @@ public class ComparisonBusiness {
 
     private Vehicule resolveVehicle(Long id) {
         if (id == null) return null;
+        if (catalogService != null) {
+            try {
+                List<FinitionMotorisationDto> all = catalogService.getVariants(null, null, null);
+                for (FinitionMotorisationDto dto : all) {
+                    if (dto.id().equals(id)) {
+                        Vehicule v = new Vehicule();
+                        v.setId(dto.id());
+                        v.setName(dto.brandName() + " " + dto.modelName() + " " + dto.motorisationName() + " " + dto.finitionName());
+                        v.setBrand(dto.brandName());
+                        v.setModel(dto.modelName());
+                        v.setVersion(dto.motorisationName() + " - " + dto.finitionName());
+                        v.setFuelType(dto.fuelType());
+                        v.setConsumption(dto.consumptionWltp());
+                        v.setPurchasePrice(dto.purchasePrice());
+                        v.setInsuranceCost(dto.defaultInsuranceCost() != null ? dto.defaultInsuranceCost() : 650.0);
+                        v.setMaintenanceCost(dto.defaultMaintenanceCost() != null ? dto.defaultMaintenanceCost() : 250.0);
+                        v.setResaleValue(dto.estimatedResaleValue() != null ? dto.estimatedResaleValue() : 0.0);
+                        v.setUrl(dto.finitionImageUrl() != null ? dto.finitionImageUrl() : dto.modelImageUrl());
+                        return v;
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }
+
         Optional<FinitionMotorisation> opt = finitionMotorisationRepository.findById(id);
         if (opt.isPresent()) {
             FinitionMotorisation fm = opt.get();
@@ -417,8 +454,35 @@ public class ComparisonBusiness {
     private record CatalogVariantItem(Vehicule vehicule, Integer autonomieWltp, Double batteryCapacity) {}
 
     private List<CatalogVariantItem> getCatalogVariantsWithDetails() {
+        if (catalogService != null) {
+            try {
+                List<FinitionMotorisationDto> dtoList = catalogService.getVariants(null, null, null);
+                List<CatalogVariantItem> list = new ArrayList<>(dtoList.size());
+                for (FinitionMotorisationDto dto : dtoList) {
+                    Vehicule v = new Vehicule();
+                    v.setId(dto.id());
+                    v.setName(dto.brandName() + " " + dto.modelName() + " " + dto.motorisationName() + " " + dto.finitionName());
+                    v.setBrand(dto.brandName());
+                    v.setModel(dto.modelName());
+                    v.setVersion(dto.motorisationName() + " - " + dto.finitionName());
+                    v.setFuelType(dto.fuelType());
+                    v.setConsumption(dto.consumptionWltp());
+                    v.setPurchasePrice(dto.purchasePrice());
+                    v.setInsuranceCost(dto.defaultInsuranceCost() != null ? dto.defaultInsuranceCost() : 650.0);
+                    v.setMaintenanceCost(dto.defaultMaintenanceCost() != null ? dto.defaultMaintenanceCost() : 250.0);
+                    v.setResaleValue(dto.estimatedResaleValue() != null ? dto.estimatedResaleValue() : 0.0);
+                    v.setUrl(dto.finitionImageUrl() != null ? dto.finitionImageUrl() : dto.modelImageUrl());
+
+                    list.add(new CatalogVariantItem(v, dto.autonomieWltpKm(), dto.batteryCapacityKwh()));
+                }
+                return list;
+            } catch (Exception ignored) {
+            }
+        }
+
         List<CatalogVariantItem> list = new ArrayList<>();
-        for (FinitionMotorisation fm : finitionMotorisationRepository.findAll()) {
+        List<FinitionMotorisation> all = finitionMotorisationRepository.findAllWithDetails();
+        for (FinitionMotorisation fm : all) {
             Motorisation m = fm.getMotorisation();
             Finition f = fm.getFinition();
             VehicleModel model = m.getModel();

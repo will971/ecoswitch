@@ -44,8 +44,11 @@ public class ComparisonController {
 	@GetMapping("/fuel-prices/live")
 	@Operation(summary = "Obtenir les prix réels des carburants en temps réel (Open Data gouv + IA)")
 	@ApiResponse(responseCode = "200", description = "Prix des carburants en direct et conseils IA")
-	public FuelPriceLiveService.FuelPricesLiveResponse getLiveFuelPrices() {
-		return fuelPriceLiveService.getLiveFuelPrices();
+	public ResponseEntity<FuelPriceLiveService.FuelPricesLiveResponse> getLiveFuelPrices() {
+		FuelPriceLiveService.FuelPricesLiveResponse live = fuelPriceLiveService.getLiveFuelPrices();
+		return ResponseEntity.ok()
+				.cacheControl(org.springframework.http.CacheControl.maxAge(30, java.util.concurrent.TimeUnit.MINUTES).cachePublic())
+				.body(live);
 	}
 
 	@PostMapping("/ai-advisor")

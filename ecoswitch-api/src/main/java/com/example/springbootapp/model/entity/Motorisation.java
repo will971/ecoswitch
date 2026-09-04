@@ -59,6 +59,10 @@ public class Motorisation {
     public Motorisation() {
     }
 
+    public Motorisation(String name, FuelType fuelType, double consumptionWltp, Integer powerHp, Double batteryCapacityKwh, VehicleModel model) {
+        this(name, fuelType, consumptionWltp, powerHp, batteryCapacityKwh, null, null, model);
+    }
+
     public Motorisation(String name, FuelType fuelType, double consumptionWltp, Integer powerHp, Double batteryCapacityKwh, Integer autonomieWltpKm, Double consoThermiquePhev, VehicleModel model) {
         this.name = name;
         this.fuelType = fuelType;

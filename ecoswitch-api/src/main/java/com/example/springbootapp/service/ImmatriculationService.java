@@ -15,10 +15,12 @@ import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Service;
 
+import com.example.springbootapp.config.CacheConfig;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -61,6 +63,7 @@ public class ImmatriculationService {
         }
     }
 
+    @Cacheable(value = CacheConfig.CACHE_IMMATRICULATION, key = "#plaque != null ? #plaque.replaceAll('[^A-Za-z0-9]', '').toUpperCase() : ''", unless = "#result.isEmpty()")
     public Optional<Map<String, Object>> getVehicleByPlate(String plaque) {
         if (plaque == null || plaque.isBlank()) {
             return Optional.empty();

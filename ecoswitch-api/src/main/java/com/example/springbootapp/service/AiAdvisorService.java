@@ -12,8 +12,10 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
+import com.example.springbootapp.config.CacheConfig;
 import com.example.springbootapp.model.entity.FuelType;
 import com.example.springbootapp.model.entity.Vehicule;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -66,6 +68,7 @@ public class AiAdvisorService {
             String aiEngine
     ) {}
 
+    @Cacheable(value = CacheConfig.CACHE_AI_ADVISOR, key = "#request.toString()")
     public AiAdvisorResponse generateAdvice(AiAdvisorRequest request) {
         if (request == null || request.currentVehicle() == null || request.targetVehicle() == null) {
             throw new IllegalArgumentException("Données de simulation incomplètes pour générer le conseil IA.");
