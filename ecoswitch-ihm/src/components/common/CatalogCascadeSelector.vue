@@ -523,7 +523,6 @@ function emitSelectedVariant() {
     purchasePrice: selectedVariantPrice.value.purchasePrice,
     monthlyLoa: selectedVariantPrice.value.monthlyLoa,
     monthlyLld: selectedVariantPrice.value.monthlyLld,
-    insuranceCost: selectedVariantPrice.value.defaultInsuranceCost || 650.0,
     maintenanceCost: selectedVariantPrice.value.defaultMaintenanceCost || 250.0,
     resaleValue: selectedVariantPrice.value.estimatedResaleValue || 0.0,
     imageUrl: selectedVariantPrice.value.finitionImageUrl || selectedModel.value.imageUrl,

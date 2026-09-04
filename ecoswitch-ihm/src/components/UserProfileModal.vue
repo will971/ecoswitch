@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
 import { X, Save, Car, Fuel, Zap, AlertCircle, Plus, Star, Trash2 } from '@lucide/vue'
-import { apiCreateUserVehicleProfile, apiUpdateUserVehicleProfile, apiDeleteUserVehicleProfile } from '../utils/api.js'
+import { apiCreateUserVehicleProfile, apiUpdateUserVehicleProfile, apiDeleteUserVehicleProfile, apiGetLiveFuelPrices } from '../utils/api.js'
 import CatalogCascadeSelector from '@/components/common/CatalogCascadeSelector.vue'
 
 const props = defineProps({
@@ -25,7 +25,6 @@ const defaultForm = {
   fuelType: 'PETROL',
   consumption: 6.5,
   annualMileage: 15000,
-  insuranceCost: 600,
   maintenanceCost: 400,
   resaleValue: 5000,
   petrolPrice: 1.88,
@@ -46,6 +45,15 @@ watch(() => [props.show, activeProfileId.value, props.profiles], () => {
         electricPrice: props.profiles[props.profiles.length - 1].electricPrice,
       } : {}
       form.value = { ...defaultForm, ...inheritedPrices, default: props.profiles.length === 0 }
+      if (props.profiles.length === 0) {
+        apiGetLiveFuelPrices().then(data => {
+          if (data && data.prices) {
+            if (data.prices.PETROL) form.value.petrolPrice = data.prices.PETROL
+            if (data.prices.DIESEL) form.value.dieselPrice = data.prices.DIESEL
+            if (data.prices.ELECTRIC) form.value.electricPrice = data.prices.ELECTRIC
+          }
+        }).catch(() => {})
+      }
     } else {
       const p = props.profiles.find(p => p.id === activeProfileId.value)
       if (p) {
@@ -72,7 +80,6 @@ const onCascadeVariantSelected = (v) => {
   form.value.name = `${v.brand} ${v.model} ${v.version}`
   form.value.fuelType = v.fuelType
   form.value.consumption = v.consumption
-  form.value.insuranceCost = v.insuranceCost || 600
   form.value.maintenanceCost = v.maintenanceCost || 400
   if (v.resaleValue) form.value.resaleValue = v.resaleValue
 
@@ -234,15 +241,9 @@ const deleteProfile = async () => {
             </h4>
           </div>
           
-          <div class="grid-2-fields mb-2.5">
-            <div class="form-group mb-0">
-              <label class="form-label text-xxs">Assurance (€/an)</label>
-              <input v-model.number="form.insuranceCost" type="number" class="form-control text-xs" required />
-            </div>
-            <div class="form-group mb-0">
-              <label class="form-label text-xxs">Entretien (€/an)</label>
-              <input v-model.number="form.maintenanceCost" type="number" class="form-control text-xs" required />
-            </div>
+          <div class="form-group mb-2.5">
+            <label class="form-label text-xxs">Entretien (€/an)</label>
+            <input v-model.number="form.maintenanceCost" type="number" class="form-control text-xs" required />
           </div>
 
           <div class="p-2.5 rounded-xl border-glass bg-card-subtle mt-3">

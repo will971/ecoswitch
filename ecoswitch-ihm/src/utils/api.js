@@ -146,6 +146,46 @@ export async function cachedFetch(key, ttlMs, fetcher, forceRefresh = false) {
   return promise
 }
 
+/**
+ * Traite les réponses HTTP de manière sécurisée.
+ * Évite les erreurs DOMException "The string did not match the expected pattern" dans Safari/WebKit
+ * lorsque le serveur renvoie du texte brut, du HTML ou un statut 502/504 Bad Gateway sans JSON.
+ */
+export async function parseApiResponse(res, defaultError = 'Erreur lors de la requête.') {
+  if (res.status === 204) return null
+  const contentType = res.headers?.get?.('content-type') || ''
+  let data = null
+
+  if (contentType.includes('application/json')) {
+    try {
+      data = await res.json()
+    } catch (e) {
+      // Corps JSON tronqué ou invalide
+    }
+  } else {
+    const text = await res.text().catch(() => '')
+    if (!res.ok) {
+      if (res.status === 502 || res.status === 504 || res.status === 503) {
+        throw new Error(`Le serveur backend (${res.status}) est temporairement inaccessible. Vérifiez que l'API Spring Boot est bien démarrée sur le port 8080.`)
+      }
+      throw new Error(text || `Erreur serveur HTTP ${res.status}`)
+    }
+    if (text) {
+      try {
+        data = JSON.parse(text)
+      } catch (e) {
+        data = text
+      }
+    }
+  }
+
+  if (!res.ok) {
+    throw new Error(data?.error || data?.message || defaultError)
+  }
+
+  return data
+}
+
 // ── Auth ──────────────────────────────────────────────────────────────────
 
 export async function apiRegister(email, password, name) {
@@ -153,9 +193,7 @@ export async function apiRegister(email, password, name) {
     method: 'POST',
     body: JSON.stringify({ email, password, name })
   })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || "Erreur lors de l'inscription.")
-  return data // { token, name, email, plan }
+  return await parseApiResponse(res, "Erreur lors de l'inscription.")
 }
 
 export async function apiLogin(email, password) {
@@ -163,9 +201,7 @@ export async function apiLogin(email, password) {
     method: 'POST',
     body: JSON.stringify({ email, password })
   })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || 'Email ou mot de passe incorrect.')
-  return data // { token, name, email, plan }
+  return await parseApiResponse(res, 'Email ou mot de passe incorrect.')
 }
 
 export async function apiGoogleLogin(credential) {
@@ -173,17 +209,13 @@ export async function apiGoogleLogin(credential) {
     method: 'POST',
     body: JSON.stringify({ credential })
   })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || "Échec de la validation Google.")
-  return data // { token, name, email, plan }
+  return await parseApiResponse(res, "Échec de la validation Google.")
 }
 
 export async function apiGetMe() {
   const res = await apiFetch('/auth/me')
   if (res.status === 401) throw new Error('SESSION_EXPIRED')
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || "Erreur récupération profil.")
-  return data
+  return await parseApiResponse(res, "Erreur récupération profil.")
 }
 
 // ── Simulations ───────────────────────────────────────────────────────────
@@ -191,9 +223,8 @@ export async function apiGetMe() {
 export async function apiGetSimulations() {
   const res = await apiFetch('/simulations')
   if (res.status === 401) throw new Error('SESSION_EXPIRED')
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || 'Impossible de charger les simulations.')
-  return data // SimulationResponse[]
+  const data = await parseApiResponse(res, 'Impossible de charger les simulations.')
+  return data || []
 }
 
 export async function apiSaveSimulation(name, simulationData) {
@@ -202,9 +233,7 @@ export async function apiSaveSimulation(name, simulationData) {
     body: JSON.stringify({ name, simulationData: JSON.stringify(simulationData) })
   })
   if (res.status === 401) throw new Error('SESSION_EXPIRED')
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || 'Impossible de sauvegarder la simulation.')
-  return data // SimulationResponse
+  return await parseApiResponse(res, 'Impossible de sauvegarder la simulation.')
 }
 
 export async function apiDeleteSimulation(id) {
@@ -219,9 +248,7 @@ export async function apiDeleteSimulation(id) {
 export async function apiGetUserVehicleProfiles() {
   const res = await apiFetch('/users/me/vehicle-profiles')
   if (res.status === 401) throw new Error('SESSION_EXPIRED')
-  if (res.status === 204) return [] // No profiles found
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || 'Impossible de charger vos profils véhicules.')
+  const data = await parseApiResponse(res, 'Impossible de charger vos profils véhicules.')
   return data || []
 }
 
@@ -231,9 +258,7 @@ export async function apiCreateUserVehicleProfile(profileData) {
     body: JSON.stringify(profileData)
   })
   if (res.status === 401) throw new Error('SESSION_EXPIRED')
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || 'Impossible de créer le profil véhicule.')
-  return data
+  return await parseApiResponse(res, 'Impossible de créer le profil véhicule.')
 }
 
 export async function apiUpdateUserVehicleProfile(id, profileData) {
@@ -242,9 +267,7 @@ export async function apiUpdateUserVehicleProfile(id, profileData) {
     body: JSON.stringify(profileData)
   })
   if (res.status === 401) throw new Error('SESSION_EXPIRED')
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || 'Impossible de mettre à jour le profil véhicule.')
-  return data
+  return await parseApiResponse(res, 'Impossible de mettre à jour le profil véhicule.')
 }
 
 export async function apiDeleteUserVehicleProfile(id) {
@@ -258,8 +281,6 @@ export async function apiDeleteUserVehicleProfile(id) {
 
 // ── IA Advisor (Gemini) ───────────────────────────────────────────────────
 
-// ── IA Advisor (Gemini) ───────────────────────────────────────────────────
-
 export async function apiGetAiAdvisorSummary(simulationPayload) {
   const cacheKey = `ai_advisor_${JSON.stringify(simulationPayload)}`
   return cachedFetch(cacheKey, 60 * 60 * 1000, async () => {
@@ -267,9 +288,7 @@ export async function apiGetAiAdvisorSummary(simulationPayload) {
       method: 'POST',
       body: JSON.stringify(simulationPayload)
     })
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.error || "Impossible de générer l'analyse IA.")
-    return data
+    return await parseApiResponse(res, "Impossible de générer l'analyse IA.")
   })
 }
 
@@ -278,8 +297,7 @@ export async function apiGetAiAdvisorSummary(simulationPayload) {
 export async function apiGetCatalogHierarchy(forceRefresh = false) {
   return cachedFetch('catalog_hierarchy', 10 * 60 * 1000, async () => {
     const res = await apiFetch('/catalog/hierarchy')
-    if (!res.ok) throw new Error("Impossible de charger l'arborescence du catalogue.")
-    const data = await res.json()
+    const data = await parseApiResponse(res, "Impossible de charger l'arborescence du catalogue.")
     return (data || []).map(b => ({
       ...b,
       logoUrl: formatImageUrl(b.logoUrl),
@@ -305,8 +323,7 @@ export async function apiGetCatalogHierarchy(forceRefresh = false) {
 export async function apiGetCatalogBrands(forceRefresh = false) {
   return cachedFetch('catalog_brands', 10 * 60 * 1000, async () => {
     const res = await apiFetch('/catalog/brands')
-    if (!res.ok) throw new Error("Impossible de charger les marques.")
-    const data = await res.json()
+    const data = await parseApiResponse(res, "Impossible de charger les marques.")
     return (data || []).map(b => ({ ...b, logoUrl: formatImageUrl(b.logoUrl) }))
   }, forceRefresh)
 }
@@ -316,8 +333,7 @@ export async function apiCreateBrand(brand) {
     method: 'POST',
     body: JSON.stringify(brand)
   })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || "Erreur lors de la création de la marque.")
+  const data = await parseApiResponse(res, "Erreur lors de la création de la marque.")
   invalidateCache('catalog')
   return data
 }
@@ -327,8 +343,7 @@ export async function apiUpdateBrand(id, brand) {
     method: 'PUT',
     body: JSON.stringify(brand)
   })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || "Erreur lors de la modification de la marque.")
+  const data = await parseApiResponse(res, "Erreur lors de la modification de la marque.")
   invalidateCache('catalog')
   return data
 }
@@ -344,8 +359,7 @@ export async function apiGetCatalogModels(brandId = null, forceRefresh = false) 
   return cachedFetch(cacheKey, 10 * 60 * 1000, async () => {
     const q = brandId ? `?brandId=${brandId}` : ''
     const res = await apiFetch(`/catalog/models${q}`)
-    if (!res.ok) throw new Error("Impossible de charger les modèles.")
-    const data = await res.json()
+    const data = await parseApiResponse(res, "Impossible de charger les modèles.")
     return (data || []).map(m => ({
       ...m,
       imageUrl: formatImageUrl(m.imageUrl),
@@ -359,8 +373,7 @@ export async function apiCreateModel(brandId, model) {
     method: 'POST',
     body: JSON.stringify(model)
   })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || "Erreur lors de la création du modèle.")
+  const data = await parseApiResponse(res, "Erreur lors de la création du modèle.")
   invalidateCache('catalog')
   return data
 }
@@ -370,8 +383,7 @@ export async function apiUpdateModel(id, model) {
     method: 'PUT',
     body: JSON.stringify(model)
   })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || "Erreur lors de la modification du modèle.")
+  const data = await parseApiResponse(res, "Erreur lors de la modification du modèle.")
   invalidateCache('catalog')
   return data
 }
@@ -387,8 +399,7 @@ export async function apiGetCatalogMotorisations(modelId = null, forceRefresh = 
   return cachedFetch(cacheKey, 10 * 60 * 1000, async () => {
     const q = modelId ? `?modelId=${modelId}` : ''
     const res = await apiFetch(`/catalog/motorisations${q}`)
-    if (!res.ok) throw new Error("Impossible de charger les motorisations.")
-    return await res.json()
+    return await parseApiResponse(res, "Impossible de charger les motorisations.")
   }, forceRefresh)
 }
 
@@ -397,8 +408,7 @@ export async function apiCreateMotorisation(modelId, motorisation) {
     method: 'POST',
     body: JSON.stringify(motorisation)
   })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || "Erreur lors de la création de la motorisation.")
+  const data = await parseApiResponse(res, "Erreur lors de la création de la motorisation.")
   invalidateCache('catalog')
   return data
 }
@@ -408,8 +418,7 @@ export async function apiUpdateMotorisation(id, motorisation) {
     method: 'PUT',
     body: JSON.stringify(motorisation)
   })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || "Erreur lors de la modification de la motorisation.")
+  const data = await parseApiResponse(res, "Erreur lors de la modification de la motorisation.")
   invalidateCache('catalog')
   return data
 }
@@ -425,8 +434,7 @@ export async function apiGetCatalogFinitions(modelId = null, forceRefresh = fals
   return cachedFetch(cacheKey, 10 * 60 * 1000, async () => {
     const q = modelId ? `?modelId=${modelId}` : ''
     const res = await apiFetch(`/catalog/finitions${q}`)
-    if (!res.ok) throw new Error("Impossible de charger les finitions.")
-    const data = await res.json()
+    const data = await parseApiResponse(res, "Impossible de charger les finitions.")
     return (data || []).map(f => ({ ...f, imageUrl: formatImageUrl(f.imageUrl) }))
   }, forceRefresh)
 }
@@ -436,8 +444,7 @@ export async function apiCreateFinition(modelId, finition) {
     method: 'POST',
     body: JSON.stringify(finition)
   })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || "Erreur lors de la création de la finition.")
+  const data = await parseApiResponse(res, "Erreur lors de la création de la finition.")
   invalidateCache('catalog')
   return data
 }
@@ -447,8 +454,7 @@ export async function apiUpdateFinition(id, finition) {
     method: 'PUT',
     body: JSON.stringify(finition)
   })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || "Erreur lors de la modification de la finition.")
+  const data = await parseApiResponse(res, "Erreur lors de la modification de la finition.")
   invalidateCache('catalog')
   return data
 }
@@ -468,8 +474,7 @@ export async function apiGetCatalogVariants(modelId = null, motorisationId = nul
     if (finitionId) params.append('finitionId', finitionId)
     const q = params.toString() ? `?${params.toString()}` : ''
     const res = await apiFetch(`/catalog/variants${q}`)
-    if (!res.ok) throw new Error("Impossible de charger les tarifs des variantes.")
-    const data = await res.json()
+    const data = await parseApiResponse(res, "Impossible de charger les tarifs des variantes.")
     return (data || []).map(v => ({
       ...v,
       brandLogoUrl: formatImageUrl(v.brandLogoUrl),
@@ -484,8 +489,7 @@ export async function apiCreateVariant(finitionId, motorisationId, variant) {
     method: 'POST',
     body: JSON.stringify(variant)
   })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || "Erreur lors de l'association tarifaire.")
+  const data = await parseApiResponse(res, "Erreur lors de l'association tarifaire.")
   invalidateCache('catalog')
   return data
 }
@@ -495,8 +499,7 @@ export async function apiUpdateVariant(id, variant) {
     method: 'PUT',
     body: JSON.stringify(variant)
   })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || "Erreur lors de la mise à jour tarifaire.")
+  const data = await parseApiResponse(res, "Erreur lors de la mise à jour tarifaire.")
   invalidateCache('catalog')
   return data
 }
@@ -523,8 +526,7 @@ export async function apiUploadImage(file, folder = 'general') {
     body: formData
   })
 
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || "Erreur lors du téléversement de l'image.")
+  const data = await parseApiResponse(res, "Erreur lors du téléversement de l'image.")
   return data.url // e.g. "/uploads/brands/..."
 }
 
@@ -533,17 +535,14 @@ export async function apiCompareCustomProfitability(payload) {
     method: 'POST',
     body: JSON.stringify(payload)
   })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || 'Erreur lors du calcul de rentabilité.')
-  return data
+  return await parseApiResponse(res, 'Erreur lors du calcul de rentabilité.')
 }
 
 // ── Prix Carburants Live (Open Data + IA) ──────────────────────────────────
 
 export async function apiGetLiveFuelPrices(forceRefresh = false) {
-  return cachedFetch('fuel_prices_live', 30 * 60 * 1000, async () => {
+  return cachedFetch('fuel_prices_live', 5 * 60 * 1000, async () => {
     const res = await apiFetch('/comparisons/fuel-prices/live')
-    if (!res.ok) throw new Error('Impossible de récupérer les prix des carburants en direct.')
-    return await res.json()
+    return await parseApiResponse(res, 'Impossible de récupérer les prix des carburants en direct.')
   }, forceRefresh)
 }

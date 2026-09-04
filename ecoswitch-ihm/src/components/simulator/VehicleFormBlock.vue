@@ -41,15 +41,6 @@ const localRepairCost = computed({
   set: (val) => emit('update:immediateRepairCost', val)
 })
 
-const getDefaultInsuranceCost = (fuelType) => {
-  switch (fuelType) {
-    case 'ELECTRIC': return 600
-    case 'HYBRID': return 650
-    case 'DIESEL': return 750
-    default: return 700 // PETROL
-  }
-}
-
 const getDefaultMaintenanceCost = (fuelType) => {
   switch (fuelType) {
     case 'ELECTRIC': return 250
@@ -66,7 +57,6 @@ const handleVariantSelected = (v) => {
   props.vehicle.version = v.version
   props.vehicle.fuelType = v.fuelType
   props.vehicle.consumption = v.consumption
-  props.vehicle.insuranceCost = v.insuranceCost || getDefaultInsuranceCost(v.fuelType)
   props.vehicle.maintenanceCost = v.maintenanceCost || getDefaultMaintenanceCost(v.fuelType)
   
   if (props.type === 'current' && v.resaleValue !== undefined) {
@@ -154,12 +144,8 @@ const onMileageInput = () => {
       </div>
     </div>
 
-    <!-- Mode Avancé : Assurance, Entretien et Reprise/Prix -->
-    <div v-if="isAdvanced || showCustomInputs" class="grid-3-fields gap-2 mb-3">
-      <div class="form-group mb-0">
-        <label class="form-label text-xxs">Assurance (€/an)</label>
-        <input v-model.number="vehicle.insuranceCost" type="number" class="form-control text-xs" required />
-      </div>
+    <!-- Mode Avancé : Entretien et Reprise/Prix -->
+    <div v-if="isAdvanced || showCustomInputs" class="grid-2-fields gap-2 mb-3">
       <div class="form-group mb-0">
         <label class="form-label text-xxs">Entretien (€/an)</label>
         <input v-model.number="vehicle.maintenanceCost" type="number" class="form-control text-xs" required />

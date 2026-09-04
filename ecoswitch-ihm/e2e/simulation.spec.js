@@ -8,56 +8,72 @@ test.describe('Profitability Simulation & Authentication', () => {
   });
 
   test('should execute a full direct simulation successfully', async ({ page }) => {
-    // Locators for the two vehicle form blocks
-    const currentBlock = page.locator('.vehicle-form-block:has(h4:has-text("Véhicule Actuel"))');
-    const targetBlock = page.locator('.vehicle-form-block:has(h4:has-text("Nouveau Véhicule"))');
+    // Step 1: Transport mode - select personal car
+    await page.locator('.option-card-touch:has-text("Ma voiture personnelle")').click();
 
-    // Fill Current Vehicle details
-    await currentBlock.locator('input[placeholder*="Peugeot 208"]').fill('Peugeot 207');
-    await currentBlock.locator('select').filter({ hasText: 'Sélectionnez un carburant' }).selectOption('DIESEL');
-    await currentBlock.locator('input[type="number"]').first().fill('5.2'); // Consommation
-    await currentBlock.locator('input[type="number"]').nth(1).fill('1800');  // Reprise actuelle
-    await currentBlock.locator('input[type="number"]').nth(2).fill('15000'); // Kilométrage annuel
+    // Step 2: Vehicle ownership status - cash
+    await page.locator('.option-card-touch:has-text("Propriétaire (payé comptant)")').click();
 
-    // Fill Target Vehicle details
-    await targetBlock.locator('input[placeholder*="Tesla Model 3"]').fill('Renault Zoe');
-    await targetBlock.locator('select').filter({ hasText: 'Sélectionnez un carburant' }).selectOption('ELECTRIC');
-    await targetBlock.locator('input[type="number"]').first().fill('17.2'); // Consommation
-    await targetBlock.locator('input[type="number"]').nth(1).fill('24000'); // Prix d'achat
+    // Step 3: Current fuel type - petrol
+    await page.locator('.option-card-touch:has-text("Essence (SP95 / E10)")').click();
 
-    // Click on calculate button
-    const calculateBtn = page.locator('button:has-text("Calculer la rentabilité")');
-    await calculateBtn.click();
+    // Step 4: Current model - pick a popular car (e.g. Peugeot 208)
+    await page.locator('button.quick-car-btn:has-text("Peugeot 208")').click();
+
+    // Step 5: Annual mileage - continue with default
+    await page.locator('button:has-text("Continuer")').click();
+
+    // Step 6: Maintenance - confirm default
+    await page.locator('button:has-text("Conserver l\'estimation moyenne constructeur")').click();
+
+    // Step 7: Vehicle departure - resale
+    await page.locator('.option-card-touch:has-text("Revente d\'occasion")').click();
+
+    // Step 8: Charging location - individual home
+    await page.locator('.option-card-touch:has-text("Maison individuelle")').click();
+
+    // Step 9: Tax income tier - standard
+    await page.locator('.option-card-touch:has-text("Plus de 15 400 €")').click();
+
+    // Step 10: Preferred target format - city car
+    await page.locator('.option-card-touch:has-text("Citadine agile")').click();
+
+    // Step 11: Target monthly budget - submit
+    await page.locator('button:has-text("Calculer mes économies")').click();
+
+    // Step 13: Final auth step - proceed without account
+    await page.locator('button:has-text("Découvrir mes résultats sans compte")').click();
 
     // Verify loading screen or results are loaded
-    const resultsContainer = page.locator('.apple-results-dashboard');
+    const resultsContainer = page.locator('.results-dashboard');
     await expect(resultsContainer).toBeVisible({ timeout: 10000 });
 
-    // Assert that the results block contains key labels (TCO, gains)
-    await expect(page.locator('body')).toContainText(/Coût Net de Transition/i);
-    await expect(page.locator('body')).toContainText(/Analyse Financière Mensuelle/i);
+    // Assert that the results block contains key labels
+    await expect(page.locator('body')).toContainText(/Impact sur votre Budget/i);
+    await expect(page.locator('body')).toContainText(/Modifier la saisie/i);
 
     // Verify clicking "Modifier la saisie" goes back to form
     const editBtn = page.locator('button:has-text("Modifier la saisie")');
     if (await editBtn.isVisible()) {
       await editBtn.click();
-      await expect(calculateBtn).toBeVisible();
+      await expect(page.locator('.step-wizard-container')).toBeVisible();
     }
+
+    // Verify that express and expert mode elements are not visible
+    await expect(page.locator('.segmented-control button:has-text("Express")')).not.toBeVisible();
+    await expect(page.locator('.segmented-control button:has-text("Expert")')).not.toBeVisible();
+    await expect(page.locator('.btn-switch-expert-subtle')).not.toBeVisible();
+    await expect(page.locator('.btn-footer-mode')).not.toBeVisible();
   });
 
   test('should display client authentication modal', async ({ page, isMobile }) => {
-    // Locate the customer space login button
-    let clientSpaceBtn;
     if (isMobile) {
-      // Bottom navigation doesn't have login directly, but let's check
-      // App.vue has Client Space button in sidebar, which is hidden on mobile.
-      // On mobile, the button is not present unless they click something else.
-      // So let's skip auth click on mobile or mock it.
-      test.skip(isMobile, 'Skip desktop auth button test on mobile device viewports');
-    } else {
-      clientSpaceBtn = page.locator('.user-auth-section >> text=Espace Client');
+      // On mobile, open drawer from bottom nav first
+      const menuBtn = page.locator('nav.mobile-bottom-nav button.bottom-nav-item:has-text("Menu")');
+      await menuBtn.click();
     }
 
+    const clientSpaceBtn = page.locator('button:has-text("Espace Client")').first();
     await clientSpaceBtn.click();
 
     // Verify authentication modal appears
@@ -65,7 +81,7 @@ test.describe('Profitability Simulation & Authentication', () => {
     await expect(authModal).toBeVisible();
 
     // Check title in modal
-    await expect(authModal.locator('h3')).toContainText(/Espace Client Connexion/i);
+    await expect(authModal.locator('h3')).toContainText(/Connexion à votre compte/i);
 
     // Fill dummy email and password
     await authModal.locator('input[type="email"]').fill('test@saas.com');

@@ -33,7 +33,7 @@ import CatalogComparator from './components/CatalogComparator.vue'
 import VehicleManager from './components/VehicleManager.vue'
 import SavedSimulations from './components/SavedSimulations.vue'
 import UserProfileModal from './components/UserProfileModal.vue'
-import { apiLogin, apiRegister, apiGoogleLogin, apiGetMe, apiGetUserVehicleProfiles, apiGetLiveFuelPrices } from './utils/api.js'
+import { apiLogin, apiRegister, apiGoogleLogin, apiGetMe, apiGetUserVehicleProfiles, apiCreateUserVehicleProfile, apiGetLiveFuelPrices } from './utils/api.js'
 
 // ── SYSTÈME DE ROUTING DYNAMIQUE HTML5 HISTORY API ───────────────────────────
 const ROUTES = {
@@ -163,6 +163,7 @@ const loadLiveFuelPrices = async () => {
       if (data.prices.PETROL) liveFuelPrices.value.PETROL = data.prices.PETROL
       if (data.prices.DIESEL) liveFuelPrices.value.DIESEL = data.prices.DIESEL
       if (data.prices.ELECTRIC) liveFuelPrices.value.ELECTRIC = data.prices.ELECTRIC
+      liveFuelPrices.value.HYBRID = data.prices.HYBRID || data.prices.PETROL || liveFuelPrices.value.PETROL
     }
   } catch (e) {
     console.warn("Énergies live : fallback aux valeurs indicatives", e)
@@ -240,6 +241,32 @@ const persistSession = (data) => {
   authPassword.value = ''
 }
 
+const syncPendingWizardProfile = async () => {
+  try {
+    const raw = localStorage.getItem('eco_pending_profile')
+    if (!raw) return
+    const pending = JSON.parse(raw)
+    if (pending && pending.currentVehicle) {
+      await apiCreateUserVehicleProfile({
+        name: pending.currentVehicle.name || 'Mon Véhicule Actuel',
+        fuelType: pending.currentVehicle.fuelType || 'PETROL',
+        consumption: pending.currentVehicle.consumption || 6.5,
+        annualMileage: pending.currentVehicle.annualMileage || 15000,
+        maintenanceCost: pending.currentVehicle.maintenanceCost || 400,
+        resaleValue: pending.currentVehicle.resaleValue || 0,
+        petrolPrice: liveFuelPrices.value.PETROL || 1.88,
+        dieselPrice: liveFuelPrices.value.DIESEL || 1.74,
+        electricPrice: liveFuelPrices.value.ELECTRIC || 0.25,
+        default: true
+      })
+      localStorage.removeItem('eco_pending_profile')
+      await loadUserProfiles()
+    }
+  } catch (err) {
+    console.warn("Échec de synchronisation du profil temporaire :", err)
+  }
+}
+
 const handleLogin = async () => {
   authError.value = ''
   authLoading.value = true
@@ -247,6 +274,7 @@ const handleLogin = async () => {
     const data = await apiLogin(authEmail.value, authPassword.value)
     persistSession(data)
     await loadUserProfiles()
+    await syncPendingWizardProfile()
   } catch (err) {
     authError.value = err.message || 'Email ou mot de passe incorrect.'
   } finally {
@@ -262,6 +290,7 @@ const handleRegister = async () => {
     const data = await apiRegister(authEmail.value, authPassword.value, name)
     persistSession(data)
     await loadUserProfiles()
+    await syncPendingWizardProfile()
   } catch (err) {
     authError.value = err.message || "Erreur lors de l'inscription."
   } finally {
@@ -517,7 +546,7 @@ const installPwa = async () => {
           @click.prevent="selectTab('direct-sim')"
         >
           <Zap size="17" />
-          <span>Simulateur Express</span>
+          <span>Simulateur</span>
         </a>
 
         <a
@@ -657,6 +686,7 @@ const installPwa = async () => {
           :currentUser="currentUser"
           :userProfile="activeUserProfile"
           :loadedSimulation="simulationToLoad"
+          :liveFuelPrices="liveFuelPrices"
           @open-garage="profileModalOpen = true"
           @open-auth="openLoginModal"
         />
@@ -752,7 +782,7 @@ const installPwa = async () => {
     <!-- Modal Authentification Apple Style Épuré -->
     <div v-if="authModalOpen" class="auth-modal-overlay flex-center">
       <div class="auth-modal-card relative animation-fadeIn">
-        <button class="icon-btn-close absolute top-5 right-5" @click="authModalOpen = false">
+        <button class="icon-btn-close absolute top-5 right-5" @click="authModalOpen = false" aria-label="Fermer la fenêtre">
           ✕
         </button>
 
@@ -1193,7 +1223,9 @@ const installPwa = async () => {
     border-left: 1px solid var(--border-glass);
     border-right: none;
     transform: translateX(100%);
-    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    visibility: hidden;
+    pointer-events: none;
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.28s;
     display: flex;
     flex-direction: column;
     overflow-y: auto;
@@ -1205,6 +1237,8 @@ const installPwa = async () => {
 
   .app-sidebar.drawer-open {
     transform: translateX(0);
+    visibility: visible;
+    pointer-events: auto;
   }
 
   .btn-close-drawer {

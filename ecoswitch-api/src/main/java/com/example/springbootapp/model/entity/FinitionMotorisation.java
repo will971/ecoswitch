@@ -44,9 +44,6 @@ public class FinitionMotorisation {
     @Column(name = "monthly_lld")
     private Double monthlyLld; // Loyer mensuel indicatif LLD €/mois
 
-    @Column(name = "default_insurance_cost")
-    private Double defaultInsuranceCost; // Assurance indicative €/an
-
     @Column(name = "default_maintenance_cost")
     private Double defaultMaintenanceCost; // Entretien indicatif €/an
 
@@ -62,7 +59,6 @@ public class FinitionMotorisation {
             double purchasePrice,
             Double monthlyLoa,
             Double monthlyLld,
-            Double defaultInsuranceCost,
             Double defaultMaintenanceCost,
             Double estimatedResaleValue
     ) {
@@ -71,7 +67,6 @@ public class FinitionMotorisation {
         this.purchasePrice = purchasePrice;
         this.monthlyLoa = monthlyLoa;
         this.monthlyLld = monthlyLld;
-        this.defaultInsuranceCost = defaultInsuranceCost;
         this.defaultMaintenanceCost = defaultMaintenanceCost;
         this.estimatedResaleValue = estimatedResaleValue;
     }
@@ -124,13 +119,6 @@ public class FinitionMotorisation {
         this.monthlyLld = monthlyLld;
     }
 
-    public Double getDefaultInsuranceCost() {
-        return defaultInsuranceCost;
-    }
-
-    public void setDefaultInsuranceCost(Double defaultInsuranceCost) {
-        this.defaultInsuranceCost = defaultInsuranceCost;
-    }
 
     public Double getDefaultMaintenanceCost() {
         return defaultMaintenanceCost;

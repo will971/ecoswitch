@@ -21,7 +21,7 @@ const formatCurrency = (val) => {
     </h4>
     
     <p class="text-xs text-muted mb-4">
-      En mode leasing, nous comparons le coût global mensuel de votre véhicule actuel (carburant + assurance + entretien) avec le loyer mensuel et les frais d'usage du nouveau véhicule.
+      En mode leasing, nous comparons le coût global mensuel de votre véhicule actuel (carburant + entretien) avec le loyer mensuel et les frais d'usage du nouveau véhicule.
     </p>
 
     <div class="grid-cols-3 gap-3">
@@ -31,7 +31,7 @@ const formatCurrency = (val) => {
         <div class="font-heading text-lg mt-1 text-rose font-bold">
           {{ formatCurrency(result.currentMonthlyTotalCost) }} / mois
         </div>
-        <div class="text-xxs text-muted mt-1">(Carburant + Assurance + Entretien)</div>
+        <div class="text-xxs text-muted mt-1">(Carburant + Entretien)</div>
       </div>
 
       <!-- Budget Nouveau -->
@@ -40,7 +40,7 @@ const formatCurrency = (val) => {
         <div class="font-heading text-lg mt-1 text-cyan font-bold">
           {{ formatCurrency(result.targetMonthlyTotalCost) }} / mois
         </div>
-        <div class="text-xxs text-muted mt-1">(Loyer + Électricité + Ass. + Ent.)</div>
+        <div class="text-xxs text-muted mt-1">(Loyer + Énergie + Entretien)</div>
       </div>
 
       <!-- Économie Mensuelle -->

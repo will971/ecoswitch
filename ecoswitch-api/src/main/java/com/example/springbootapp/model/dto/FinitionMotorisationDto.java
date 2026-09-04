@@ -25,7 +25,6 @@ public record FinitionMotorisationDto(
     double purchasePrice,
     Double monthlyLoa,
     Double monthlyLld,
-    Double defaultInsuranceCost,
     Double defaultMaintenanceCost,
     Double estimatedResaleValue
 ) {}

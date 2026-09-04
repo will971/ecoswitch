@@ -12,12 +12,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import com.example.springbootapp.config.CacheConfig;
 import com.example.springbootapp.dao.FuelPriceOpenDataDao;
 import com.example.springbootapp.model.dto.FuelPriceOpenDataDto;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -67,7 +64,6 @@ public class FuelPriceLiveService {
      * Synchronise les prix en temps réel via la DAO toutes les 6 heures (ou à 6h et 14h).
      */
     @Scheduled(cron = "0 0 6,12,18 * * *")
-    @CacheEvict(value = CacheConfig.CACHE_FUEL_PRICES_LIVE, allEntries = true)
     public void fetchLiveFuelPrices() {
         logger.info("Synchronisation des prix des carburants via FuelPriceOpenDataDao...");
         FuelPriceOpenDataDto result = fuelPriceOpenDataDao.fetchNationalAverages();
@@ -153,7 +149,6 @@ public class FuelPriceLiveService {
         return cachedPrices;
     }
 
-    @Cacheable(value = CacheConfig.CACHE_FUEL_PRICES_LIVE)
     public FuelPricesLiveResponse getLiveFuelPrices() {
         return new FuelPricesLiveResponse(
                 cachedPrices,

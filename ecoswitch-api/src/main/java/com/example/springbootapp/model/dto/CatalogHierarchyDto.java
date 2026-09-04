@@ -44,7 +44,6 @@ public record CatalogHierarchyDto(
         double purchasePrice,
         Double monthlyLoa,
         Double monthlyLld,
-        Double defaultInsuranceCost,
         Double defaultMaintenanceCost,
         Double estimatedResaleValue
     ) {}

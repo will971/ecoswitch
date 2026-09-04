@@ -76,7 +76,7 @@ class CatalogServiceTest {
         FinitionMotorisation v1 = catalogService.createVariant(
                 allure.getId(),
                 elec.getId(),
-                new FinitionMotorisation(null, null, 34800.0, 270.0, 250.0, 600.0, 240.0, 16000.0)
+                new FinitionMotorisation(null, null, 34800.0, 270.0, 250.0, 240.0, 16000.0)
         );
         assertNotNull(v1.getId());
         assertEquals(34800.0, v1.getPurchasePrice());
@@ -86,7 +86,7 @@ class CatalogServiceTest {
         FinitionMotorisation v2 = catalogService.createVariant(
                 gt.getId(),
                 elec.getId(),
-                new FinitionMotorisation(null, null, 37100.0, 310.0, 290.0, 640.0, 250.0, 17500.0)
+                new FinitionMotorisation(null, null, 37100.0, 310.0, 290.0, 250.0, 17500.0)
         );
         assertNotNull(v2.getId());
 
@@ -94,7 +94,7 @@ class CatalogServiceTest {
         FinitionMotorisation v3 = catalogService.createVariant(
                 gt.getId(),
                 hybrid.getId(),
-                new FinitionMotorisation(null, null, 28500.0, 230.0, 210.0, 580.0, 360.0, 13000.0)
+                new FinitionMotorisation(null, null, 28500.0, 230.0, 210.0, 360.0, 13000.0)
         );
         assertNotNull(v3.getId());
 

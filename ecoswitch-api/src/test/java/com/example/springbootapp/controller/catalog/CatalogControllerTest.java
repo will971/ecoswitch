@@ -72,7 +72,7 @@ class CatalogControllerTest {
         Finition fin = new Finition("Iconic", "https://car.com/iconic.png", model);
         fin.setId(200L);
 
-        FinitionMotorisation variant = new FinitionMotorisation(fin, mot, 42000.0, 320.0, 300.0, 650.0, 250.0, 20000.0);
+        FinitionMotorisation variant = new FinitionMotorisation(fin, mot, 42000.0, 320.0, 300.0, 250.0, 20000.0);
         variant.setId(500L);
 
         when(catalogService.createModel(eq(1L), any(VehicleModel.class))).thenReturn(model);

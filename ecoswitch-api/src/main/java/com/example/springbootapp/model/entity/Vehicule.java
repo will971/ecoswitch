@@ -47,9 +47,6 @@ public class Vehicule {
     private int annualMileage;
     // km/an
 
-    @Column(name = "insurance_cost")
-    private double insuranceCost;
-    // €/an
 
     @Column(name = "maintenance_cost")
     private double maintenanceCost;
@@ -92,9 +89,6 @@ public class Vehicule {
         return annualMileage;
     }
 
-    public double getInsuranceCost() {
-        return insuranceCost;
-    }
 
     public double getMaintenanceCost() {
         return maintenanceCost;
@@ -140,9 +134,6 @@ public class Vehicule {
         this.annualMileage = annualMileage;
     }
 
-    public void setInsuranceCost(double insuranceCost) {
-        this.insuranceCost = insuranceCost;
-    }
 
     public void setMaintenanceCost(double maintenanceCost) {
         this.maintenanceCost = maintenanceCost;

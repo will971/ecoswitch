@@ -18,7 +18,8 @@ import {
   Car,
   Fuel,
   CreditCard,
-  ShieldCheck
+  ShieldCheck,
+  ExternalLink
 } from '@lucide/vue'
 import { apiGetCatalogVariants } from '../../utils/api.js'
 
@@ -90,7 +91,6 @@ const popularCurrentCars = [
     brand: 'Peugeot',
     fuelType: 'PETROL',
     consumption: 5.3,
-    insuranceCost: 580,
     maintenanceCost: 440,
     resaleValue: 9800,
     tag: 'Essence'
@@ -100,7 +100,6 @@ const popularCurrentCars = [
     brand: 'Renault',
     fuelType: 'PETROL',
     consumption: 5.2,
-    insuranceCost: 560,
     maintenanceCost: 420,
     resaleValue: 9500,
     tag: 'Essence'
@@ -110,7 +109,6 @@ const popularCurrentCars = [
     brand: 'Citroën',
     fuelType: 'PETROL',
     consumption: 5.5,
-    insuranceCost: 550,
     maintenanceCost: 430,
     resaleValue: 9000,
     tag: 'Essence'
@@ -120,7 +118,6 @@ const popularCurrentCars = [
     brand: 'Dacia',
     fuelType: 'PETROL',
     consumption: 5.8,
-    insuranceCost: 490,
     maintenanceCost: 380,
     resaleValue: 8200,
     tag: 'Essence'
@@ -130,7 +127,6 @@ const popularCurrentCars = [
     brand: 'Peugeot',
     fuelType: 'DIESEL',
     consumption: 4.5,
-    insuranceCost: 740,
     maintenanceCost: 580,
     resaleValue: 14000,
     tag: 'Diesel'
@@ -140,7 +136,6 @@ const popularCurrentCars = [
     brand: 'Volkswagen',
     fuelType: 'DIESEL',
     consumption: 4.1,
-    insuranceCost: 780,
     maintenanceCost: 620,
     resaleValue: 15000,
     tag: 'Diesel'
@@ -150,7 +145,6 @@ const popularCurrentCars = [
     brand: 'Toyota',
     fuelType: 'HYBRID',
     consumption: 3.8,
-    insuranceCost: 560,
     maintenanceCost: 360,
     resaleValue: 12500,
     tag: 'Hybride'
@@ -160,7 +154,6 @@ const popularCurrentCars = [
     brand: 'Peugeot',
     fuelType: 'DIESEL',
     consumption: 4.8,
-    insuranceCost: 450,
     maintenanceCost: 500,
     resaleValue: 2000,
     tag: 'Vieux Diesel'
@@ -175,7 +168,6 @@ const popularTargetCars = [
     fuelType: 'ELECTRIC',
     consumption: 14.4,
     purchasePrice: 41490,
-    insuranceCost: 900,
     maintenanceCost: 250,
     badge: 'Best-Seller Élec'
   },
@@ -185,7 +177,6 @@ const popularTargetCars = [
     fuelType: 'ELECTRIC',
     consumption: 16.1,
     purchasePrice: 38000,
-    insuranceCost: 780,
     maintenanceCost: 260,
     badge: 'Made in France'
   },
@@ -195,7 +186,6 @@ const popularTargetCars = [
     fuelType: 'ELECTRIC',
     consumption: 15.4,
     purchasePrice: 34800,
-    insuranceCost: 720,
     maintenanceCost: 240,
     badge: 'Citadine Élec'
   },
@@ -205,7 +195,6 @@ const popularTargetCars = [
     fuelType: 'ELECTRIC',
     consumption: 16.0,
     purchasePrice: 32990,
-    insuranceCost: 760,
     maintenanceCost: 240,
     badge: 'Rapport Qualité/Prix'
   },
@@ -215,7 +204,6 @@ const popularTargetCars = [
     fuelType: 'ELECTRIC',
     consumption: 13.9,
     purchasePrice: 18900,
-    insuranceCost: 450,
     maintenanceCost: 180,
     badge: 'Ultra Abordable'
   },
@@ -225,7 +213,6 @@ const popularTargetCars = [
     fuelType: 'HYBRID',
     consumption: 3.8,
     purchasePrice: 23950,
-    insuranceCost: 560,
     maintenanceCost: 360,
     badge: 'Hybride sans prise'
   },
@@ -235,7 +222,6 @@ const popularTargetCars = [
     fuelType: 'HYBRID',
     consumption: 4.2,
     purchasePrice: 22400,
-    insuranceCost: 590,
     maintenanceCost: 380,
     badge: 'Hybride Polyvalente'
   },
@@ -245,7 +231,6 @@ const popularTargetCars = [
     fuelType: 'ELECTRIC',
     consumption: 15.7,
     purchasePrice: 44990,
-    insuranceCost: 950,
     maintenanceCost: 280,
     badge: 'SUV Familial'
   }
@@ -288,7 +273,6 @@ const dynamicCurrentCars = computed(() => {
         model: v.modelName,
         fuelType: v.fuelType,
         consumption: v.consumptionWltp || 5.5,
-        insuranceCost: v.defaultInsuranceCost || 580,
         maintenanceCost: v.defaultMaintenanceCost || 440,
         resaleValue: v.estimatedResaleValue || item.resale,
         imageUrl: v.finitionImageUrl || v.imageUrl || v.modelImageUrl,
@@ -354,7 +338,6 @@ const dynamicTargetCars = computed(() => {
         purchasePrice: v.purchasePrice || 35000,
         monthlyLoa: v.monthlyLoa,
         monthlyLld: v.monthlyLld,
-        insuranceCost: v.defaultInsuranceCost || 780,
         maintenanceCost: v.defaultMaintenanceCost || 240,
         imageUrl: v.finitionImageUrl || v.imageUrl || v.modelImageUrl,
         brandLogoUrl: v.brandLogoUrl,
@@ -379,7 +362,6 @@ const dynamicTargetCars = computed(() => {
         purchasePrice: props.targetVehicle.purchasePrice || 35000,
         monthlyLoa: props.targetVehicle.monthlyLoa || props.customLeasingMonthlyPrice,
         monthlyLld: props.targetVehicle.monthlyLld,
-        insuranceCost: props.targetVehicle.insuranceCost || 780,
         maintenanceCost: props.targetVehicle.maintenanceCost || 240,
         imageUrl: props.targetVehicle.imageUrl || null,
         brandLogoUrl: props.targetVehicle.brandLogoUrl || null,
@@ -519,7 +501,6 @@ const selectCurrentCar = (car) => {
   props.currentVehicle.model = car.model || ''
   props.currentVehicle.fuelType = car.fuelType
   props.currentVehicle.consumption = car.consumption
-  props.currentVehicle.insuranceCost = car.insuranceCost || 580
   props.currentVehicle.maintenanceCost = car.maintenanceCost || 440
   props.currentVehicle.resaleValue = car.resaleValue || 8000
   props.currentVehicle.imageUrl = car.imageUrl || null
@@ -533,7 +514,6 @@ const selectTargetCar = (car) => {
   props.targetVehicle.fuelType = car.fuelType
   props.targetVehicle.consumption = car.consumption
   props.targetVehicle.purchasePrice = car.purchasePrice || 35000
-  props.targetVehicle.insuranceCost = car.insuranceCost || 780
   props.targetVehicle.maintenanceCost = car.maintenanceCost || 240
   props.targetVehicle.imageUrl = car.imageUrl || null
   props.targetVehicle.annualMileage = props.currentVehicle.annualMileage || 15000
@@ -561,7 +541,6 @@ const currentSearchResults = computed(() => {
         model: v.modelName,
         fuelType: v.fuelType,
         consumption: v.consumptionWltp || 5.5,
-        insuranceCost: v.defaultInsuranceCost || 580,
         maintenanceCost: v.defaultMaintenanceCost || 440,
         resaleValue: v.estimatedResaleValue || 8000,
         imageUrl: v.finitionImageUrl || v.imageUrl || v.modelImageUrl
@@ -584,7 +563,6 @@ const targetSearchResults = computed(() => {
         purchasePrice: v.purchasePrice || 35000,
         monthlyLoa: v.monthlyLoa,
         monthlyLld: v.monthlyLld,
-        insuranceCost: v.defaultInsuranceCost || 780,
         maintenanceCost: v.defaultMaintenanceCost || 240,
         imageUrl: v.finitionImageUrl || v.imageUrl || v.modelImageUrl
       }))
@@ -735,7 +713,7 @@ const formatFuelBadge = (fuelType) => {
             <div class="flex-between items-center mb-2">
               <label class="form-label text-xs font-semibold m-0">Énergie du véhicule actuel</label>
               <span v-if="fuelPrices[currentVehicle.fuelType || 'PETROL']" class="badge badge-small badge-teal">
-                {{ fuelPrices[currentVehicle.fuelType || 'PETROL'] }} €/{{ currentVehicle.fuelType === 'ELECTRIC' ? 'kWh' : 'L' }}
+                {{ Number(fuelPrices[currentVehicle.fuelType || 'PETROL']).toFixed(2).replace('.', ',') }} €/{{ currentVehicle.fuelType === 'ELECTRIC' ? 'kWh' : 'L' }}
               </span>
             </div>
             <div class="fuel-pills-row">
@@ -749,7 +727,7 @@ const formatFuelBadge = (fuelType) => {
               >
                 <span class="fuel-pill-label">{{ fuel.label }}</span>
                 <span v-if="fuelPrices[fuel.value]" class="text-xxs text-dimmed block font-mono">
-                  {{ fuelPrices[fuel.value] }} €
+                  {{ Number(fuelPrices[fuel.value]).toFixed(2).replace('.', ',') }} €
                 </span>
               </button>
             </div>
@@ -829,6 +807,18 @@ const formatFuelBadge = (fuelType) => {
         </div>
         <div class="resale-hints flex gap-2 mt-2">
           <button v-for="h in resaleHints" :key="h.v" type="button" class="hint-chip font-mono" :class="{ active: currentVehicle.resaleValue === h.v }" @click="currentVehicle.resaleValue = h.v">{{ h.l }}</button>
+        </div>
+        <div class="mt-2 text-xxs text-dimmed flex items-center justify-between gap-1">
+          <span>Un doute sur la cote ?</span>
+          <a
+            href="https://www.lacentrale.fr/lacote_origine.php"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-accent-teal hover:underline inline-flex items-center gap-1 font-semibold"
+          >
+            <span>Estimer sur La Centrale</span>
+            <ExternalLink size="11" />
+          </a>
         </div>
       </div>
 

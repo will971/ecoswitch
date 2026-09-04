@@ -23,8 +23,8 @@ public class VehiculeRepository {
 	public Vehicule save(Vehicule vehicule) {
 		final String sql = """
 			INSERT INTO vehicule
-			(name, brand, model, generation, version, purchase_price, fuel_type, consumption, annual_mileage, insurance_cost, maintenance_cost, resale_value, url, visibility, created_by)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			(name, brand, model, generation, version, purchase_price, fuel_type, consumption, annual_mileage, maintenance_cost, resale_value, url, visibility, created_by)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			""";
 		KeyHolder keyHolder = new GeneratedKeyHolder();
 		jdbcTemplate.update(connection -> {
@@ -38,12 +38,11 @@ public class VehiculeRepository {
 			statement.setString(7, vehicule.getFuelType().name());
 			statement.setDouble(8, vehicule.getConsumption());
 			statement.setInt(9, vehicule.getAnnualMileage());
-			statement.setDouble(10, vehicule.getInsuranceCost());
-			statement.setDouble(11, vehicule.getMaintenanceCost());
-			statement.setDouble(12, vehicule.getResaleValue());
-			statement.setString(13, vehicule.getUrl());
-			statement.setString(14, vehicule.getVisibility());
-			statement.setString(15, vehicule.getCreatedBy());
+			statement.setDouble(10, vehicule.getMaintenanceCost());
+			statement.setDouble(11, vehicule.getResaleValue());
+			statement.setString(12, vehicule.getUrl());
+			statement.setString(13, vehicule.getVisibility());
+			statement.setString(14, vehicule.getCreatedBy());
 			return statement;
 		}, keyHolder);
 
@@ -66,7 +65,7 @@ public class VehiculeRepository {
 
 	public List<Vehicule> findAll() {
 		final String sql = """
-			SELECT id, name, brand, model, generation, version, purchase_price, fuel_type, consumption, annual_mileage, insurance_cost, maintenance_cost, resale_value, url, visibility, created_by
+			SELECT id, name, brand, model, generation, version, purchase_price, fuel_type, consumption, annual_mileage, maintenance_cost, resale_value, url, visibility, created_by
 			FROM vehicule
 			ORDER BY id DESC
 			""";
@@ -79,7 +78,7 @@ public class VehiculeRepository {
 
 	public List<Vehicule> findAll(Integer page, Integer size, String name, String fuelType, String brand, String model, String version) {
 		StringBuilder sql = new StringBuilder("""
-			SELECT id, name, brand, model, generation, version, purchase_price, fuel_type, consumption, annual_mileage, insurance_cost, maintenance_cost, resale_value, url, visibility, created_by
+			SELECT id, name, brand, model, generation, version, purchase_price, fuel_type, consumption, annual_mileage, maintenance_cost, resale_value, url, visibility, created_by
 			FROM vehicule
 			WHERE 1=1
 			""");
@@ -128,7 +127,7 @@ public class VehiculeRepository {
 
 	public Optional<Vehicule> findById(Long id) {
 		final String sql = """
-			SELECT id, name, brand, model, generation, version, purchase_price, fuel_type, consumption, annual_mileage, insurance_cost, maintenance_cost, resale_value, url, visibility, created_by
+			SELECT id, name, brand, model, generation, version, purchase_price, fuel_type, consumption, annual_mileage, maintenance_cost, resale_value, url, visibility, created_by
 			FROM vehicule
 			WHERE id = ?
 			""";
@@ -139,7 +138,7 @@ public class VehiculeRepository {
 	public int update(Vehicule vehicule) {
 		final String sql = """
 			UPDATE vehicule
-			SET name = ?, brand = ?, model = ?, generation = ?, version = ?, purchase_price = ?, fuel_type = ?, consumption = ?, annual_mileage = ?, insurance_cost = ?,
+			SET name = ?, brand = ?, model = ?, generation = ?, version = ?, purchase_price = ?, fuel_type = ?, consumption = ?, annual_mileage = ?,
 			    maintenance_cost = ?, resale_value = ?, url = ?, visibility = ?, created_by = ?
 			WHERE id = ?
 			""";
@@ -154,7 +153,6 @@ public class VehiculeRepository {
 			vehicule.getFuelType().name(),
 			vehicule.getConsumption(),
 			vehicule.getAnnualMileage(),
-			vehicule.getInsuranceCost(),
 			vehicule.getMaintenanceCost(),
 			vehicule.getResaleValue(),
 			vehicule.getUrl(),
@@ -181,7 +179,6 @@ public class VehiculeRepository {
 		vehicule.setFuelType(FuelType.valueOf(resultSet.getString("fuel_type")));
 		vehicule.setConsumption(resultSet.getDouble("consumption"));
 		vehicule.setAnnualMileage(resultSet.getInt("annual_mileage"));
-		vehicule.setInsuranceCost(resultSet.getDouble("insurance_cost"));
 		vehicule.setMaintenanceCost(resultSet.getDouble("maintenance_cost"));
 		vehicule.setResaleValue(resultSet.getDouble("resale_value"));
 		vehicule.setUrl(resultSet.getString("url"));

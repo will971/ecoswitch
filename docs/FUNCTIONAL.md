@@ -22,7 +22,7 @@ Les calculs financiers et écologiques sont au cœur de la valeur d'EcoSwitch. I
 ### A. Coût Total de Possession (TCO annuel)
 Le coût annuel d'utilisation d'un véhicule est calculé comme suit :
 
-$$\text{Coût Annuel} = \text{Coût Carburant Annuel} + \text{Coût Assurance} + \text{Coût Entretien}$$
+$$\text{Coût Annuel} = \text{Coût Carburant Annuel} + \text{Coût Entretien}$$
 
 Où le coût de carburant annuel est défini par :
 

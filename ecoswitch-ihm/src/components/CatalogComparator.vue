@@ -72,7 +72,6 @@ const manualVehicle = ref({
   annualMileage: 15000,
   purchasePrice: 0,
   resaleValue: 6000,
-  insuranceCost: 650,
   maintenanceCost: 450
 })
 
@@ -111,7 +110,6 @@ const fetchVehicles = async () => {
         purchasePrice: v.purchasePrice,
         monthlyLoa: v.monthlyLoa,
         monthlyLld: v.monthlyLld,
-        insuranceCost: v.defaultInsuranceCost || 650,
         maintenanceCost: v.defaultMaintenanceCost || 250,
         resaleValue: v.estimatedResaleValue || 0,
         imageUrl: v.finitionImageUrl || v.modelImageUrl,
@@ -140,7 +138,6 @@ const activeReferenceVehicle = computed(() => {
         consumption: p.consumption || 6.5,
         annualMileage: p.annualMileage || 15000,
         resaleValue: p.resaleValue || 5000,
-        insuranceCost: p.insuranceCost || 600,
         maintenanceCost: p.maintenanceCost || 400
       }
     }
@@ -159,9 +156,8 @@ const currentVehicleAnnualFuelCost = computed(() => {
 const currentVehicleTotalAnnualCost = computed(() => {
   const v = activeReferenceVehicle.value
   const fuel = currentVehicleAnnualFuelCost.value
-  const ins = v.insuranceCost || 600
   const maint = v.maintenanceCost || 400
-  return fuel + ins + maint
+  return fuel + maint
 })
 
 // Calculateur de rentabilité pour un véhicule cible donné
@@ -170,7 +166,7 @@ const getVehicleMetrics = (v) => {
   const km = ref.annualMileage || 15000
   const fuelP = fuelPrices.value[v.fuelType] || 1.80
   const annualFuel = (v.consumption / 100) * km * fuelP
-  const annualTotal = annualFuel + (v.insuranceCost || 650) + (v.maintenanceCost || 250)
+  const annualTotal = annualFuel + (v.maintenanceCost || 250)
   const annualSavings = currentVehicleTotalAnnualCost.value - annualTotal
   const switchInvestment = Math.max(0, (v.purchasePrice || 0) - (ref.resaleValue || 0)) + (immediateRepairCost.value || 0)
   
@@ -283,9 +279,12 @@ watch(() => props.activeUserProfile, (newProfile) => {
   if (newProfile) {
     selectedProfileId.value = newProfile.id
     referenceMode.value = 'GARAGE'
-    if (newProfile.petrolPrice) fuelPrices.value.PETROL = newProfile.petrolPrice
-    if (newProfile.dieselPrice) fuelPrices.value.DIESEL = newProfile.dieselPrice
-    if (newProfile.electricPrice) fuelPrices.value.ELECTRIC = newProfile.electricPrice
+    if (newProfile.hasCustomPrices) {
+      if (newProfile.petrolPrice) fuelPrices.value.PETROL = newProfile.petrolPrice
+      if (newProfile.dieselPrice) fuelPrices.value.DIESEL = newProfile.dieselPrice
+      if (newProfile.electricPrice) fuelPrices.value.ELECTRIC = newProfile.electricPrice
+      fuelPrices.value.HYBRID = newProfile.petrolPrice || fuelPrices.value.HYBRID
+    }
   }
 }, { immediate: true })
 
@@ -347,7 +346,6 @@ const compare = async () => {
         annualMileage: profile.annualMileage || 15000,
         purchasePrice: 0,
         resaleValue: profile.resaleValue || 5000,
-        insuranceCost: profile.insuranceCost || 600,
         maintenanceCost: profile.maintenanceCost || 400
       }
     }
@@ -389,7 +387,6 @@ const openInSimulator = (targetVariantId) => {
       purchasePrice: found.purchasePrice,
       monthlyLoa: found.monthlyLoa,
       monthlyLld: found.monthlyLld,
-      insuranceCost: found.insuranceCost,
       maintenanceCost: found.maintenanceCost,
       resaleValue: found.resaleValue,
       imageUrl: found.imageUrl,
@@ -409,14 +406,14 @@ onMounted(async () => {
   try {
     apiGetLiveFuelPrices().then(data => {
       if (data && data.prices) {
-        if (!props.activeUserProfile?.petrolPrice && data.prices.PETROL) {
+        if (data.prices.PETROL) {
           fuelPrices.value.PETROL = data.prices.PETROL
           fuelPrices.value.HYBRID = data.prices.HYBRID || data.prices.PETROL
         }
-        if (!props.activeUserProfile?.dieselPrice && data.prices.DIESEL) {
+        if (data.prices.DIESEL) {
           fuelPrices.value.DIESEL = data.prices.DIESEL
         }
-        if (!props.activeUserProfile?.electricPrice && data.prices.ELECTRIC) {
+        if (data.prices.ELECTRIC) {
           fuelPrices.value.ELECTRIC = data.prices.ELECTRIC
         }
       }
@@ -654,20 +651,14 @@ onMounted(async () => {
               <input v-model.number="manualVehicle.resaleValue" type="number" step="500" class="luxury-input" />
             </div>
             <div class="form-group">
-              <label class="luxury-label">Assurance annuelle (€)</label>
-              <input v-model.number="manualVehicle.insuranceCost" type="number" step="50" class="luxury-input" />
-            </div>
-          </div>
-
-          <div class="luxury-grid-2">
-            <div class="form-group">
               <label class="luxury-label">Entretien annuel (€)</label>
               <input v-model.number="manualVehicle.maintenanceCost" type="number" step="50" class="luxury-input" />
             </div>
-            <div class="form-group">
-              <label class="luxury-label text-rose">Frais réparations immédiats (€)</label>
-              <input v-model.number="immediateRepairCost" type="number" step="100" class="luxury-input" placeholder="0" />
-            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="luxury-label text-rose">Frais réparations immédiats (€)</label>
+            <input v-model.number="immediateRepairCost" type="number" step="100" class="luxury-input" placeholder="0" />
           </div>
         </div>
 
@@ -679,8 +670,6 @@ onMounted(async () => {
           </div>
           <div class="tco-breakdown">
             <span>Carburant : {{ formatCurrency(currentVehicleAnnualFuelCost) }}</span>
-            <span>&middot;</span>
-            <span>Assurance : {{ formatCurrency(activeReferenceVehicle.insuranceCost || 600) }}</span>
             <span>&middot;</span>
             <span>Entretien : {{ formatCurrency(activeReferenceVehicle.maintenanceCost || 400) }}</span>
           </div>

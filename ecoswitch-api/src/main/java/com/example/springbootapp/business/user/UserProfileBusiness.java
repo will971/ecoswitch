@@ -95,7 +95,6 @@ public class UserProfileBusiness {
         profile.setFuelType(input.getFuelType());
         profile.setConsumption(input.getConsumption());
         profile.setAnnualMileage(input.getAnnualMileage());
-        profile.setInsuranceCost(input.getInsuranceCost());
         profile.setMaintenanceCost(input.getMaintenanceCost());
         profile.setResaleValue(input.getResaleValue());
         profile.setPetrolPrice(input.getPetrolPrice());

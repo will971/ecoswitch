@@ -414,7 +414,6 @@ public class ComparisonBusiness {
                         v.setFuelType(dto.fuelType());
                         v.setConsumption(dto.consumptionWltp());
                         v.setPurchasePrice(dto.purchasePrice());
-                        v.setInsuranceCost(dto.defaultInsuranceCost() != null ? dto.defaultInsuranceCost() : 650.0);
                         v.setMaintenanceCost(dto.defaultMaintenanceCost() != null ? dto.defaultMaintenanceCost() : 250.0);
                         v.setResaleValue(dto.estimatedResaleValue() != null ? dto.estimatedResaleValue() : 0.0);
                         v.setUrl(dto.finitionImageUrl() != null ? dto.finitionImageUrl() : dto.modelImageUrl());
@@ -442,7 +441,6 @@ public class ComparisonBusiness {
             v.setFuelType(m.getFuelType());
             v.setConsumption(m.getConsumptionWltp());
             v.setPurchasePrice(fm.getPurchasePrice());
-            v.setInsuranceCost(fm.getDefaultInsuranceCost() != null ? fm.getDefaultInsuranceCost() : 650.0);
             v.setMaintenanceCost(fm.getDefaultMaintenanceCost() != null ? fm.getDefaultMaintenanceCost() : 250.0);
             v.setResaleValue(fm.getEstimatedResaleValue() != null ? fm.getEstimatedResaleValue() : 0.0);
             v.setUrl(f.getImageUrl() != null ? f.getImageUrl() : model.getImageUrl());
@@ -468,7 +466,6 @@ public class ComparisonBusiness {
                     v.setFuelType(dto.fuelType());
                     v.setConsumption(dto.consumptionWltp());
                     v.setPurchasePrice(dto.purchasePrice());
-                    v.setInsuranceCost(dto.defaultInsuranceCost() != null ? dto.defaultInsuranceCost() : 650.0);
                     v.setMaintenanceCost(dto.defaultMaintenanceCost() != null ? dto.defaultMaintenanceCost() : 250.0);
                     v.setResaleValue(dto.estimatedResaleValue() != null ? dto.estimatedResaleValue() : 0.0);
                     v.setUrl(dto.finitionImageUrl() != null ? dto.finitionImageUrl() : dto.modelImageUrl());
@@ -497,7 +494,6 @@ public class ComparisonBusiness {
             v.setFuelType(m.getFuelType());
             v.setConsumption(m.getConsumptionWltp());
             v.setPurchasePrice(fm.getPurchasePrice());
-            v.setInsuranceCost(fm.getDefaultInsuranceCost() != null ? fm.getDefaultInsuranceCost() : 650.0);
             v.setMaintenanceCost(fm.getDefaultMaintenanceCost() != null ? fm.getDefaultMaintenanceCost() : 250.0);
             v.setResaleValue(fm.getEstimatedResaleValue() != null ? fm.getEstimatedResaleValue() : 0.0);
             v.setUrl(f.getImageUrl() != null ? f.getImageUrl() : model.getImageUrl());

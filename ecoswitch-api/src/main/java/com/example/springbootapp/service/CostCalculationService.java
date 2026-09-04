@@ -69,7 +69,6 @@ public class CostCalculationService {
 		double fuelCost = calculateAnnualFuelCost(vehicle, fuelPrice, fuelPricesByType, homeChargingRatio, autonomieWltpKm);
 
 		return fuelCost
-			+ vehicle.getInsuranceCost()
 			+ vehicle.getMaintenanceCost();
 	}
 

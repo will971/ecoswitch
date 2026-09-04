@@ -29,8 +29,6 @@ public class UserVehicleProfile {
     @Column(name = "annual_mileage")
     private int annualMileage;
 
-    @Column(name = "insurance_cost")
-    private double insuranceCost;
 
     @Column(name = "maintenance_cost")
     private double maintenanceCost;
@@ -71,8 +69,6 @@ public class UserVehicleProfile {
     public int getAnnualMileage() { return annualMileage; }
     public void setAnnualMileage(int annualMileage) { this.annualMileage = annualMileage; }
 
-    public double getInsuranceCost() { return insuranceCost; }
-    public void setInsuranceCost(double insuranceCost) { this.insuranceCost = insuranceCost; }
 
     public double getMaintenanceCost() { return maintenanceCost; }
     public void setMaintenanceCost(double maintenanceCost) { this.maintenanceCost = maintenanceCost; }

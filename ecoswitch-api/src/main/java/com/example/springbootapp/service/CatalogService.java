@@ -355,7 +355,6 @@ public class CatalogService {
             current.setPurchasePrice(variant.getPurchasePrice());
             current.setMonthlyLoa(variant.getMonthlyLoa());
             current.setMonthlyLld(variant.getMonthlyLld());
-            if (variant.getDefaultInsuranceCost() != null) current.setDefaultInsuranceCost(variant.getDefaultInsuranceCost());
             if (variant.getDefaultMaintenanceCost() != null) current.setDefaultMaintenanceCost(variant.getDefaultMaintenanceCost());
             if (variant.getEstimatedResaleValue() != null) current.setEstimatedResaleValue(variant.getEstimatedResaleValue());
             return variantRepository.save(current);
@@ -377,9 +376,6 @@ public class CatalogService {
         }
         if (updated.getMonthlyLld() != null) {
             existing.setMonthlyLld(updated.getMonthlyLld());
-        }
-        if (updated.getDefaultInsuranceCost() != null) {
-            existing.setDefaultInsuranceCost(updated.getDefaultInsuranceCost());
         }
         if (updated.getDefaultMaintenanceCost() != null) {
             existing.setDefaultMaintenanceCost(updated.getDefaultMaintenanceCost());
@@ -453,7 +449,6 @@ public class CatalogService {
                                     fm.getPurchasePrice(),
                                     fm.getMonthlyLoa(),
                                     fm.getMonthlyLld(),
-                                    fm.getDefaultInsuranceCost(),
                                     fm.getDefaultMaintenanceCost(),
                                     fm.getEstimatedResaleValue()
                             ))
@@ -567,7 +562,6 @@ public class CatalogService {
                 fm.getPurchasePrice(),
                 fm.getMonthlyLoa(),
                 fm.getMonthlyLld(),
-                fm.getDefaultInsuranceCost(),
                 fm.getDefaultMaintenanceCost(),
                 fm.getEstimatedResaleValue()
         );

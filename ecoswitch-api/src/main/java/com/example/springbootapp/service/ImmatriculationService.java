@@ -107,7 +107,6 @@ public class ImmatriculationService {
                     // Mappage du type de carburant et de la consommation par defaut
                     String fuelType = "PETROL";
                     double consumption = 6.2;
-                    double insurance = 600.0;
                     double maintenance = 400.0;
                     double resale = 6000.0;
 
@@ -116,19 +115,16 @@ public class ImmatriculationService {
                         if (cleanFuel.contains("elec") || cleanFuel.contains("volt")) {
                             fuelType = "ELECTRIC";
                             consumption = 16.5;
-                            insurance = 550.0;
                             maintenance = 200.0;
                             resale = 15000.0;
                         } else if (cleanFuel.contains("hybr")) {
                             fuelType = "HYBRID";
                             consumption = 4.4;
-                            insurance = 580.0;
                             maintenance = 320.0;
                             resale = 12000.0;
                         } else if (cleanFuel.contains("dies") || cleanFuel.contains("gazo")) {
                             fuelType = "DIESEL";
                             consumption = 4.9;
-                            insurance = 620.0;
                             maintenance = 450.0;
                             resale = 8000.0;
                         }
@@ -141,7 +137,6 @@ public class ImmatriculationService {
                             "fuelType", fuelType,
                             "consumption", consumption,
                             "annualMileage", 15000,
-                            "insuranceCost", insurance,
                             "maintenanceCost", maintenance,
                             "resaleValue", resale,
                             "source", "OSCARO"

@@ -603,11 +603,7 @@
             </div>
           </div>
 
-          <div class="grid-3-modal">
-            <div class="form-group mb-0">
-              <label class="form-label">Assurance (€/an)</label>
-              <input v-model.number="variantForm.defaultInsuranceCost" type="number" class="form-control" />
-            </div>
+          <div class="grid-2-modal">
             <div class="form-group mb-0">
               <label class="form-label">Entretien (€/an)</label>
               <input v-model.number="variantForm.defaultMaintenanceCost" type="number" class="form-control" />
@@ -720,7 +716,6 @@ const variantForm = ref({
   purchasePrice: 35000,
   monthlyLoa: 290,
   monthlyLld: 270,
-  defaultInsuranceCost: 650,
   defaultMaintenanceCost: 250,
   estimatedResaleValue: 18000
 })
@@ -1004,7 +999,6 @@ const openAddVariantModal = (motId) => {
     purchasePrice: 35000,
     monthlyLoa: 290,
     monthlyLld: 270,
-    defaultInsuranceCost: 650,
     defaultMaintenanceCost: 250,
     estimatedResaleValue: 18000
   }
@@ -1019,7 +1013,6 @@ const openEditVariantModal = (motId, p) => {
     purchasePrice: p.purchasePrice,
     monthlyLoa: p.monthlyLoa,
     monthlyLld: p.monthlyLld,
-    defaultInsuranceCost: p.defaultInsuranceCost || 650,
     defaultMaintenanceCost: p.defaultMaintenanceCost || 250,
     estimatedResaleValue: p.estimatedResaleValue || 18000
   }
@@ -1067,7 +1060,6 @@ const openSimulatorWithVariant = (brand, model, mot, variant) => {
       consumption: mot.consumptionWltp,
       monthlyLoa: variant.monthlyLoa,
       monthlyLld: variant.monthlyLld,
-      insuranceCost: variant.defaultInsuranceCost || 650,
       maintenanceCost: variant.defaultMaintenanceCost || 250,
       resaleValue: variant.estimatedResaleValue || 0,
       imageUrl: variant.finitionImageUrl || model.imageUrl

@@ -47,7 +47,7 @@ public class ComparisonController {
 	public ResponseEntity<FuelPriceLiveService.FuelPricesLiveResponse> getLiveFuelPrices() {
 		FuelPriceLiveService.FuelPricesLiveResponse live = fuelPriceLiveService.getLiveFuelPrices();
 		return ResponseEntity.ok()
-				.cacheControl(org.springframework.http.CacheControl.maxAge(30, java.util.concurrent.TimeUnit.MINUTES).cachePublic())
+				.cacheControl(org.springframework.http.CacheControl.maxAge(5, java.util.concurrent.TimeUnit.MINUTES).cachePublic())
 				.body(live);
 	}
 

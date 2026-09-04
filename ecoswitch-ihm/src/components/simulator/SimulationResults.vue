@@ -74,10 +74,30 @@ const props = defineProps({
   currentUser: {
     type: Object,
     default: null
+  },
+  hasCurrentVehicle: {
+    type: Boolean,
+    default: true
+  },
+  currentVehicleFinanceType: {
+    type: String,
+    default: 'CASH'
+  },
+  currentVehicleMonthlyCost: {
+    type: Number,
+    default: 0
+  },
+  currentLoaBuyoutPrice: {
+    type: Number,
+    default: null
+  },
+  baselineMobilityCost: {
+    type: Number,
+    default: 86
   }
 })
 
-const emit = defineEmits(['back', 'load-alternative'])
+const emit = defineEmits(['back', 'load-alternative', 'open-auth'])
 
 const showShareModal = ref(false)
 const showSaveModal = ref(false)
@@ -86,15 +106,30 @@ const showDetailedTables = ref(false)
 const saveSuccessToast = ref(false)
 
 // Labels d'affichage : fallback sur "Votre véhicule" si le nom n'est pas renseigné
-const currentVehicleLabel = computed(() => props.currentVehicle?.name?.trim() || 'Votre véhicule')
+const currentVehicleLabel = computed(() => {
+  if (props.hasCurrentVehicle === false) {
+    return 'Mobilité Actuelle (Sans Voiture)'
+  }
+  return props.currentVehicle?.name?.trim() || 'Votre véhicule'
+})
 const targetVehicleLabel  = computed(() => props.targetVehicle?.name?.trim()  || 'Véhicule cible')
 
 // Calculs du budget mensuel
-const currentMonthlyUsage = computed(() => (props.result?.currentAnnualCost || 0) / 12.0)
+const currentMonthlyUsage = computed(() => {
+  if (props.hasCurrentVehicle === false) {
+    return 0.0
+  }
+  return (props.result?.currentAnnualCost || 0) / 12.0
+})
 const targetMonthlyUsage = computed(() => (props.result?.targetAnnualCost || 0) / 12.0)
 const monthlyUsageSavings = computed(() => currentMonthlyUsage.value - targetMonthlyUsage.value)
 
-const currentMonthlyFinancing = computed(() => 0.0)
+const currentMonthlyFinancing = computed(() => {
+  if (props.hasCurrentVehicle === false) {
+    return Number(props.baselineMobilityCost) || 86.0
+  }
+  return Number(props.currentVehicleMonthlyCost) || 0.0
+})
 const targetMonthlyFinancing = computed(() => {
   if (props.isLeasing && props.result?.targetMonthlyTotalCost !== undefined) {
     return Math.max(0, props.result.targetMonthlyTotalCost - targetMonthlyUsage.value)
@@ -186,8 +221,11 @@ const exportToCSV = () => {
 
 const triggerSave = () => {
   if (!props.currentUser) {
-    alert("Veuillez vous connecter à votre Espace Client pour enregistrer vos simulations.")
+    emit('open-auth')
     return
+  }
+  if (!saveNote.value) {
+    saveNote.value = `${currentVehicleLabel.value} ➔ ${targetVehicleLabel.value}`
   }
   showSaveModal.value = true
 }
@@ -200,10 +238,15 @@ const confirmSave = async () => {
     maxYears:          props.maxYears,
     immediateRepairCost: props.immediateRepairCost,
     isLeasing:         props.isLeasing,
+    hasCurrentVehicle: props.hasCurrentVehicle,
+    currentVehicleFinanceType: props.currentVehicleFinanceType,
+    currentVehicleMonthlyCost: props.currentVehicleMonthlyCost,
+    currentLoaBuyoutPrice: props.currentLoaBuyoutPrice,
+    baselineMobilityCost: props.baselineMobilityCost,
     result:            { ...props.result },
     note:              saveNote.value
   }
-  const simName = `${currentVehicleLabel.value} ➔ ${targetVehicleLabel.value}`
+  const simName = saveNote.value || `${currentVehicleLabel.value} ➔ ${targetVehicleLabel.value}`
 
   try {
     await apiSaveSimulation(simName, simData)
@@ -291,8 +334,18 @@ const handleLoadAlternative = (rec) => {
           </span>
         </div>
         
+        <!-- Cas Non Véhiculé (Primo-Accédant) -->
+        <template v-if="!hasCurrentVehicle">
+          <h3 class="diagnostic-title text-main font-heading m-0">
+            Roulez en électrique pour {{ formatCurrency(targetMonthlyTotal) }} / mois tout compris
+          </h3>
+          <p class="diagnostic-description text-xs text-muted mt-1 m-0">
+            Par rapport à vos dépenses actuelles de transport ({{ formatCurrency(currentMonthlyFinancing) }}/mois), votre véhicule neuf garanti vous revient à {{ formatCurrency(targetMonthlyTotal) }}/mois (mensualité + recharge + entretien inclus).
+          </p>
+        </template>
+
         <!-- Cas LOA / LLD : Analyse en budget mensuel de trésorerie (contrat 36/48/60 mois) -->
-        <template v-if="isLeasing">
+        <template v-else-if="isLeasing">
           <h3 class="diagnostic-title text-main font-heading m-0">
             {{ netMonthlySavings >= 0 
               ? `Opération Blanche ou Positive : +${formatCurrency(netMonthlySavings)} / mois de gain net` 
