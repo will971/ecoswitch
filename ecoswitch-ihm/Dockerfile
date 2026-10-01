@@ -20,8 +20,9 @@ RUN rm -rf /usr/share/nginx/html/*
 COPY --from=build /app/dist/ /usr/share/nginx/html/
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-ENV API_HOST=https://ecoswitch-api.up.railway.app
+# Adresse de l API vue depuis le conteneur Nginx (service Compose par defaut).
+ENV API_HOST=http://api:8080
 
 EXPOSE 80
 
-CMD ["/bin/sh", "-c", "if echo \"${API_HOST:-https://ecoswitch-api.up.railway.app}\" | grep -q '^https://'; then CLEAN=$(echo \"${API_HOST}\" | sed -e 's|/$||'); TARGET_API=\"${CLEAN}/api/\"; TARGET_UPLOADS=\"${CLEAN}/uploads/\"; elif echo \"${API_HOST:-https://ecoswitch-api.up.railway.app}\" | grep -q '^http://'; then CLEAN=$(echo \"${API_HOST}\" | sed -e 's|/$||'); TARGET_API=\"${CLEAN}/api/\"; TARGET_UPLOADS=\"${CLEAN}/uploads/\"; else CLEAN=$(echo \"${API_HOST:-https://ecoswitch-api.up.railway.app}\" | sed -e 's|/$||'); TARGET_API=\"http://${CLEAN}/api/\"; TARGET_UPLOADS=\"http://${CLEAN}/uploads/\"; fi; sed -i \"s|__API_PASS__|${TARGET_API}|g\" /etc/nginx/conf.d/default.conf; sed -i \"s|__UPLOADS_PASS__|${TARGET_UPLOADS}|g\" /etc/nginx/conf.d/default.conf; nginx -t && nginx -g 'daemon off;'"]
+CMD ["/bin/sh", "-c", "if echo \"${API_HOST:-http://api:8080}\" | grep -q '^https://'; then CLEAN=$(echo \"${API_HOST}\" | sed -e 's|/$||'); TARGET_API=\"${CLEAN}/api/\"; TARGET_UPLOADS=\"${CLEAN}/uploads/\"; elif echo \"${API_HOST:-http://api:8080}\" | grep -q '^http://'; then CLEAN=$(echo \"${API_HOST}\" | sed -e 's|/$||'); TARGET_API=\"${CLEAN}/api/\"; TARGET_UPLOADS=\"${CLEAN}/uploads/\"; else CLEAN=$(echo \"${API_HOST:-http://api:8080}\" | sed -e 's|/$||'); TARGET_API=\"http://${CLEAN}/api/\"; TARGET_UPLOADS=\"http://${CLEAN}/uploads/\"; fi; sed -i \"s|__API_PASS__|${TARGET_API}|g\" /etc/nginx/conf.d/default.conf; sed -i \"s|__UPLOADS_PASS__|${TARGET_UPLOADS}|g\" /etc/nginx/conf.d/default.conf; nginx -t && nginx -g 'daemon off;'"]

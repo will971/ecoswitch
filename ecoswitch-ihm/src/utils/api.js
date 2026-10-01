@@ -218,6 +218,27 @@ export async function apiGetMe() {
   return await parseApiResponse(res, "Erreur récupération profil.")
 }
 
+// ── Immatriculation ───────────────────────────────────────────────────────
+
+/**
+ * Identifie un véhicule à partir de sa plaque (formats AB-123-CD ou 1234 AB 56).
+ * Renvoie null si la plaque est inconnue ou si le service ne répond pas : la
+ * saisie manuelle reste toujours possible, l'appelant n'a pas d'erreur à gérer.
+ */
+export async function apiGetImmatriculation(plaque) {
+  const clean = String(plaque || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase()
+  if (clean.length < 5) return null
+  return cachedFetch(`immatriculation:${clean}`, 24 * 60 * 60 * 1000, async () => {
+    try {
+      const res = await apiFetch(`/immatriculation/${encodeURIComponent(clean)}`)
+      if (!res.ok) return null
+      return await res.json()
+    } catch (e) {
+      return null
+    }
+  })
+}
+
 // ── Simulations ───────────────────────────────────────────────────────────
 
 export async function apiGetSimulations() {
@@ -527,7 +548,7 @@ export async function apiUploadImage(file, folder = 'general') {
   })
 
   const data = await parseApiResponse(res, "Erreur lors du téléversement de l'image.")
-  return data.url // e.g. "/uploads/brands/..."
+  return data.url // URL absolue vers le bucket d'images
 }
 
 export async function apiCompareCustomProfitability(payload) {

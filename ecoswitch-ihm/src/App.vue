@@ -6,8 +6,6 @@ import {
   Settings,
   Zap,
   Activity,
-  ExternalLink,
-  ShieldCheck,
   User,
   LogOut,
   Lock,
@@ -114,9 +112,6 @@ const openAuth = () => {
   openLoginModal()
 }
 
-// Lien Console Admin dynamique
-const adminUrl = import.meta.env.PROD ? 'https://ecoswitch-api.up.railway.app/admin' : 'http://localhost:8080/admin'
-
 // Theme (Default Light Studio)
 const theme = ref(localStorage.getItem('eco_theme') || 'light')
 
@@ -132,11 +127,9 @@ const toggleTheme = () => {
 
 // État Authentification
 const currentUser = ref(null)
-const isAdmin = computed(() => {
-  if (!currentUser.value) return false
-  const email = (currentUser.value.email || '').trim().toLowerCase()
-  return currentUser.value.role === 'ADMIN' || email === 'modeste.william.s@gmail.com' || email === 'admin'
-})
+// Le role est attribue par le serveur, qui l'applique aussi : ce drapeau ne
+// fait que masquer l'interface d'administration.
+const isAdmin = computed(() => currentUser.value?.role === 'ADMIN')
 const authModalOpen = ref(false)
 const authMode = ref('login') // 'login' | 'register'
 const authEmail = ref('')
@@ -183,21 +176,12 @@ const checkCurrentUser = async () => {
 
   if (savedUser && savedUser !== 'undefined' && savedUser !== 'null') {
     try {
-      const parsed = JSON.parse(savedUser)
-      const email = (parsed.email || '').trim().toLowerCase()
-      if (email === 'modeste.william.s@gmail.com' || email === 'admin') {
-        parsed.role = 'ADMIN'
-      }
-      currentUser.value = parsed
+      currentUser.value = JSON.parse(savedUser)
     } catch (e) {}
   }
 
   try {
     const user = await apiGetMe()
-    const email = (user.email || '').trim().toLowerCase()
-    if (email === 'modeste.william.s@gmail.com' || email === 'admin') {
-      user.role = 'ADMIN'
-    }
     currentUser.value = user
     localStorage.setItem('saas_user', JSON.stringify(user))
     await loadUserProfiles()
@@ -226,13 +210,11 @@ const loadUserProfiles = async () => {
 const persistSession = (data) => {
   if (!data?.token) return
   localStorage.setItem('saas_token', data.token)
-  const email = (data.email || authEmail.value || '').trim().toLowerCase()
-  const isAdmin = data.role === 'ADMIN' || email === 'modeste.william.s@gmail.com' || email === 'admin'
   const user = {
     email: data.email || authEmail.value,
     name: data.name || (data.email ? data.email.split('@')[0] : 'Utilisateur'),
     plan: data.plan || 'Pro',
-    role: isAdmin ? 'ADMIN' : (data.role || 'USER')
+    role: data.role === 'ADMIN' ? 'ADMIN' : 'USER'
   }
   localStorage.setItem('saas_user', JSON.stringify(user))
   currentUser.value = user
@@ -627,17 +609,7 @@ const installPwa = async () => {
 
         <!-- Theme Toggle & Admin -->
         <div class="flex-between items-center mb-3">
-          <a
-            v-if="isAdmin"
-            :href="adminUrl"
-            target="_blank"
-            class="btn-admin-link flex items-center gap-1.5 text-xxs text-muted"
-          >
-            <ShieldCheck size="13" />
-            <span>Console Admin</span>
-            <ExternalLink size="10" />
-          </a>
-          <span v-else></span>
+          <span></span>
 
           <button
             class="btn-theme-toggle flex-center"
@@ -939,16 +911,6 @@ const installPwa = async () => {
   font-weight: 700;
 }
 
-.btn-admin-link {
-  text-decoration: none;
-  padding: 4px 8px;
-  border-radius: 6px;
-  transition: background 0.15s ease;
-}
-.btn-admin-link:hover {
-  background: var(--bg-card-subtle);
-  color: var(--text-main);
-}
 
 .btn-theme-toggle {
   width: 28px;

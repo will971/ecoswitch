@@ -724,12 +724,9 @@ const uploadingImage = ref(false)
 
 // ── Computed ──────────────────────────────────────────────────────────────
 
-const isAdmin = computed(() => {
-  if (!props.currentUser) return false
-  if (props.currentUser.role === 'ADMIN') return true
-  const email = (props.currentUser.email || '').trim().toLowerCase()
-  return email === 'modeste.william.s@gmail.com' || email === 'admin' || email === 'admin@ecoswitch.com'
-})
+// Masque l'interface d'edition. Le serveur refuse de toute facon les ecritures
+// a un non-ADMIN : ce n'est pas ici que se joue la securite.
+const isAdmin = computed(() => props.currentUser?.role === 'ADMIN')
 
 const filteredHierarchy = computed(() => {
   if (!brandSearch.value.trim()) return hierarchy.value

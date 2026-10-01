@@ -5,6 +5,16 @@ import istanbul from 'vite-plugin-istanbul'
 import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
+/**
+ * Cible du proxy de developpement.
+ *
+ * Conductor alloue des ports differents a chaque workspace, donc l'API n'est
+ * pas forcement sur 8080 : .conductor/scripts/dev.sh renseigne
+ * VITE_DEV_API_TARGET avec le port effectif. Hors Conductor, on retombe sur
+ * le port historique du projet.
+ */
+const devApiTarget = process.env.VITE_DEV_API_TARGET || 'http://127.0.0.1:8080'
+
 export default defineConfig({
   plugins: [
     vue(),
@@ -125,12 +135,12 @@ export default defineConfig({
     allowedHosts: true,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8080',
+        target: devApiTarget,
         changeOrigin: true,
         secure: false,
       },
       '/uploads': {
-        target: 'http://127.0.0.1:8080',
+        target: devApiTarget,
         changeOrigin: true,
         secure: false,
       }

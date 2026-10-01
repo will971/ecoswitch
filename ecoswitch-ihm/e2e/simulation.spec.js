@@ -17,28 +17,34 @@ test.describe('Profitability Simulation & Authentication', () => {
     // Step 3: Current fuel type - petrol
     await page.locator('.option-card-touch:has-text("Essence (SP95 / E10)")').click();
 
-    // Step 4: Current model - pick a popular car (e.g. Peugeot 208)
-    await page.locator('button.quick-car-btn:has-text("Peugeot 208")').click();
+    // Step 4: Consommation - on garde l'estimation par defaut.
+    // (Les boutons « voitures populaires » ont ete retires du wizard par le
+    // commit 68c765b ; ce scenario les cherchait encore.)
+    await page.locator('button:has-text("Continuer (")').click();
 
-    // Step 5: Annual mileage - continue with default
+    // Step 5: Kilometrage - valeur par defaut
     await page.locator('button:has-text("Continuer")').click();
 
-    // Step 6: Maintenance - confirm default
-    await page.locator('button:has-text("Conserver l\'estimation moyenne constructeur")').click();
+    // Step 6: Entretien - budget par defaut
+    await page.locator('button:has-text("Valider mon budget entretien")').click();
 
-    // Step 7: Vehicle departure - resale
+    // Step 7: Devenir du vehicule - revente, puis validation de l'apport
     await page.locator('.option-card-touch:has-text("Revente d\'occasion")').click();
+    await page.locator('button:has-text("Valider cet apport")').click();
 
-    // Step 8: Charging location - individual home
+    // Step 8: Recharge - maison individuelle
     await page.locator('.option-card-touch:has-text("Maison individuelle")').click();
 
-    // Step 9: Tax income tier - standard
+    // Step 9: Revenu fiscal - foyer standard
     await page.locator('.option-card-touch:has-text("Plus de 15 400 €")').click();
 
-    // Step 10: Preferred target format - city car
+    // Step 10: Format cible - citadine
     await page.locator('.option-card-touch:has-text("Citadine agile")').click();
 
-    // Step 11: Target monthly budget - submit
+    // Step 11: Vehicule cible - suggestion par defaut
+    await page.locator('button:has-text("Continuer")').click();
+
+    // Step 12: Budget mensuel - calcul
     await page.locator('button:has-text("Calculer mes économies")').click();
 
     // Step 13: Final auth step - proceed without account

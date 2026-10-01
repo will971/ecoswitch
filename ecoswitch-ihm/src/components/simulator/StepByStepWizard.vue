@@ -28,7 +28,7 @@ import {
   Wallet,
   ExternalLink
 } from '@lucide/vue'
-import { apiGetCatalogVariants, apiGetLiveFuelPrices } from '../../utils/api.js'
+import { apiGetCatalogVariants, apiGetImmatriculation, apiGetLiveFuelPrices } from '../../utils/api.js'
 
 const props = defineProps({
   currentVehicle: {
@@ -286,6 +286,37 @@ const selectFuelType = (fuel) => {
     props.currentVehicle.name = props.currentVehicle.name || 'Véhicule Essence'
   }
   navigateTo('A05_CONSUMPTION')
+}
+
+// 4 bis. Écran A04 : recherche facultative par plaque d'immatriculation.
+// En cas de succès on préremplit le véhicule puis on passe à l'écran de
+// consommation, où l'utilisateur confirme ou corrige. En cas d'échec on reste
+// sur le choix manuel du carburant, sans bloquer.
+const plateInput = ref('')
+const plateLoading = ref(false)
+const plateMessage = ref('')
+
+const lookupPlate = async () => {
+  if (plateLoading.value || !plateInput.value.trim()) return
+  plateLoading.value = true
+  plateMessage.value = ''
+  try {
+    const v = await apiGetImmatriculation(plateInput.value)
+    if (!v || !v.fuelType) {
+      plateMessage.value = 'Plaque non reconnue : choisissez simplement votre carburant ci-dessous.'
+      return
+    }
+    const fuel = v.fuelType === 'PLUGIN_HYBRID' ? 'HYBRID' : v.fuelType
+    props.currentVehicle.name = v.name || props.currentVehicle.name
+    props.currentVehicle.fuelType = fuel
+    if (typeof v.consumption === 'number') props.currentVehicle.consumption = v.consumption
+    if (typeof v.maintenanceCost === 'number') props.currentVehicle.maintenanceCost = v.maintenanceCost
+    if (typeof v.resaleValue === 'number') props.currentVehicle.resaleValue = v.resaleValue
+    if (typeof v.annualMileage === 'number' && v.annualMileage > 0) props.currentVehicle.annualMileage = v.annualMileage
+    navigateTo('A05_CONSUMPTION')
+  } finally {
+    plateLoading.value = false
+  }
 }
 
 // 5. Écran A05 : Consommation moyenne réelle (Slider)
@@ -806,6 +837,31 @@ onMounted(async () => {
             Nous appliquons les prix moyens officiels des carburants relevés en direct.
           </p>
         </div>
+
+        <!-- Raccourci facultatif : identification par plaque -->
+        <form class="target-search-accordion p-3.5 rounded-xl border-glass bg-card-subtle mb-4" @submit.prevent="lookupPlate">
+          <label for="plate-input" class="form-label text-xxs font-semibold text-main flex items-center gap-1.5 mb-1.5">
+            <Search size="13" class="text-teal" />
+            <span>Gagnez du temps : votre plaque d'immatriculation (facultatif)</span>
+          </label>
+          <div class="flex items-center gap-2">
+            <input
+              id="plate-input"
+              v-model="plateInput"
+              type="text"
+              class="form-control text-sm"
+              placeholder="AB-123-CD"
+              autocomplete="off"
+              autocapitalize="characters"
+              maxlength="12"
+            />
+            <button type="submit" class="btn btn-primary" :disabled="plateLoading || !plateInput.trim()">
+              <RefreshCw v-if="plateLoading" size="16" class="spin" />
+              <span v-else>Rechercher</span>
+            </button>
+          </div>
+          <p v-if="plateMessage" class="text-xxs text-dimmed mt-1.5" role="status">{{ plateMessage }}</p>
+        </form>
 
         <div class="options-grid">
           <button type="button" class="option-card-touch" @click="selectFuelType('PETROL')">
@@ -2039,6 +2095,10 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+/* Indicateur de chargement de la recherche par plaque */
+.spin { animation: plate-spin 0.8s linear infinite; }
+@keyframes plate-spin { to { transform: rotate(360deg); } }
+
 .step-wizard-container {
   max-width: 640px;
   margin: 0 auto;
