@@ -1,0 +1,266 @@
+// Schema derive par introspection (`prisma db pull`) d'une base creee par
+// Hibernate `ddl-auto`, puis renomme en conventions TypeScript via @map/@@map.
+// Les noms physiques restent STRICTEMENT identiques a l'existant : aucune
+// migration de structure n'est induite par ce fichier, hors les deux
+// changements documentes ci-dessous.
+//
+// Ecarts assumes vs. l'existant (voir prisma/migrations/) :
+//   1. media_files.data : oid (large object) -> bytea. Prisma ne sait pas lire
+//      les large objects Postgres ; il n'en verrait que le pointeur. Migration
+//      validee sans perte (lo_get).
+//   2. user_vehicle_profile gagne un index sur user_email (chemin chaud).
+//
+// Les contraintes CHECK sur fuel_type generees par Hibernate restent en base et
+// continuent d'appliquer les 5 valeurs. Prisma ne les represente pas mais ne les
+// supprime pas non plus.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Catalogue ────────────────────────────────────────────────────────────
+
+model Brand {
+  id      BigInt         @id @default(autoincrement())
+  name    String         @unique(map: "ukoce3937d2f4mpfqrycbr0l93m") @db.VarChar(100)
+  logoUrl String?        @map("logo_url") @db.VarChar(2000)
+  models  VehicleModel[]
+
+  @@map("brands")
+}
+
+model VehicleModel {
+  id       BigInt  @id @default(autoincrement())
+  name     String  @db.VarChar(100)
+  imageUrl String? @map("image_url") @db.VarChar(2000)
+  category String? @db.VarChar(50)
+  brandId  BigInt  @map("brand_id")
+
+  brand         Brand          @relation(fields: [brandId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fkd47bmoabg5f8dhgme304ex5ov")
+  motorisations Motorisation[]
+  finitions     Finition[]
+
+  @@map("vehicle_models")
+}
+
+model Motorisation {
+  id                 BigInt @id @default(autoincrement())
+  name               String @db.VarChar(150)
+  /// PETROL | DIESEL | HYBRID | PLUGIN_HYBRID | ELECTRIC — CHECK en base.
+  fuelType           String @map("fuel_type") @db.VarChar(30)
+  /// L/100km pour thermique/hybride, kWh/100km pour electrique.
+  consumptionWltp    Float  @map("consumption_wltp")
+  powerHp            Int?   @map("power_hp")
+  batteryCapacityKwh Float? @map("battery_capacity_kwh")
+  autonomieWltpKm    Int?   @map("autonomie_wltp_km")
+  /// Conso essence d'un PHEV batterie vide.
+  consoThermiquePhev Float? @map("conso_thermique_phev")
+  modelId            BigInt @map("model_id")
+
+  model           VehicleModel           @relation(fields: [modelId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk53gb6ujecbdcyjv47wvmrpoep")
+  variantPricings FinitionMotorisation[]
+
+  @@map("motorisations")
+}
+
+model Finition {
+  id       BigInt  @id @default(autoincrement())
+  name     String  @db.VarChar(100)
+  imageUrl String? @map("image_url") @db.VarChar(2000)
+  modelId  BigInt  @map("model_id")
+
+  model           VehicleModel           @relation(fields: [modelId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk6j5x1rrad79kuwk9mi4772y71")
+  variantPricings FinitionMotorisation[]
+
+  @@map("finitions")
+}
+
+/// Variante tarifee : une finition x une motorisation.
+model FinitionMotorisation {
+  id                     BigInt @id @default(autoincrement())
+  finitionId             BigInt @map("finition_id")
+  motorisationId         BigInt @map("motorisation_id")
+  purchasePrice          Float  @map("purchase_price")
+  monthlyLoa             Float? @map("monthly_loa")
+  monthlyLld             Float? @map("monthly_lld")
+  defaultMaintenanceCost Float? @map("default_maintenance_cost")
+  estimatedResaleValue   Float? @map("estimated_resale_value")
+
+  finition     Finition     @relation(fields: [finitionId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk23fvqqhutoqb4vdb17dnbk1rq")
+  motorisation Motorisation @relation(fields: [motorisationId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk1b3qoogjlyrj1kykvwpfuqe5i")
+
+  @@unique([finitionId, motorisationId], map: "uklpw6gqxbqokgjmcfyc2kl7n8p")
+  @@map("finition_motorisations")
+}
+
+// ── Donnees utilisateur ──────────────────────────────────────────────────
+
+/// Sauvegarde de simulation. `simulationData` est un blob JSON opaque produit
+/// par le front ; le serveur ne l'interprete pas.
+model Simulation {
+  id             BigInt   @id @default(autoincrement())
+  userEmail      String   @map("user_email") @db.VarChar(320)
+  name           String   @db.VarChar(300)
+  /// timestamp SANS fuseau — serialise en "2026-09-30T14:23:11.123", sans Z.
+  savedAt        DateTime @map("saved_at") @db.Timestamp(6)
+  simulationData String   @map("simulation_data")
+
+  @@index([userEmail], map: "idx_simulation_user_email")
+  @@map("simulation")
+}
+
+/// Garage virtuel. ATTENTION : `isDefault` circule sous le nom `default` sur le
+/// fil (getter `is` de Jackson cote Java) — le front Vue lit `p.default`.
+/// Le mapper DTO doit conserver ce nom.
+model UserVehicleProfile {
+  id              BigInt  @id @default(autoincrement())
+  userEmail       String  @map("user_email") @db.VarChar(320)
+  isDefault       Boolean @map("is_default")
+  name            String  @db.VarChar(255)
+  fuelType        String  @map("fuel_type") @db.VarChar(255)
+  consumption     Float?
+  annualMileage   Int?    @map("annual_mileage")
+  maintenanceCost Float?  @map("maintenance_cost")
+  resaleValue     Float?  @map("resale_value")
+  petrolPrice     Float?  @map("petrol_price")
+  dieselPrice     Float?  @map("diesel_price")
+  electricPrice   Float?  @map("electric_price")
+
+  @@index([userEmail])
+  @@map("user_vehicle_profile")
+}
+
+// ── Medias ───────────────────────────────────────────────────────────────
+
+/// Images servies sur /uploads/*. La colonne `data` passe de `oid` (large
+/// object Hibernate) a `bytea` : Prisma ne sait pas lire un large object.
+model MediaFile {
+  id          BigInt   @id @default(autoincrement())
+  folder      String   @db.VarChar(64)
+  fileName    String   @map("file_name") @db.VarChar(128)
+  contentType String   @map("content_type") @db.VarChar(64)
+  data        Bytes
+  createdAt   DateTime @map("created_at") @db.Timestamptz(6)
+
+  @@unique([folder, fileName], map: "uk5yvcwapwvb7pbkabay7dblrby")
+  @@map("media_files")
+}
+
+// ── Identite (better-auth) ───────────────────────────────────────────────
+// Structure imposee par better-auth 1.7 (cf. getAuthTables). Tables prefixees
+// `auth_` : `user` est un mot reserve Postgres, et le prefixe evite toute
+// confusion avec l'ancienne table `app_user`, conservee pour le rollback.
+//
+// Les donnees metier (simulation, user_vehicle_profile) referencent
+// l'utilisateur par son EMAIL, sans cle etrangere — comme avant. L'identite
+// peut donc changer de table sans toucher a ces donnees.
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @map("email_verified")
+  image         String?
+  /// Champ additionnel, herite de app_user. Toujours "Pro" aujourd'hui.
+  plan          String    @default("Pro")
+  /// USER | ADMIN. Remplace la liste d'emails codee en dur cote Java.
+  role          String    @default("USER")
+  createdAt     DateTime  @map("created_at")
+  updatedAt     DateTime  @map("updated_at")
+  sessions      Session[]
+  accounts      Account[]
+
+  @@map("auth_user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime @map("expires_at")
+  token     String   @unique
+  createdAt DateTime @map("created_at")
+  updatedAt DateTime @map("updated_at")
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("auth_session")
+}
+
+/// Un compte par methode de connexion : `credential` (mot de passe) ou `google`.
+model Account {
+  id                    String    @id
+  accountId             String    @map("account_id")
+  providerId            String    @map("provider_id")
+  userId                String    @map("user_id")
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?   @map("access_token")
+  refreshToken          String?   @map("refresh_token")
+  idToken               String?   @map("id_token")
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at")
+  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at")
+  scope                 String?
+  /// Hachage bcrypt. Les comptes migres gardent leur prefixe Spring `{bcrypt}`.
+  password              String?
+  createdAt             DateTime  @map("created_at")
+  updatedAt             DateTime  @map("updated_at")
+
+  @@index([userId])
+  @@map("auth_account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @map("created_at")
+  updatedAt  DateTime @map("updated_at")
+
+  @@map("auth_verification")
+}
+
+// ── Heritage : non utilise par l'API, conserve pour le rollback ──────────
+// Ces deux tables ne sont lues ni ecrites par le NestJS. Elles sont modelisees
+// UNIQUEMENT pour que `prisma migrate diff` cesse de proposer un DROP TABLE.
+// Leur suppression est une etape manuelle du cutover (J+14), pas une migration.
+
+/// Remplacee par les tables better-auth. Renommee app_user_legacy au cutover.
+model AppUserLegacy {
+  id           BigInt  @id @default(autoincrement())
+  email        String  @unique(map: "uk1j9d9a06i600gd43uu3km82jw") @db.VarChar(320)
+  name         String  @db.VarChar(200)
+  passwordHash String? @map("password_hash") @db.VarChar(255)
+  provider     String  @db.VarChar(20)
+  plan         String  @db.VarChar(50)
+  role         String  @db.VarChar(20)
+
+  @@map("app_user")
+}
+
+/// CRUD de vehicules libres, remplace par le catalogue structure. Non porte.
+model VehiculeLegacy {
+  id              BigInt  @id @default(autoincrement())
+  name            String  @db.VarChar(255)
+  brand           String? @db.VarChar(100)
+  model           String? @db.VarChar(100)
+  generation      String? @db.VarChar(100)
+  version         String? @db.VarChar(300)
+  purchasePrice   Float?  @map("purchase_price")
+  fuelType        String  @map("fuel_type") @db.VarChar(255)
+  consumption     Float?
+  annualMileage   Int?    @map("annual_mileage")
+  maintenanceCost Float?  @map("maintenance_cost")
+  resaleValue     Float?  @map("resale_value")
+  url             String? @db.VarChar(2000)
+  visibility      String  @db.VarChar(20)
+  createdBy       String? @map("created_by") @db.VarChar(320)
+
+  @@map("vehicule")
+}
