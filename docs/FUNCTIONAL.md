@@ -11,13 +11,13 @@ La plateforme s'articule autour de quatre grands cas d'usage :
 1. **Simulateur Direct** : Saisie libre de deux véhicules (actuel et cible) pour comparer instantanément leurs coûts de fonctionnement, leurs émissions de CO2, et intégrer des aides de l'État.
 2. **Comparateur du Catalogue** : Comparaison d'un véhicule avec plusieurs alternatives issues du catalogue de référence (issu des données de l'ADEME).
 3. **Gestion du Garage Virtuel (Profils)** : Enregistrement de ses propres véhicules pour des simulations ultérieures.
-4. **Dashboard d'Administration** : Suivi technique de l'application (logs, monitoring, métriques JVM).
+4. **Gestion du catalogue** : création et mise à jour des marques, modèles, motorisations, finitions et tarifs, réservée aux comptes ADMIN.
 
 ---
 
 ## 2. Indicateurs Clés & Formules de Calcul
 
-Les calculs financiers et écologiques sont au cœur de la valeur d'EcoSwitch. Ils sont implémentés dans la classe [CostCalculationService.java](../ecoswitch-api/src/main/java/com/example/springbootapp/service/CostCalculationService.java).
+Les calculs financiers et écologiques sont au cœur de la valeur d'EcoSwitch. Ils sont implémentés dans [cost-calculation.service.ts](../ecoswitch-api/src/comparison/cost-calculation.service.ts), portage exact de l'ancienne implémentation Java (vérifié sur 4 422 vecteurs de référence).
 
 ### A. Coût Total de Possession (TCO annuel)
 Le coût annuel d'utilisation d'un véhicule est calculé comme suit :
@@ -36,7 +36,9 @@ Pour les véhicules électriques, le coût de l'électricité dépend du lieu de
 $$\text{Prix Électricité Pondéré} = (R_{\text{domicile}} \times P_{\text{domicile}}) + ((1 - R_{\text{domicile}}) \times P_{\text{publique}})$$
 
 *   $P_{\text{domicile}}$ est le tarif de l'électricité résidentiel saisi par l'utilisateur (ex: 0.25 €/kWh).
-*   $P_{\text{publique}}$ est fixé par défaut au tarif moyen d'une borne publique rapide : **0.65 €/kWh**.
+*   $P_{\text{publique}}$ est fixé au tarif moyen d'une borne publique rapide : **0.55 €/kWh**.
+
+> Cette documentation annonçait auparavant 0,65 €/kWh. Le code a toujours utilisé 0,55 €/kWh, et c'est cette valeur qui fait foi.
 
 ### C. Seuil de Rentabilité (Break-Even)
 Le seuil de rentabilité correspond au nombre d'années nécessaires pour que le cumul des économies d'utilisation compense le coût de l'investissement initial requis pour changer de véhicule.
@@ -57,6 +59,7 @@ EcoSwitch évalue l'impact écologique des véhicules en calculant leurs émissi
 | **PETROL** (Essence) | Consommation $\times$ 23.0 |
 | **DIESEL** (Gazole) | Consommation $\times$ 26.4 |
 | **HYBRID** (Hybride) | Consommation $\times$ 20.0 |
+| **PLUGIN_HYBRID** (Hybride rechargeable) | Consommation $\times$ 9.5 |
 | **ELECTRIC** (Électricité) | Consommation $\times$ 0.5 (basé sur le mix électrique français bas carbone) |
 
 Les émissions annuelles globales sont calculées par :
@@ -77,7 +80,7 @@ Le bonus écologique s'applique à l'acquisition d'un véhicule propre (type `EL
     *   Si $\text{RFR} > 15\ 400\ €$ ou non renseigné : **4 000 €**
 
 ### B. Prime à la Conversion
-La prime à la conversion est octroyée lors de la mise au rebut (scrap) d'un vieux véhicule thermique (type `PETROL` ou `DIESEL`) au profit d'un véhicule propre (`ELECTRIC` ou `HYBRID`).
+La prime à la conversion est octroyée lors de la mise au rebut (scrap) d'un vieux véhicule thermique (type `PETROL` ou `DIESEL`) au profit d'un véhicule propre (`ELECTRIC`, `HYBRID` ou `PLUGIN_HYBRID`).
 *   **Barème selon les revenus** :
     *   Si $\text{RFR} \le 15\ 400\ €$ : **3 000 €**
     *   Si $\text{RFR} > 15\ 400\ €$ ou non renseigné : **1 500 €**
@@ -103,16 +106,23 @@ Où :
 
 ---
 
-## 5. Recherche Intelligente par Plaque d'Immatriculation
+## 5. Recherche par Plaque d'Immatriculation
 
-Pour simplifier l'onboarding utilisateur, l'IHM intègre une barre de recherche par plaque d'immatriculation (format standard `AA-123-BB` ou ancien `1234 AB 56`).
+Sur l'écran « carburant » du simulateur, l'utilisateur peut saisir sa plaque (format `AB-123-CD` ou `1234 AB 56`). Le champ est **facultatif** : en cas de succès, la marque, le modèle, le carburant, la consommation, l'entretien et la valeur de revente sont préremplis, puis l'utilisateur confirme sa consommation ; en cas d'échec, il poursuit simplement par le choix manuel du carburant.
 
-1.  **Requête Oscaro (Live)** : Le backend interroge directement les services Oscaro (`https://www.oscaro.com/catalog/vehicles/by_registration`) en nettoyant la plaque pour obtenir la marque, le modèle, la version et le carburant.
-2.  **Base de secours locale (Fallback)** : En cas d'erreur réseau, de blocage (anti-scraping) ou si la plaque n'existe pas chez le fournisseur, l'application bascule de manière transparente sur [fallback-plates.json](../ecoswitch-api/src/main/resources/data/fallback-plates.json) qui contient des plaques prédéfinies pour le test.
+1.  **Oscaro (en direct)** : l'API interroge `https://www.oscaro.com/catalog/vehicles/by_registration`.
+2.  **Dictionnaire local de secours** : en cas d'erreur réseau, de blocage ou de plaque inconnue, l'API bascule sur [fallback-plates.json](../ecoswitch-api/src/immatriculation/fallback-plates.json).
+
+Résultats mis en cache 24 h ; 20 recherches par minute et par IP au maximum.
+
+> [!WARNING]
+> Oscaro est interrogé sans convention, comme le ferait un navigateur. C'est fragile (un changement de leur site casse la fonction) et juridiquement discutable en usage commercial. L'API officielle du SIV, ou un fournisseur sous contrat, serait la cible à terme.
 
 > [!TIP]
-> **Plaques de test configurées localement :**
-> *   `AA-123-AA` : Peugeot 208 (Essence)
-> *   `BB-456-BB` : Renault Zoe (Électrique)
-> *   `CC-789-CC` : Tesla Model 3 (Électrique)
-> *   `DD-101-DD` : Toyota Yaris (Hybride)
+> **Plaques de test du dictionnaire local** (les plaques `AA-123-AA`… citées par une version précédente de cette page n'ont jamais existé) :
+> *   `AB-123-CD` : Peugeot 208 II 1.2 PureTech 100 (Essence)
+> *   `AA-987-BB` : Peugeot 3008 II 1.5 BlueHDi 130 (Diesel)
+> *   `FR-199-XC` : Renault Clio V E-Tech 140 (Hybride)
+> *   `GG-555-EL` : Tesla Model 3 Grande Autonomie (Électrique)
+> *   `DK-120-FR` : Renault Zoe R135 (Électrique)
+> *   `EZ-999-ZZ`, `DA-015-CM` : BMW 114i (Essence)

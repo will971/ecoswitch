@@ -1,74 +1,54 @@
-# EcoSwitch — Monorepo de Transition Écologique
+# EcoSwitch
 
-EcoSwitch est un outil d'aide à la décision financière et écologique permettant de comparer le coût de détention de différents véhicules et d'identifier le seuil de rentabilité lors du passage au véhicule électrique ou hybride.
+Outil d'aide à la décision financière et écologique : il compare le coût de
+détention d'un véhicule actuel avec celui d'un véhicule cible (électrique,
+hybride ou thermique récent) et calcule le seuil de rentabilité du passage.
 
-Ce dépôt est un monorepo contenant :
-*   **ecoswitch-api** : Le serveur backend REST (Spring Boot 4.1.0 / Java 26 / H2).
-*   **ecoswitch-ihm** : L'interface utilisateur Web monopage (Vue 3 / Vite).
+Monorepo :
 
----
+- **`ecoswitch-api/`** — API REST **NestJS 11 + Prisma 6 + better-auth**, PostgreSQL
+- **`ecoswitch-ihm/`** — interface web **Vue 3 + Vite**, servie par Nginx
 
-## 📂 Structure du Projet
+> L'API a été réécrite depuis Spring Boot 4 / Java 26. La procédure de bascule
+> d'une base existante est décrite dans [docs/MIGRATION.md](./docs/MIGRATION.md).
 
-```text
-DEV/
-  ├── ecoswitch-api/      # Backend Spring Boot (API & Admin)
-  ├── ecoswitch-ihm/      # Frontend Vue.js (Interface Web & Proxy Nginx)
-  ├── docs/               # Documentations détaillées (Fonctionnelle, Technique, Dév)
-  ├── Makefile            # Raccourcis de commandes unifiées pour le projet
-  ├── docker-compose.yml  # Fichier d'orchestration multi-conteneurs
-  └── DOCKER-RUN.md       # Guide de déploiement Docker simplified
-```
+## Démarrage rapide
 
----
-
-## 📖 Documentations Détaillées
-
-Pour faciliter l'intégration et la contribution au projet, la documentation est découpée en trois guides spécifiques :
-
-*   📘 **[Documentation Fonctionnelle](./docs/FUNCTIONAL.md)** : Règles métier, calcul du seuil de rentabilité (Break-Even), amortissement LOA/LLD, subventions gouvernementales (Bonus Écologique et Prime à la Conversion), émissions CO₂ et recherche de plaques d'immatriculation.
-*   📗 **[Documentation Technique](./docs/TECHNICAL.md)** : Architecture logicielle, double chaîne de sécurité Spring Security (JWT stateless pour l'API et session standard pour l'Admin), proxy Nginx, et solutions d'observabilité (AspectJ, JVM MXBeans, modification dynamique du niveau de log).
-*   📙 **[Guide de Développement & Intégration](./docs/DEVELOPMENT.md)** : Prérequis d'installation, lancement local avec/sans Docker, accès aux consoles Swagger & H2, peuplement initial des bases de données et lancement des tests JUnit.
-
----
-
-## 🚀 Démarrage Rapide
-
-Le moyen le plus simple de démarrer l'ensemble des services est d'utiliser Docker Compose via le `Makefile`.
-
-### Lancement Complet
-Depuis la racine du projet, exécutez :
 ```bash
 make up
 ```
 
-### URL Utiles
-*   **Application Web (IHM)** : [http://localhost:3000](http://localhost:3000)
-*   **API Swagger (OpenAPI)** : [http://localhost:8080/swagger-ui/index.html](http://localhost:8080/swagger-ui/index.html)
-*   **Dashboard d'Administration** : [http://localhost:8080/admin](http://localhost:8080/admin) *(User: `admin` / Password: `admin`)*
-*   **Console Base de Données H2** : [http://localhost:8080/h2-console](http://localhost:8080/h2-console) *(JDBC URL : `jdbc:h2:mem:testdb`)*
+| Service | URL |
+|---|---|
+| Interface web | http://localhost:3000 |
+| API | http://localhost:8080 (`/health`) |
+| Console MinIO (images) | http://localhost:9001 — `minioadmin` / `minioadmin` |
 
-### Arrêt de l'Environnement
+Le catalogue est vide au premier lancement. Pour le peupler, il faut un compte
+**ADMIN** : inscris-toi depuis l'interface avec un email listé dans
+`ECOSWITCH_BOOTSTRAP_ADMIN_EMAILS`, puis :
+
 ```bash
-make down
+ECOSWITCH_BOOTSTRAP_ADMIN_EMAILS=moi@exemple.fr make up
+make seed-local ECOSWITCH_ADMIN_EMAIL=moi@exemple.fr ECOSWITCH_ADMIN_PASSWORD=...
 ```
 
----
+Depuis **Conductor**, tout est automatisé — voir [.conductor/README.md](./.conductor/README.md).
 
-## 🛠️ Commandes Utiles (Raccourcis Makefile)
+## Documentation
+
+- 📘 [Fonctionnelle](./docs/FUNCTIONAL.md) — règles métier, formules, aides de l'État
+- 📗 [Technique](./docs/TECHNICAL.md) — architecture, sécurité, stockage, tests
+- 📙 [Développement](./docs/DEVELOPMENT.md) — installation, commandes, tests
+- 📕 [Migration](./docs/MIGRATION.md) — bascule depuis l'ancienne API Java
+
+## Commandes
 
 | Commande | Action |
-| :--- | :--- |
-| `make up` | Démarre et reconstruit l'ensemble des conteneurs Docker (API + IHM + Proxy) |
-| `make down` | Arrête et nettoie tous les conteneurs et réseaux Docker associés |
-| `make dev-api` | Lance le serveur backend en local sur le port `8080` (sans Docker) |
-| `make dev-ihm` | Installe les dépendances et lance le front en local sur le port `5173` |
-| `make test-api` | Exécute l'ensemble des tests automatisés JUnit du backend |
-| `make seed-local` | Peuple le catalogue relationnel sur l'API locale (`http://localhost:8080`) |
-| `make seed-local-reset` | Nettoie la base locale et réinjecte l'intégralité du catalogue |
-| `make seed-prod` | Peuple/met à jour le catalogue sur l'API de production (`https://ecoswitch-api.up.railway.app`) |
-| `make seed-prod-reset` | Nettoie la base de production et réinjecte proprement tous les logos et photos |
-| `make test-scripts` | Exécute la suite de tests unitaires du script de seed |
-| `make build` | Reconstruit uniquement les images Docker |
-| `make logs` | Affiche en continu les logs des conteneurs Docker |
-| `make ps` | Liste l'état des conteneurs en cours d'exécution |
+|---|---|
+| `make up` / `make down` | Pile complète en conteneurs (base, MinIO, API, IHM) |
+| `make dev-api` / `make dev-ihm` | API ou IHM en local, avec rechargement à chaud |
+| `make test` | Tests de l'API (Vitest) et du seeder (Python) |
+| `make migrate` | Applique les migrations Prisma |
+| `make seed-local` | Peuple le catalogue (compte ADMIN requis) |
+| `make prod-up` | Production, à partir de `.env` (cf. `.env.example`) |

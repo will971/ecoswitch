@@ -1,55 +1,35 @@
-# EcoSwitch — Lancement Docker & Déploiement
+# Déploiement Docker
 
-## 1. Prérequis
-- Docker Engine + Docker Compose (ou Docker Desktop)
-
----
-
-## 2. Environnement de Développement Local
-Utilise une base H2 en mémoire et recharge automatiquement les données :
+## Développement
 
 ```bash
-# Démarrage
-make up
-# ou : docker compose up --build
-
-# Arrêt
-make down
-# ou : docker compose down
+make up            # docker compose up --build
 ```
 
-**Accès :**
-- IHM Web : [http://localhost:3000](http://localhost:3000)
-- API Directe : [http://localhost:8080](http://localhost:8080)
-- Swagger UI : [http://localhost:8080/swagger-ui/index.html](http://localhost:8080/swagger-ui/index.html)
-- Console H2 : [http://localhost:8080/h2-console](http://localhost:8080/h2-console)
+Démarre PostgreSQL, MinIO (stockage d'images compatible S3, bucket
+`ecoswitch-media` créé et rendu public automatiquement), l'API et l'IHM.
 
----
+## Production
 
-## 3. Environnement de Production (PostgreSQL + Optimisations)
-Utilise PostgreSQL persistant, les flags mémoire JVM légers, la compression Gzip et le cache Nginx :
+```bash
+cp .env.example .env     # renseigner les secrets
+make prod-up             # docker compose -f docker-compose.prod.yml up -d --build
+```
 
-1. **Préparation des variables d'environnement :**
-   ```bash
-   cp .env.example .env
-   # Éditez .env pour définir vos mots de passe et clés
-   ```
+`docker-compose.prod.yml` démarre PostgreSQL, l'API et l'IHM. Les images sont
+stockées dans un **bucket OVH Object Storage** (compatible S3), qui doit être en
+lecture publique : le navigateur charge les images directement.
 
-2. **Démarrage en arrière-plan :**
-   ```bash
-   make prod-up
-   # ou : docker compose -f docker-compose.prod.yml up -d --build
-   ```
+Variables **obligatoires** (le conteneur refuse de démarrer sans) :
+`POSTGRES_*`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `S3_ENDPOINT`,
+`S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_PUBLIC_BASE_URL`,
+`CORS_ALLOWED_ORIGINS`.
 
-3. **Suivi des logs :**
-   ```bash
-   make prod-logs
-   # ou : docker compose -f docker-compose.prod.yml logs -f
-   ```
+L'API applique ses migrations au démarrage (`prisma migrate deploy`). Elles sont
+additives : une base existante n'est jamais vidée.
 
-4. **Arrêt :**
-   ```bash
-   make prod-down
-   # ou : docker compose -f docker-compose.prod.yml down
-   ```
+Empreinte mémoire : 256 Mo pour l'API (contre 512 Mo et un réglage fin de la JVM
+pour l'ancienne API Java), 256 Mo pour PostgreSQL, 128 Mo pour Nginx.
 
+Pour basculer une base de production issue de l'API Java, suivre
+[docs/MIGRATION.md](./docs/MIGRATION.md).
