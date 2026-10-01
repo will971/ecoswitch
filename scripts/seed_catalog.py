@@ -18,6 +18,7 @@ import urllib.error
 import threading
 import time
 import argparse
+import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # ── Configuration ─────────────────────────────────────────────────────────────
@@ -38,6 +39,10 @@ UPLOAD_CACHE_LOCK = threading.Lock()
 MAX_WORKERS_UPLOAD = 6   # uploads en parallele
 MAX_WORKERS_BRAND  = 4   # marques en parallele
 MAX_WORKERS_MODEL  = 3   # modeles en parallele par marque
+
+# Jeton bearer d'un compte ADMIN : les ecritures du catalogue et les envois
+# d'images sont proteges depuis la migration NestJS.
+AUTH_TOKEN = None
 
 WIKI_IMAGE_CACHE = {}
 WIKI_IMAGE_LOCK  = threading.Lock()
@@ -63,8 +68,33 @@ def configure_api_endpoints(base_url):
 
 # ── HTTP Helpers ───────────────────────────────────────────────────────────────
 
+def _auth_headers(headers=None):
+    h = dict(headers or {})
+    if AUTH_TOKEN:
+        h["Authorization"] = f"Bearer {AUTH_TOKEN}"
+    return h
+
+
+def login(base_url, email, password):
+    """Recupere un jeton via /api/v1/auth/login. Le compte doit etre ADMIN."""
+    body = json.dumps({"email": email, "password": password}).encode("utf-8")
+    req = urllib.request.Request(
+        f"{base_url.rstrip('/')}/api/v1/auth/login", data=body, method="POST",
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        raise SystemExit(f"[X] Connexion refusee ({e.code}) : {e.read().decode()}")
+    if data.get("role") != "ADMIN":
+        raise SystemExit(f"[X] Le compte {email} n'est pas ADMIN (role={data.get('role')}). "
+                         "Ajoute-le a ECOSWITCH_BOOTSTRAP_ADMIN_EMAILS cote API.")
+    return data["token"]
+
+
 def _http(url, method="GET", data=None, headers=None, timeout=30):
-    req = urllib.request.Request(url, data=data, headers=headers or {}, method=method)
+    req = urllib.request.Request(url, data=data, headers=_auth_headers(headers), method=method)
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
@@ -103,7 +133,7 @@ def api_put(endpoint, data=None, params=None):
 
 def api_delete(endpoint):
     url = f"{API_BASE}{endpoint}"
-    req = urllib.request.Request(url, method="DELETE")
+    req = urllib.request.Request(url, method="DELETE", headers=_auth_headers())
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             return resp.status
@@ -131,7 +161,7 @@ def upload_image_bytes(image_data: bytes, filename: str, content_type: str = "im
     req = urllib.request.Request(
         f"{API_UPLOAD_URL}?folder={folder}",
         data=bytes(body),
-        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+        headers=_auth_headers({"Content-Type": f"multipart/form-data; boundary={boundary}"}),
         method="POST",
     )
     try:
@@ -1249,9 +1279,24 @@ def main():
     parser.add_argument("--url", "-u", help="URL directe de l'API (ecrase env)")
     parser.add_argument("--reset", "--clean", action="store_true",
                         help="Supprime tout le catalogue avant le seed")
+    parser.add_argument("--token", default=os.environ.get("ECOSWITCH_ADMIN_TOKEN"),
+                        help="Jeton bearer d'un compte ADMIN (ou ECOSWITCH_ADMIN_TOKEN)")
+    parser.add_argument("--email", default=os.environ.get("ECOSWITCH_ADMIN_EMAIL"),
+                        help="Email d'un compte ADMIN (ou ECOSWITCH_ADMIN_EMAIL)")
+    parser.add_argument("--password", default=os.environ.get("ECOSWITCH_ADMIN_PASSWORD"),
+                        help="Mot de passe ADMIN (ou ECOSWITCH_ADMIN_PASSWORD)")
     args = parser.parse_args()
 
     target_url = args.url if args.url else resolve_target_url(args.env)
+
+    global AUTH_TOKEN
+    if args.token:
+        AUTH_TOKEN = args.token
+    elif args.email and args.password:
+        AUTH_TOKEN = login(target_url, args.email, args.password)
+    else:
+        raise SystemExit("[X] Authentification requise : --email/--password ou --token "
+                         "(variables ECOSWITCH_ADMIN_EMAIL / ECOSWITCH_ADMIN_PASSWORD / ECOSWITCH_ADMIN_TOKEN).")
     env_name   = args.env.upper() if args.env.lower() in ENV_CONFIGS else "CUSTOM"
 
     print("=" * 60)

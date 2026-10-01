@@ -11,7 +11,7 @@ from seed_catalog import (
     resolve_target_url,
     configure_api_endpoints,
     generate_model_svg,
-    BRAND_LOGOS_SVG,
+    DIRECT_BRAND_LOGOS,
     CATALOG_DATA,
     API_BASE,
     API_UPLOAD_URL
@@ -50,25 +50,21 @@ class TestSeedCatalog(unittest.TestCase):
         self.assertEqual(seed_catalog.API_BASE, "http://localhost:8080/api/v1/catalog")
         self.assertEqual(seed_catalog.API_UPLOAD_URL, "http://localhost:8080/api/v1/uploads/image")
 
-    def test_brand_logos_svg_validity(self):
-        """Vérifie que tous les logos de marques sont des SVG XML valides."""
-        self.assertGreaterEqual(len(BRAND_LOGOS_SVG), 20)
-        for brand_name, svg_code in BRAND_LOGOS_SVG.items():
-            try:
-                root = ET.fromstring(svg_code)
-                self.assertEqual(root.tag, "{http://www.w3.org/2000/svg}svg")
-            except Exception as e:
-                self.fail(f"Invalid SVG XML for brand '{brand_name}': {e}")
+    def test_brand_logos_are_https_urls(self):
+        """Depuis la v3, les logos sont des URL directes (et non plus des SVG embarques)."""
+        self.assertGreaterEqual(len(DIRECT_BRAND_LOGOS), 10)
+        for brand_name, url in DIRECT_BRAND_LOGOS.items():
+            self.assertTrue(url.startswith("https://"), f"URL de logo invalide pour {brand_name}: {url}")
 
     def test_model_svg_generation(self):
         """Vérifie que la génération des silhouettes de modèles produit du SVG valide."""
-        svg_ev = generate_model_svg("Tesla", "Model Y", "SUV", is_ev=True)
+        svg_ev = generate_model_svg("Tesla", "Model Y", "SUV", fuel_type="ELECTRIC")
         self.assertIn("Model Y", svg_ev)
-        self.assertIn("ÉLEC", svg_ev)
+        self.assertIn("ELECTRIQUE", svg_ev)
         root_ev = ET.fromstring(svg_ev)
         self.assertEqual(root_ev.tag, "{http://www.w3.org/2000/svg}svg")
 
-        svg_hybrid = generate_model_svg("Toyota", "Yaris Cross", "SUV", is_ev=False)
+        svg_hybrid = generate_model_svg("Toyota", "Yaris Cross", "SUV", fuel_type="HYBRID")
         self.assertIn("Yaris Cross", svg_hybrid)
         self.assertIn("HYBRIDE", svg_hybrid)
         root_hybrid = ET.fromstring(svg_hybrid)
@@ -124,6 +120,18 @@ class TestSeedCatalog(unittest.TestCase):
 
         args_default = parser.parse_args(["prod"])
         self.assertFalse(args_default.reset)
+
+    def test_auth_header_injected_when_token_set(self):
+        """Les ecritures du catalogue exigent un jeton ADMIN depuis la migration NestJS."""
+        import seed_catalog
+        seed_catalog.AUTH_TOKEN = None
+        self.assertNotIn("Authorization", seed_catalog._auth_headers({"Accept": "x"}))
+        seed_catalog.AUTH_TOKEN = "jeton-admin"
+        h = seed_catalog._auth_headers({"Accept": "x"})
+        self.assertEqual(h["Authorization"], "Bearer jeton-admin")
+        self.assertEqual(h["Accept"], "x")
+        seed_catalog.AUTH_TOKEN = None
+
 
 if __name__ == "__main__":
     unittest.main()
