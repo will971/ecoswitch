@@ -1,6 +1,5 @@
 .DS_Store
 .vscode/
-springboot-app/.gradle/
 
 # Secrets / env
 **/.env

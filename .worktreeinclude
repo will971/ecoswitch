@@ -1,0 +1,5 @@
+# Fichiers gitignores copies dans chaque nouveau workspace (secrets locaux,
+# cles Gemini/Google...). La configuration de base, de stockage et
+# d'authentification de dev est fournie par .conductor/scripts/lib.sh.
+.env
+ecoswitch-api/.env

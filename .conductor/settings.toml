@@ -1,0 +1,50 @@
+"$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
+
+[scripts]
+setup = ".conductor/scripts/setup.sh"
+archive = ".conductor/scripts/archive.sh"
+
+# Ports isoles par workspace (derives de $CONDUCTOR_PORT) : plusieurs workspaces
+# tournent en parallele. La base et le stockage d'images sont volontairement
+# partages — voir .conductor/README.md pour la contrepartie sur les migrations.
+run_mode = "concurrent"
+
+[scripts.run.dev]
+command = ".conductor/scripts/dev.sh all"
+default = true
+available_in = [ "local" ]
+icon = "play"
+
+[scripts.run."API seule"]
+command = ".conductor/scripts/dev.sh api"
+available_in = [ "local" ]
+icon = "server"
+
+[scripts.run."IHM seule"]
+command = ".conductor/scripts/dev.sh ihm"
+available_in = [ "local" ]
+icon = "monitor"
+
+[scripts.run.tests]
+command = ".conductor/scripts/test.sh"
+icon = "test-tube"
+
+[scripts.run."tests e2e"]
+command = ".conductor/scripts/test.sh e2e"
+available_in = [ "local" ]
+icon = "flask-conical"
+
+[scripts.run."base : etat"]
+command = ".conductor/scripts/db.sh status"
+available_in = [ "local" ]
+icon = "database"
+
+[scripts.run."base : peupler"]
+command = ".conductor/scripts/db.sh seed"
+available_in = [ "local" ]
+icon = "sprout"
+
+[scripts.run."base : Prisma Studio"]
+command = ".conductor/scripts/db.sh studio"
+available_in = [ "local" ]
+icon = "table-2"

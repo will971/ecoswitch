@@ -1,20 +1,92 @@
+# Pile complete de developpement : base, stockage d'images, API, IHM.
+#   make up   ->  IHM http://localhost:3000 | API http://localhost:8080
+#                 MinIO http://localhost:9001 (console, minioadmin / minioadmin)
+#
+# Valeurs de developpement uniquement. La production utilise
+# docker-compose.prod.yml et un fichier .env.
+
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ecoswitch
+      POSTGRES_USER: ecoswitch
+      POSTGRES_PASSWORD: ecoswitch
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ecoswitch -d ecoswitch"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # Stockage objet compatible S3, equivalent local du bucket OVH.
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # Cree le bucket et le rend lisible publiquement (comme le bucket OVH).
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "mc alias set local http://minio:9000 minioadmin minioadmin &&
+             mc mb --ignore-existing local/ecoswitch-media &&
+             mc anonymous set download local/ecoswitch-media"
+    restart: "no"
+
   api:
-    build:
-      context: ./ecoswitch-api
-      dockerfile: Dockerfile
-    container_name: ecoswitch-api
+    build: ./ecoswitch-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql://ecoswitch:ecoswitch@postgres:5432/ecoswitch?schema=public
+      BETTER_AUTH_SECRET: dev-only-secret-change-me-0123456789abcdef
+      BETTER_AUTH_URL: http://localhost:8080
+      ECOSWITCH_BOOTSTRAP_ADMIN_EMAILS: ${ECOSWITCH_BOOTSTRAP_ADMIN_EMAILS:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      S3_ENDPOINT: http://minio:9000
+      S3_REGION: us-east-1
+      S3_BUCKET: ecoswitch-media
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      # URL vue par le NAVIGATEUR, donc localhost et non le nom du service.
+      S3_PUBLIC_BASE_URL: http://localhost:9000/ecoswitch-media
+      CORS_ALLOWED_ORIGINS: "*"
     ports:
       - "8080:8080"
-    restart: unless-stopped
 
   ihm:
     build:
       context: ./ecoswitch-ihm
-      dockerfile: Dockerfile
-    container_name: ecoswitch-ihm
+      args:
+        VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     depends_on:
       - api
+    environment:
+      API_HOST: http://api:8080
     ports:
       - "3000:80"
-    restart: unless-stopped
+
+volumes:
+  pgdata:
+  miniodata:

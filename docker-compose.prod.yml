@@ -1,59 +1,69 @@
+# Production. Toutes les valeurs sensibles viennent de .env (cf. .env.example).
+# Les images sont stockees dans le bucket OVH : aucun volume de fichiers ici.
+#
+#   cp .env.example .env   # puis renseigner les secrets
+#   docker compose -f docker-compose.prod.yml up -d --build
+
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: ecoswitch-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-ecoswitch}
-      POSTGRES_USER: ${POSTGRES_USER:-ecoswitch}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secret_change_me}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB manquant}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER manquant}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ecoswitch} -d ${POSTGRES_DB:-ecoswitch}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
     deploy:
       resources:
         limits:
           memory: 256M
 
   api:
-    build:
-      context: ./ecoswitch-api
-      dockerfile: Dockerfile
-    container_name: ecoswitch-api
+    build: ./ecoswitch-api
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      SPRING_PROFILES_ACTIVE: prod
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ecoswitch}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-ecoswitch}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-secret_change_me}
-      JWT_SECRET: ${JWT_SECRET:-RWNvU3dpdGNoU2VjcmV0S2V5MjAyNlByZW1pdW1BcHBKd3RTZWNVcmVUb2tlbg==}
-      APP_ADMIN_USERNAME: ${APP_ADMIN_USERNAME:-admin}
-      APP_ADMIN_PASSWORD: ${APP_ADMIN_PASSWORD:-ChangeMeAdminPass2026!}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public&connection_limit=5
+      # Aucune valeur par defaut : l'API refuse de demarrer sans secret.
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET manquant}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:?BETTER_AUTH_URL manquant}
+      ECOSWITCH_BOOTSTRAP_ADMIN_EMAILS: ${ECOSWITCH_BOOTSTRAP_ADMIN_EMAILS:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-*}
-    ports:
-      - "8080:8080"
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-flash-lite-latest}
+      S3_ENDPOINT: ${S3_ENDPOINT:?S3_ENDPOINT manquant}
+      S3_REGION: ${S3_REGION:-gra}
+      S3_BUCKET: ${S3_BUCKET:?S3_BUCKET manquant}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?S3_ACCESS_KEY manquant}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?S3_SECRET_KEY manquant}
+      S3_PUBLIC_BASE_URL: ${S3_PUBLIC_BASE_URL:?S3_PUBLIC_BASE_URL manquant}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-5}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?CORS_ALLOWED_ORIGINS manquant}
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 256M
 
   ihm:
     build:
       context: ./ecoswitch-ihm
-      dockerfile: Dockerfile
-    container_name: ecoswitch-ihm
+      args:
+        VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     restart: unless-stopped
     depends_on:
       - api
+    environment:
+      API_HOST: http://api:8080
     ports:
       - "${PORT:-80}:80"
     deploy:
@@ -63,4 +73,3 @@ services:
 
 volumes:
   postgres_data:
-    driver: local

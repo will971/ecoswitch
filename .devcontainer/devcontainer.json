@@ -1,18 +1,14 @@
 {
-  "name": "springboot-ts",
+  "name": "ecoswitch",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
   "features": {
-    "ghcr.io/devcontainers/features/java:1": {
-      "version": "21",
-      "installMaven": false,
-      "installGradle": true,
-      "gradleVersion": "8.14.3"
-    },
     "ghcr.io/devcontainers/features/docker-in-docker:2": {
       "moby": false
     }
   },
-  "runArgs": ["--privileged"],
+  "runArgs": [
+    "--privileged"
+  ],
   "remoteUser": "node",
   "containerEnv": {
     "GH_TOKEN": "${localEnv:GH_TOKEN}"
