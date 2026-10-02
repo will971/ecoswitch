@@ -65,7 +65,7 @@ cette étape : c'est elle qui valide la reprise du schéma réel.
    Le script échoue si une simulation ou un profil de garage reste rattaché à un
    email sans compte.
 
-4. **Démarrer l'API**, puis extraire les images vers le bucket OVH :
+4. **Démarrer la stack**, puis extraire les images de la base vers MinIO (ou OVH) :
 
    ```bash
    make prod-up

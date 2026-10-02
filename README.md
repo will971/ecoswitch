@@ -8,6 +8,7 @@ Monorepo :
 
 - **`ecoswitch-api/`** — API REST **NestJS 11 + Prisma 6 + better-auth**, PostgreSQL
 - **`ecoswitch-ihm/`** — interface web **Vue 3 + Vite**, servie par Nginx
+- **MinIO** — stockage des images (compatible S3), intégré à la stack Docker
 
 > L'API a été réécrite depuis Spring Boot 4 / Java 26. La procédure de bascule
 > d'une base existante est décrite dans [docs/MIGRATION.md](./docs/MIGRATION.md).
@@ -22,7 +23,8 @@ make up
 |---|---|
 | Interface web | http://localhost:3000 |
 | API | http://localhost:8080 (`/health`) |
-| Console MinIO (images) | http://localhost:9001 — `minioadmin` / `minioadmin` |
+| Images | http://localhost:3000/media/… (servies par Nginx depuis MinIO) |
+| Console MinIO | http://localhost:9001 — `minioadmin` / `minioadmin` |
 
 Le catalogue est vide au premier lancement. Pour le peupler, il faut un compte
 **ADMIN** : inscris-toi depuis l'interface avec un email listé dans

@@ -1,5 +1,8 @@
 # Production. Toutes les valeurs sensibles viennent de .env (cf. .env.example).
-# Les images sont stockees dans le bucket OVH : aucun volume de fichiers ici.
+#
+# Images : MinIO (compatible S3) fait partie de la stack et est servi par Nginx
+# sous https://<site>/media/. Pour utiliser un bucket OVH a la place, renseigner
+# les variables S3_* dans .env : MinIO tourne alors a vide et peut etre retire.
 #
 #   cp .env.example .env   # puis renseigner les secrets
 #   docker compose -f docker-compose.prod.yml up -d --build
@@ -24,12 +27,51 @@ services:
         limits:
           memory: 256M
 
+  # Stockage d'images compatible S3. Non expose : Nginx le sert sous /media/.
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER manquant}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD manquant}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  # Cree le bucket et l'ouvre en lecture anonyme (les navigateurs chargent les
+  # images sans signature). Idempotent ; s'arrete une fois le travail fait.
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      BUCKET: ${S3_BUCKET:-ecoswitch-media}
+    entrypoint: >
+      sh -c "mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD &&
+             mc mb --ignore-existing local/$$BUCKET &&
+             mc anonymous set download local/$$BUCKET"
+    restart: "no"
+
   api:
     build: ./ecoswitch-api
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public&connection_limit=5
@@ -41,11 +83,13 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-flash-lite-latest}
-      S3_ENDPOINT: ${S3_ENDPOINT:?S3_ENDPOINT manquant}
-      S3_REGION: ${S3_REGION:-gra}
-      S3_BUCKET: ${S3_BUCKET:?S3_BUCKET manquant}
-      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?S3_ACCESS_KEY manquant}
-      S3_SECRET_KEY: ${S3_SECRET_KEY:?S3_SECRET_KEY manquant}
+      # Par defaut : le MinIO de la stack. Surcharger S3_* pour un bucket OVH.
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-ecoswitch-media}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-${MINIO_ROOT_USER}}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-${MINIO_ROOT_PASSWORD}}
+      # URL vue par le navigateur, ex. https://www.example.fr/media
       S3_PUBLIC_BASE_URL: ${S3_PUBLIC_BASE_URL:?S3_PUBLIC_BASE_URL manquant}
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-5}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?CORS_ALLOWED_ORIGINS manquant}
@@ -64,6 +108,8 @@ services:
       - api
     environment:
       API_HOST: http://api:8080
+      MEDIA_UPSTREAM: http://minio:9000
+      MEDIA_BUCKET: ${S3_BUCKET:-ecoswitch-media}
     ports:
       - "${PORT:-80}:80"
     deploy:
@@ -73,3 +119,4 @@ services:
 
 volumes:
   postgres_data:
+  minio_data:

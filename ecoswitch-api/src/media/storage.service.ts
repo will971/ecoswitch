@@ -3,11 +3,12 @@ import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { optionalEnv } from '../common/env'
 
 /**
- * Stockage objet compatible S3 : OVH Object Storage en production, MinIO en
- * developpement. La base ne conserve que des URL absolues.
+ * Stockage objet compatible S3 : MinIO, integre a la stack Docker (dev et
+ * prod), ou un bucket OVH si les variables S3_* le designent. La base ne
+ * conserve que des URL absolues.
  *
- * Le bucket doit etre lisible publiquement (politique de bucket) : le
- * navigateur charge les images directement, sans passer par l'API.
+ * Le bucket doit etre lisible anonymement : le navigateur charge les images
+ * sans passer par l'API (via Nginx sous /media/ dans la stack Docker).
  */
 @Injectable()
 export class StorageService {

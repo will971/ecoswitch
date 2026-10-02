@@ -9,7 +9,7 @@ graph TD
     Vue[Vue 3 - fichiers statiques]
     API[API NestJS - ecoswitch-api : 8080]
     PG[(PostgreSQL)]
-    S3[(Bucket OVH / MinIO)]
+    S3[(MinIO / bucket OVH)]
     OD[Open Data prix carburants]
     GM[Google Gemini]
     OS[Oscaro]
@@ -17,7 +17,7 @@ graph TD
     User -->|/| Nginx
     Nginx --> Vue
     Nginx -->|/api/*| API
-    User -->|images| S3
+    Nginx -->|/media/*| S3
     API --> PG
     API -->|upload| S3
     API --> OD
@@ -25,9 +25,9 @@ graph TD
     API -->|plaques| OS
 ```
 
-Nginx sert le build Vue et relaie `/api/*` (et les anciennes URL `/uploads/*`)
-vers l'API. Les images sont chargées **directement depuis le bucket** par le
-navigateur.
+Nginx sert le build Vue, relaie `/api/*` (et les anciennes URL `/uploads/*`)
+vers l'API, et `/media/*` vers MinIO en lecture seule : les images sont servies
+sur le domaine du site, sans exposer MinIO.
 
 ## 2. API (`ecoswitch-api/`)
 
@@ -107,7 +107,9 @@ base issue de l'API Java est reprise sans perte (cf. `docs/MIGRATION.md`).
 Les données métier (`simulation`, `user_vehicle_profile`) référencent
 l'utilisateur par **email**, sans clé étrangère, comme avant.
 
-Images : bucket S3 (OVH en production, MinIO en développement). La table
+Images : stockage compatible S3 — MinIO, intégré à la stack Docker en
+développement comme en production, ou un bucket OVH si les variables `S3_*` le
+désignent. La table
 `media_files` héritée est conservée en lecture seule pour les anciennes URL
 `/uploads/…`, notamment celles enregistrées dans des simulations sauvegardées.
 
