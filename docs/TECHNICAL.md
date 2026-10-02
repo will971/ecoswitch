@@ -9,7 +9,7 @@ graph TD
     Vue[Vue 3 - fichiers statiques]
     API[API NestJS - ecoswitch-api : 8080]
     PG[(PostgreSQL)]
-    S3[(MinIO / bucket OVH)]
+    S3[(RustFS / bucket OVH)]
     OD[Open Data prix carburants]
     GM[Google Gemini]
     OS[Oscaro]
@@ -26,8 +26,8 @@ graph TD
 ```
 
 Nginx sert le build Vue, relaie `/api/*` (et les anciennes URL `/uploads/*`)
-vers l'API, et `/media/*` vers MinIO en lecture seule : les images sont servies
-sur le domaine du site, sans exposer MinIO.
+vers l'API, et `/media/*` vers RustFS en lecture seule : les images sont servies
+sur le domaine du site, sans exposer le stockage.
 
 ## 2. API (`ecoswitch-api/`)
 
@@ -91,8 +91,10 @@ jeton — l'ancienne API se contentait de journaliser une audience incorrecte.
 `ECOSWITCH_BOOTSTRAP_ADMIN_EMAILS` sont promus au démarrage ; plus aucune liste
 d'emails n'est codée dans le code, côté API comme côté front.
 
-**Limitation de débit.** 10 requêtes/min/IP sur l'authentification, 20 sur la
-recherche par plaque (qui déclenche un appel sortant), 300 ailleurs.
+**Limitation de débit.** 10 requêtes/min/IP sur l'authentification
+(`AUTH_RATE_LIMIT_PER_MINUTE`, relevé en développement), 20 sur la recherche par
+plaque (qui déclenche un appel sortant), 300 ailleurs. Au-delà : 429 avec un
+message en français.
 
 **Images.** Type MIME déduit de l'extension (jamais du client), liste blanche
 d'extensions, 5 Mo maximum. Les images servies par l'API (anciennes URL)
@@ -107,7 +109,8 @@ base issue de l'API Java est reprise sans perte (cf. `docs/MIGRATION.md`).
 Les données métier (`simulation`, `user_vehicle_profile`) référencent
 l'utilisateur par **email**, sans clé étrangère, comme avant.
 
-Images : stockage compatible S3 — MinIO, intégré à la stack Docker en
+Images : stockage compatible S3 — RustFS (MinIO n'étant plus distribué en
+image Docker), intégré à la stack Docker en
 développement comme en production, ou un bucket OVH si les variables `S3_*` le
 désignent. La table
 `media_files` héritée est conservée en lecture seule pour les anciennes URL

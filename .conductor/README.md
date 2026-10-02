@@ -20,7 +20,7 @@ worktrees — archiver un workspace ne détruit aucune donnée :
 | Service | Conteneur | Port | Volume |
 |---|---|---|---|
 | PostgreSQL | `ecoswitch-dev-db` | 5433 | `ecoswitch-dev-pgdata` |
-| Images (MinIO, équivalent local du bucket OVH) | `ecoswitch-dev-minio` | 9100 (console 9101) | `ecoswitch-dev-miniodata` |
+| Images (RustFS, compatible S3) | `ecoswitch-dev-s3` | 9100 | `ecoswitch-dev-s3data` |
 
 ## Au quotidien
 
@@ -69,8 +69,9 @@ puis **base : peupler**.
 ## Le seeder n'est pas fiable
 
 `scripts/seed_catalog.py` télécharge les photos des modèles depuis Wikimedia et
-**abandonne tout modèle dont il n'obtient pas d'image**. Son jeu de données
-compte 20 marques et 61 modèles, mais il n'en injecte souvent qu'une fraction.
+**abandonne tout modèle dont il n'obtient pas d'image** — or Wikimedia le bloque
+(`HTTP 429 … robot policy`). Son jeu de données compte 20 marques et 61 modèles ;
+il n'en injecte qu'une fraction (6 lors du dernier essai).
 D'où l'intérêt d'une base partagée et persistante : une fois peuplée, on n'y
 revient plus. Le correctif de fond serait de versionner les images.
 

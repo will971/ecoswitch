@@ -8,7 +8,7 @@ Monorepo :
 
 - **`ecoswitch-api/`** — API REST **NestJS 11 + Prisma 6 + better-auth**, PostgreSQL
 - **`ecoswitch-ihm/`** — interface web **Vue 3 + Vite**, servie par Nginx
-- **MinIO** — stockage des images (compatible S3), intégré à la stack Docker
+- **RustFS** — stockage des images (compatible S3, remplace MinIO), intégré à la stack Docker
 
 > L'API a été réécrite depuis Spring Boot 4 / Java 26. La procédure de bascule
 > d'une base existante est décrite dans [docs/MIGRATION.md](./docs/MIGRATION.md).
@@ -23,8 +23,9 @@ make up
 |---|---|
 | Interface web | http://localhost:3000 |
 | API | http://localhost:8080 (`/health`) |
-| Images | http://localhost:3000/media/… (servies par Nginx depuis MinIO) |
-| Console MinIO | http://localhost:9001 — `minioadmin` / `minioadmin` |
+| Images | http://localhost:3000/media/… (servies par Nginx depuis RustFS) |
+
+Ports déjà pris ? `IHM_PORT=3300 API_PORT=8180 make up`.
 
 Le catalogue est vide au premier lancement. Pour le peupler, il faut un compte
 **ADMIN** : inscris-toi depuis l'interface avec un email listé dans
@@ -48,7 +49,7 @@ Depuis **Conductor**, tout est automatisé — voir [.conductor/README.md](./.co
 
 | Commande | Action |
 |---|---|
-| `make up` / `make down` | Pile complète en conteneurs (base, MinIO, API, IHM) |
+| `make up` / `make down` | Pile complète en conteneurs (base, RustFS, API, IHM) |
 | `make dev-api` / `make dev-ihm` | API ou IHM en local, avec rechargement à chaud |
 | `make test` | Tests de l'API (Vitest) et du seeder (Python) |
 | `make migrate` | Applique les migrations Prisma |

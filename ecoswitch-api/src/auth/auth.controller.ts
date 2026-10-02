@@ -9,11 +9,12 @@ import { CurrentUser, Public } from './decorators'
  * codes. Le jeton renvoye est stocke cote front sous `saas_token` et renvoye
  * en `Authorization: Bearer`.
  *
- * Limite a 10 tentatives par minute et par IP : le Java n'avait aucune
- * protection contre le bourrage d'identifiants.
+ * Limite a 10 tentatives par minute et par IP par defaut : le Java n'avait
+ * aucune protection contre le bourrage d'identifiants. AUTH_RATE_LIMIT_PER_MINUTE
+ * permet de la relever en developpement, ou les tests enchainent les connexions.
  */
 @Controller('api/v1/auth')
-@Throttle({ default: { limit: 10, ttl: 60_000 } })
+@Throttle({ default: { limit: Number(process.env.AUTH_RATE_LIMIT_PER_MINUTE ?? 10), ttl: 60_000 } })
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 

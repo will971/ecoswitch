@@ -9,7 +9,13 @@ import { SessionService } from './session.service'
 @Global()
 @Module({
   // Limite par defaut genereuse ; les routes sensibles se resserrent via @Throttle.
-  imports: [ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 300 }])],
+  imports: [
+    ThrottlerModule.forRoot({
+      throttlers: [{ name: 'default', ttl: 60_000, limit: 300 }],
+      // Affiche tel quel par le front : pas de « ThrottlerException » en anglais.
+      errorMessage: 'Trop de tentatives. Réessayez dans une minute.',
+    }),
+  ],
   controllers: [AuthController],
   providers: [
     AuthService,

@@ -26,7 +26,7 @@ case "${1:-status}" in
     fi
     log "Conteneur : ${ECOSWITCH_DB_CONTAINER} (${state}) sur le port ${ECOSWITCH_DB_PORT}"
     log "Volume    : ${ECOSWITCH_DB_VOLUME}"
-    log "Images    : ${S3_PUBLIC_BASE_URL} (console http://localhost:${ECOSWITCH_S3_CONSOLE_PORT})"
+    log "Images    : ${S3_PUBLIC_BASE_URL} (conteneur ${ECOSWITCH_S3_CONTAINER})"
     log "URL       : ${DATABASE_URL}"
     if [ "$state" = "running" ]; then
       psql_shared -c "

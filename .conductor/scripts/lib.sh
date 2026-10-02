@@ -23,16 +23,19 @@ export ECOSWITCH_DB_IMAGE="${ECOSWITCH_DB_IMAGE:-postgres:16-alpine}"
 
 export DATABASE_URL="postgresql://${ECOSWITCH_DB_USER}:${ECOSWITCH_DB_PASSWORD}@127.0.0.1:${ECOSWITCH_DB_PORT}/${ECOSWITCH_DB_NAME}?schema=public"
 
-# ── Stockage d'images PARTAGE (MinIO, equivalent local du bucket OVH) ────
-export ECOSWITCH_S3_CONTAINER="${ECOSWITCH_S3_CONTAINER:-ecoswitch-dev-minio}"
-export ECOSWITCH_S3_VOLUME="${ECOSWITCH_S3_VOLUME:-ecoswitch-dev-miniodata}"
+# ── Stockage d'images PARTAGE (RustFS, compatible S3) ───────────────────
+# MinIO n'est plus distribue en image Docker ; RustFS le remplace. Le bucket
+# et sa lecture publique sont crees par l'API au demarrage.
+export ECOSWITCH_S3_CONTAINER="${ECOSWITCH_S3_CONTAINER:-ecoswitch-dev-s3}"
+export ECOSWITCH_S3_VOLUME="${ECOSWITCH_S3_VOLUME:-ecoswitch-dev-s3data}"
+export ECOSWITCH_S3_IMAGE="${ECOSWITCH_S3_IMAGE:-rustfs/rustfs:1.0.0}"
 export ECOSWITCH_S3_PORT="${ECOSWITCH_S3_PORT:-9100}"
-export ECOSWITCH_S3_CONSOLE_PORT="${ECOSWITCH_S3_CONSOLE_PORT:-9101}"
 export S3_ENDPOINT="http://127.0.0.1:${ECOSWITCH_S3_PORT}"
 export S3_REGION="us-east-1"
 export S3_BUCKET="ecoswitch-media"
-export S3_ACCESS_KEY="minioadmin"
-export S3_SECRET_KEY="minioadmin"
+export S3_ACCESS_KEY="ecoswitch"
+export S3_SECRET_KEY="ecoswitch-dev-secret"
+export S3_AUTO_CREATE_BUCKET="true"
 export S3_PUBLIC_BASE_URL="http://127.0.0.1:${ECOSWITCH_S3_PORT}/${S3_BUCKET}"
 
 # ── Authentification de developpement ────────────────────────────────────
@@ -132,7 +135,7 @@ psql_shared() {
   docker exec -i "$ECOSWITCH_DB_CONTAINER" psql -U "$ECOSWITCH_DB_USER" -d "$ECOSWITCH_DB_NAME" "$@"
 }
 
-# Demarre le stockage d'images partage et cree le bucket public. Idempotent.
+# Demarre le stockage d'images partage. Idempotent.
 ensure_shared_storage() {
   require_docker
   local state
@@ -145,17 +148,16 @@ ensure_shared_storage() {
   case "$state" in
     running) ;;
     absent)
-      log "Creation du stockage d'images partage (MinIO) sur le port ${ECOSWITCH_S3_PORT}..."
+      log "Creation du stockage d'images partage (RustFS) sur le port ${ECOSWITCH_S3_PORT}..."
       docker volume create "$ECOSWITCH_S3_VOLUME" >/dev/null
       docker run -d \
         --name "$ECOSWITCH_S3_CONTAINER" \
         --restart unless-stopped \
-        -e MINIO_ROOT_USER="$S3_ACCESS_KEY" \
-        -e MINIO_ROOT_PASSWORD="$S3_SECRET_KEY" \
+        -e RUSTFS_ACCESS_KEY="$S3_ACCESS_KEY" \
+        -e RUSTFS_SECRET_KEY="$S3_SECRET_KEY" \
         -v "$ECOSWITCH_S3_VOLUME":/data \
         -p "${ECOSWITCH_S3_PORT}":9000 \
-        -p "${ECOSWITCH_S3_CONSOLE_PORT}":9001 \
-        minio/minio:latest server /data --console-address ":9001" >/dev/null
+        "$ECOSWITCH_S3_IMAGE" >/dev/null
       ;;
     *)
       docker start "$ECOSWITCH_S3_CONTAINER" >/dev/null
@@ -164,15 +166,13 @@ ensure_shared_storage() {
 
   local i
   for i in $(seq 1 30); do
-    if docker exec "$ECOSWITCH_S3_CONTAINER" mc alias set local http://127.0.0.1:9000 "$S3_ACCESS_KEY" "$S3_SECRET_KEY" >/dev/null 2>&1; then
-      docker exec "$ECOSWITCH_S3_CONTAINER" mc mb --ignore-existing "local/${S3_BUCKET}" >/dev/null
-      docker exec "$ECOSWITCH_S3_CONTAINER" mc anonymous set download "local/${S3_BUCKET}" >/dev/null
-      log "Stockage d'images pret (bucket ${S3_BUCKET}, console http://localhost:${ECOSWITCH_S3_CONSOLE_PORT})."
+    if curl -sf "${S3_ENDPOINT}/health" >/dev/null 2>&1; then
+      log "Stockage d'images pret (${S3_ENDPOINT}, bucket ${S3_BUCKET})."
       return 0
     fi
     sleep 1
   done
-  die "MinIO n'a pas repondu apres 30 s. Inspecte : docker logs ${ECOSWITCH_S3_CONTAINER}"
+  die "Le stockage d'images n'a pas repondu apres 30 s. Inspecte : docker logs ${ECOSWITCH_S3_CONTAINER}"
 }
 
 ensure_shared_infra() {

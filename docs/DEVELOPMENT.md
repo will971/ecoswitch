@@ -2,7 +2,7 @@
 
 ## Prérequis
 
-- **Docker Desktop** (PostgreSQL et MinIO tournent en conteneurs)
+- **Docker Desktop** (PostgreSQL et le stockage d'images RustFS tournent en conteneurs)
 - **Node 22+**
 - **Python 3** (seeder du catalogue)
 
@@ -28,7 +28,7 @@ Il faut une base et un stockage d'images. Le plus simple est de démarrer ceux d
 `make up`, puis d'arrêter les conteneurs `api` et `ihm` :
 
 ```bash
-docker compose up -d postgres minio minio-init
+docker compose up -d postgres s3
 ```
 
 Puis, dans `ecoswitch-api/`, créer un `.env` :
@@ -40,13 +40,15 @@ ECOSWITCH_BOOTSTRAP_ADMIN_EMAILS="moi@exemple.fr"
 S3_ENDPOINT="http://127.0.0.1:9000"
 S3_REGION="us-east-1"
 S3_BUCKET="ecoswitch-media"
-S3_ACCESS_KEY="minioadmin"
-S3_SECRET_KEY="minioadmin"
+S3_ACCESS_KEY="ecoswitch"
+S3_SECRET_KEY="ecoswitch-dev-secret"
+S3_AUTO_CREATE_BUCKET="true"
 S3_PUBLIC_BASE_URL="http://127.0.0.1:9000/ecoswitch-media"
 ```
 
-(`docker-compose.yml` n'expose pas Postgres sur l'hôte : ajouter
-`ports: ["5432:5432"]` au service `postgres` pour ce mode.)
+(`docker-compose.yml` n'expose ni Postgres ni RustFS sur l'hôte : ajouter
+`ports: ["5432:5432"]` au service `postgres` et `ports: ["9000:9000"]` au
+service `s3` pour ce mode.)
 
 ```bash
 make migrate     # applique le schéma
@@ -68,8 +70,11 @@ python3 scripts/seed_catalog.py --url http://localhost:8080 \
 ```
 
 ⚠️ Le seeder télécharge les photos des modèles depuis Wikimedia et **abandonne
-tout modèle dont il n'obtient pas d'image**. Selon la disponibilité du réseau, il
-n'injecte qu'une partie des 20 marques et 61 modèles de son jeu de données.
+tout modèle dont il n'obtient pas d'image**. Or Wikimedia le bloque : les
+téléchargements répondent `HTTP 429 — Your request does not comply with our
+robot policy`. Il n'injecte donc qu'une fraction des 61 modèles de son jeu de
+données (6 lors du dernier essai). Correctif : versionner les images dans le
+dépôt, ou au minimum envoyer un User-Agent conforme à la politique de Wikimedia.
 
 ## Tests
 

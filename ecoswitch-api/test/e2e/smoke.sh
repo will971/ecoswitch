@@ -106,6 +106,24 @@ check "hierarchie"                                 200 GET  /api/v1/catalog/hier
 check "liste marques (seeder)"                     200 GET  /api/v1/catalog/brands
 echo "       modelCount=$(field "[b['modelCount'] for b in d if b['name']=='Renault$RUN'][0]")"
 
+echo "── Images"
+printf '\x89PNG\r\n\x1a\n' > /tmp/smoke.png
+code="$(curl -s -o /tmp/smoke.body -w '%{http_code}' -X POST "$API/api/v1/uploads/image" \
+  -H "Authorization: Bearer $ADMIN" -F "file=@/tmp/smoke.png;filename=logo.png" -F folder=brands)"
+if [ "$code" = "200" ]; then pass=$((pass+1)); printf '  ok   %-58s %s\n' "envoi d'image (ADMIN)" "$code"
+else fail=$((fail+1)); printf '  KO   %-58s %s %s\n' "envoi d'image (ADMIN)" "$code" "$(head -c 160 /tmp/smoke.body)"; fi
+IMG="$(field "d['url']")"
+echo "       url=$IMG"
+if [ -n "$IMG" ] && [ "$(curl -s -o /dev/null -w '%{http_code}' "$IMG")" = "200" ] && \
+   curl -sI "$IMG" | grep -qi '^content-type: image/png'; then
+  pass=$((pass+1)); printf '  ok   %-58s\n' "image lisible anonymement, type image/png"
+else fail=$((fail+1)); printf '  KO   %-58s\n' "image lisible anonymement, type image/png"; fi
+printf '<html></html>' > /tmp/smoke.html
+code="$(curl -s -o /tmp/smoke.body -w '%{http_code}' -X POST "$API/api/v1/uploads/image" \
+  -H "Authorization: Bearer $ADMIN" -F "file=@/tmp/smoke.html;filename=x.html")"
+[ "$code" = "400" ] && { pass=$((pass+1)); printf '  ok   %-58s %s\n' "fichier .html refuse -> 400" "$code"; } \
+  || { fail=$((fail+1)); printf '  KO   %-58s %s\n' "fichier .html refuse -> 400" "$code"; }
+
 echo "── Comparaisons"
 check "simulateur direct"                          200 POST /api/v1/comparisons/profitability/direct '{"currentVehicle":{"name":"Clio","fuelType":"PETROL","consumption":6.5,"annualMileage":15000,"maintenanceCost":500,"resaleValue":8000},"targetVehicle":{"name":"Zoe","fuelType":"ELECTRIC","consumption":17,"annualMileage":15000,"maintenanceCost":250,"purchasePrice":30000},"fuelPricesByType":{"PETROL":1.9,"ELECTRIC":0.25},"homeChargingRatio":0.8,"scrapVehicle":true}'
 echo "       breakEven=$(field "d['breakEvenYear']") subsides=$(field "d['totalSubsidies']") recos=$(field "len(d['recommendations'])")"

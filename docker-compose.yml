@@ -1,6 +1,9 @@
 # Pile complete de developpement : base, stockage d'images, API, IHM.
 #   make up   ->  IHM http://localhost:3000 | API http://localhost:8080
-#                 MinIO http://localhost:9001 (console, minioadmin / minioadmin)
+#                 Images http://localhost:3000/media/...
+#
+# Ports de l'hote modifiables si 3000 ou 8080 sont deja pris :
+#   IHM_PORT=3300 API_PORT=8180 make up
 #
 # Valeurs de developpement uniquement. La production utilise
 # docker-compose.prod.yml et un fichier .env.
@@ -20,61 +23,48 @@ services:
       timeout: 3s
       retries: 20
 
-  # Stockage objet compatible S3, equivalent local du bucket OVH.
-  minio:
-    image: minio/minio:latest
-    command: server /data --console-address ":9001"
+  # Stockage d'images compatible S3 (RustFS). MinIO n'est plus distribue en
+  # image Docker. Le bucket est cree par l'API au demarrage
+  # (S3_AUTO_CREATE_BUCKET). Non expose : Nginx sert les images sous /media/.
+  s3:
+    image: rustfs/rustfs:1.0.0
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+      RUSTFS_ACCESS_KEY: ecoswitch
+      RUSTFS_SECRET_KEY: ecoswitch-dev-secret
     volumes:
-      - miniodata:/data
+      - s3data:/data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD", "curl", "-fs", "http://127.0.0.1:9000/health"]
       interval: 3s
       timeout: 3s
       retries: 20
-
-  # Cree le bucket et le rend lisible publiquement (comme le bucket OVH).
-  minio-init:
-    image: minio/mc:latest
-    depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint: >
-      sh -c "mc alias set local http://minio:9000 minioadmin minioadmin &&
-             mc mb --ignore-existing local/ecoswitch-media &&
-             mc anonymous set download local/ecoswitch-media"
-    restart: "no"
 
   api:
     build: ./ecoswitch-api
     depends_on:
       postgres:
         condition: service_healthy
-      minio-init:
-        condition: service_completed_successfully
+      s3:
+        condition: service_healthy
     environment:
       DATABASE_URL: postgresql://ecoswitch:ecoswitch@postgres:5432/ecoswitch?schema=public
       BETTER_AUTH_SECRET: dev-only-secret-change-me-0123456789abcdef
-      BETTER_AUTH_URL: http://localhost:8080
+      BETTER_AUTH_URL: http://localhost:${API_PORT:-8080}
       ECOSWITCH_BOOTSTRAP_ADMIN_EMAILS: ${ECOSWITCH_BOOTSTRAP_ADMIN_EMAILS:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      S3_ENDPOINT: http://minio:9000
+      S3_ENDPOINT: http://s3:9000
       S3_REGION: us-east-1
       S3_BUCKET: ecoswitch-media
-      S3_ACCESS_KEY: minioadmin
-      S3_SECRET_KEY: minioadmin
-      # URL vue par le NAVIGATEUR : Nginx de l'IHM relaie /media/ vers MinIO,
+      S3_ACCESS_KEY: ecoswitch
+      S3_SECRET_KEY: ecoswitch-dev-secret
+      S3_AUTO_CREATE_BUCKET: "true"
+      # URL vue par le NAVIGATEUR : Nginx de l'IHM relaie /media/ vers RustFS,
       # exactement comme en production.
-      S3_PUBLIC_BASE_URL: http://localhost:3000/media
+      S3_PUBLIC_BASE_URL: http://localhost:${IHM_PORT:-3000}/media
       CORS_ALLOWED_ORIGINS: "*"
     ports:
-      - "8080:8080"
+      - "${API_PORT:-8080}:8080"
 
   ihm:
     build:
@@ -85,11 +75,11 @@ services:
       - api
     environment:
       API_HOST: http://api:8080
-      MEDIA_UPSTREAM: http://minio:9000
+      MEDIA_UPSTREAM: http://s3:9000
       MEDIA_BUCKET: ecoswitch-media
     ports:
-      - "3000:80"
+      - "${IHM_PORT:-3000}:80"
 
 volumes:
   pgdata:
-  miniodata:
+  s3data:
